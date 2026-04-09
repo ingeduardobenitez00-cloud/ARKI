@@ -1,0 +1,18 @@
+
+{
+  "type": "FeatureCollection",
+  "name": "Seccionales Asuncion",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "id": "1",
+        "numero": 1,
+        "distrito": 2,
+        "nombre_distrito": "Catedral",
+        "zona": 2
+      },
+      "geometry": { "type": "Polygon", "coordinates": [[[0,0], [0,1], [1,1], [1,0], [0,0]]] }
+    }
+  ]
+}

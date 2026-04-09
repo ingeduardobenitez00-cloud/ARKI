@@ -1,0 +1,102 @@
+
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user in the system.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the user (Auth UID).",
+          "format": "uuid"
+        },
+        "name": {
+          "type": "string",
+          "description": "The user's full name."
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's system username."
+        },
+        "email": {
+          "type": "string",
+          "description": "The user's email address.",
+          "format": "email"
+        },
+        "role": {
+          "type": "string",
+          "description": "Assigned role (Admin, Coordinador, Dirigente, etc.)"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "username",
+        "email",
+        "role"
+      ]
+    },
+    "SeccionalData": {
+      "title": "SeccionalData",
+      "type": "object",
+      "description": "Información técnica y política por seccional.",
+      "properties": {
+        "numero": { "type": "integer" },
+        "zona_id": { "type": "integer", "enum": [1, 2, 3, 4, 5] },
+        "distrito_oficial": { "type": "integer", "enum": [1, 2, 3, 4, 5, 6] },
+        "total_votos_seguros": { "type": "integer" },
+        "meta_objetivo": { "type": "integer" },
+        "lat": { "type": "number" },
+        "lng": { "type": "number" }
+      },
+      "required": ["numero", "zona_id", "distrito_oficial", "total_votos_seguros", "meta_objetivo"]
+    },
+    "ZonaData": {
+      "title": "ZonaData",
+      "type": "object",
+      "description": "Límites geográficos por zona estratégica.",
+      "properties": {
+        "id": { "type": "integer" },
+        "nombre": { "type": "string" },
+        "boundary": { 
+          "type": "array",
+          "description": "Lista de coordenadas [lat, lng] que definen el polígono de la zona.",
+          "items": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "number" }
+          }
+        }
+      },
+      "required": ["id", "nombre"]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/seccionales_data/{id}",
+        "definition": {
+          "entityName": "SeccionalData",
+          "schema": { "$ref": "#/backend/entities/SeccionalData" },
+          "description": "Colección técnica para el mapa político."
+        }
+      },
+      {
+        "path": "/zonas_data/{id}",
+        "definition": {
+          "entityName": "ZonaData",
+          "schema": { "$ref": "#/backend/entities/ZonaData" },
+          "description": "Límites geográficos para las 5 zonas estratégicas."
+        }
+      }
+    ]
+  }
+}

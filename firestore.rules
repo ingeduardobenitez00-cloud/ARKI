@@ -1,0 +1,28 @@
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. RECURSOS PÚBLICOS
+    match /system_settings/{document=**} { allow read: if true; }
+    match /flyer_library/{document=**} { allow read: if true; }
+    match /seccionales/{document=**} { allow read: if true; }
+
+    // 2. PADRÓN (sheet1)
+    match /sheet1/{docId} {
+      allow read: if true;
+    }
+
+    // 3. MAPA TÉCNICO POLÍTICO
+    match /seccionales_data/{id} {
+      allow read: if request.auth != null;
+      // Solo permite escritura a usuarios con rol Dirigente según el token
+      allow write: if request.auth != null && request.auth.token.role == 'Dirigente';
+    }
+
+    // 4. ACCESO GENERAL
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

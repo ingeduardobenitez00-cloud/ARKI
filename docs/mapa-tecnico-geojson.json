@@ -1,0 +1,53 @@
+
+{
+  "type": "FeatureCollection",
+  "description": "Capa geográfica oficial de seccionales para pintar el Mapa Técnico Político.",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "numero": 17,
+        "nombre": "Seccional 17",
+        "zona_id": 1,
+        "distrito": "La Encarnación",
+        "color": "#3498db"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-57.64120, -25.28540],
+            [-57.64350, -25.28680],
+            [-57.64580, -25.28850],
+            [-57.64200, -25.29100],
+            [-57.63950, -25.28900],
+            [-57.64120, -25.28540]
+          ]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "numero": 1,
+        "nombre": "Seccional 1",
+        "zona_id": 2,
+        "distrito": "La Catedral",
+        "color": "#e74c3c"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [-57.63100, -25.28050],
+            [-57.63350, -25.28180],
+            [-57.63500, -25.28350],
+            [-57.63200, -25.28500],
+            [-57.63100, -25.28050]
+          ]
+        ]
+      }
+    }
+  ],
+  "usage_note": "Para que el mapa se pinte automáticamente, sube el archivo completo con este formato a la carpeta 'public' con el nombre 'mapa-asuncion.json'."
+}
