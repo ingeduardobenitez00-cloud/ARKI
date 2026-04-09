@@ -292,7 +292,7 @@ export default function RootLayout({
         
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="shortcut icon" href="/favicon.ico" />
-        <link rel="apple-touch-icon" type="image/png" href="/logo.png?v=3" />
+        <link rel="apple-touch-icon" type="image/png" href="/icon-192x192.png" />
         
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
