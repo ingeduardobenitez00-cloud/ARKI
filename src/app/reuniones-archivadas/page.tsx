@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, writeBatch, doc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +50,7 @@ export default function ArchivedMeetingsPage() {
         return query(collection(db, 'archived_meetings'), orderBy('archivedAt', 'desc'));
     }, [db]);
 
-    const { data: meetings, isLoading } = useCollection<ArchivedMeeting>(archivedMeetingsQuery);
+    const { data: meetings, isLoading } = useCollectionOnce<ArchivedMeeting>(archivedMeetingsQuery);
 
     const handleSyncPhones = async (meeting: ArchivedMeeting) => {
         if (!user || !db) return;

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, limit, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
 
 interface AuditLog {
     id: string;
@@ -29,6 +30,7 @@ interface AuditLog {
 export default function AuditoriaPage() {
     const db = useFirestore();
     const [searchTerm, setSearchTerm] = useState('');
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const [limitCount, setLimitCount] = useState(150);
     const [totalEvents, setTotalEvents] = useState<number | null>(null);
@@ -36,9 +38,13 @@ export default function AuditoriaPage() {
     const auditQuery = useMemoFirebase(() => {
         if (!db) return null;
         return query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(limitCount));
-    }, [db, limitCount]);
+    }, [db, limitCount, refreshKey]);
 
-    const { data: logs, isLoading, error } = useCollection<AuditLog>(auditQuery);
+    const { data: logs, isLoading, error } = useCollectionOnce<AuditLog>(auditQuery);
+
+    const handleRefresh = () => {
+        setRefreshKey(prev => prev + 1);
+    };
 
     useState(() => {
         if (!db) return;
@@ -77,7 +83,7 @@ export default function AuditoriaPage() {
                         <ShieldCheck className="h-8 w-8 text-primary" />
                         Registro de Auditoría
                     </h1>
-                    <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Monitoreo de seguridad y actividad de usuarios en tiempo real.</p>
+                    <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Historial detallado de seguridad y actividad del sistema.</p>
                 </div>
                 <Badge variant="secondary" className="px-4 py-1.5 font-medium bg-primary/10 text-primary uppercase">
                     {totalEvents !== null ? `${totalEvents} Eventos Totales` : (logs?.length || 0) + ' Cargados'}
@@ -91,14 +97,26 @@ export default function AuditoriaPage() {
                             <CardTitle className="text-base font-medium uppercase">Historial de Eventos</CardTitle>
                             <CardDescription className="font-medium text-xs uppercase text-muted-foreground">Últimas acciones realizadas por los operadores.</CardDescription>
                         </div>
-                        <div className="relative w-full md:w-96">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="BUSCAR POR USUARIO, ACCIÓN O MÓDULO..." 
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-9 bg-background font-medium border-primary/10 h-10 uppercase text-[11px]"
-                            />
+                        <div className="flex items-center gap-2">
+                            <div className="relative w-full md:w-96">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="BUSCAR POR USUARIO, ACCIÓN O MÓDULO..." 
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    className="pl-9 bg-background font-medium border-primary/10 h-10 uppercase text-[11px]"
+                                />
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={handleRefresh}
+                                disabled={isLoading}
+                                className="h-10 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary border-primary/10"
+                            >
+                                <Activity className={cn("h-4 w-4", isLoading && "animate-spin")} />
+                                Refrescar
+                            </Button>
                         </div>
                     </div>
                 </CardHeader>

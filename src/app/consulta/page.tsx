@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -77,6 +77,7 @@ export default function ConsultaPage() {
     const [selectedPerson, setSelectedPerson] = useState<PadronData | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
+    const [refreshKey, setRefreshKey] = useState(0);
 
     const userSeccionales = useMemo(() => {
         if (!user) return [];
@@ -96,9 +97,9 @@ export default function ConsultaPage() {
     const registeredQuery = useMemoFirebase(() => {
         if (!db || !user) return null;
         return query(collection(db, COLLECTION_CAPTURAS), limit(300));
-    }, [db, user]);
+    }, [db, user, refreshKey]);
 
-    const { data: rawList, isLoading: isLoadingList, error: listError } = useCollection<PadronData>(registeredQuery);
+    const { data: rawList, isLoading: isLoadingList, error: listError } = useCollectionOnce<PadronData>(registeredQuery);
 
     const registeredList = useMemo(() => {
         if (!rawList || !user) return [];
@@ -138,6 +139,10 @@ export default function ConsultaPage() {
         });
         return groups;
     }, [registeredList]);
+
+    const handleRefresh = () => {
+        setRefreshKey(prev => prev + 1);
+    };
 
     const applyPhoneMask = (value: string) => {
         const cleanValue = value.replace(/\D/g, '').slice(0, 10);
@@ -393,7 +398,20 @@ export default function ConsultaPage() {
                 </div>
             </div>
 
-            <Card className="border-primary/10 shadow-sm overflow-hidden"><CardHeader className="bg-muted/30 border-b py-4"><CardTitle className="text-sm font-black uppercase">Registros en Jurisdicción</CardTitle></CardHeader>
+            <Card className="border-primary/10 shadow-sm overflow-hidden">
+                <CardHeader className="bg-muted/30 border-b py-4 flex flex-row items-center justify-between gap-4">
+                    <CardTitle className="text-sm font-black uppercase">Registros en Jurisdicción</CardTitle>
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleRefresh} 
+                        disabled={isLoadingList}
+                        className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
+                    >
+                        <Zap className={cn("h-3 w-3", isLoadingList && "animate-spin")} />
+                        Actualizar
+                    </Button>
+                </CardHeader>
                 <CardContent className="p-0">
                     {isLoadingList ? <div className="p-8 space-y-4"><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-12 w-full rounded-xl" /></div> : 
                     Object.keys(groupedCaptures).length > 0 ? <div className="p-4"><Accordion type="multiple" className="w-full space-y-2">

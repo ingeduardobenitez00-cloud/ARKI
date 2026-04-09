@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, limit, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { useAuth } from '@/hooks/use-auth';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -45,14 +45,15 @@ export default function ReportesPage() {
   const { user } = useAuth();
   const db = useFirestore();
   const [totalCaptures, setTotalCaptures] = useState<number | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // 1. ESCUCHADOR EN TIEMPO REAL CON LÍMITE PARA ESTABILIDAD DE COSTOS
   const registeredQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
     return query(collection(db, 'votos_confirmados'), limit(300));
-  }, [db, user]);
+  }, [db, user, refreshKey]);
 
-  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
+  const { data: rawList, isLoading } = useCollectionOnce<VotoSeguroData>(registeredQuery);
 
   // CONTEO GLOBAL DESDE EL SERVIDOR
   useState(() => {
@@ -61,6 +62,10 @@ export default function ReportesPage() {
         setTotalCaptures(snap.data().count);
     });
   });
+
+  const handleRefresh = () => {
+    setRefreshKey(prev => prev + 1);
+  };
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
@@ -74,14 +79,14 @@ export default function ReportesPage() {
     if (isAdmin) return rawList;
 
     if (isCoordinador) {
-        return rawList.filter(item => {
+        return rawList.filter((item: VotoSeguroData) => {
             const itemSec = String(item.CODIGO_SEC || '');
             return userSeccionales.includes(itemSec);
         });
     }
 
     if (isDirigente) {
-        return rawList.filter(item => item.registradoPor_id === user.id);
+        return rawList.filter((item: VotoSeguroData) => item.registradoPor_id === user.id);
     }
 
     return [];
@@ -90,7 +95,7 @@ export default function ReportesPage() {
   // 3. AGRUPAMIENTO POR USUARIO CON CÁLCULO DE PARTICIPACIÓN
   const groupedData = useMemo(() => {
     const groups: GroupedReport = {};
-    filteredList.forEach(voto => {
+    filteredList.forEach((voto: VotoSeguroData) => {
         const userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
         const itemSecc = String(voto.CODIGO_SEC || '');
@@ -163,6 +168,16 @@ export default function ReportesPage() {
                     <span className="text-[9px] font-bold text-orange-600 uppercase">Mostrando últimos 300 (Usa filtros para más detalle)</span>
                 )}
             </div>
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={handleRefresh} 
+                disabled={isLoading}
+                className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
+            >
+                <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
+                Actualizar
+            </Button>
         </CardHeader>
         <CardContent className="p-0">
             {isLoading ? <div className="p-8 space-y-4"><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-12 w-full rounded-xl" /></div> : 
