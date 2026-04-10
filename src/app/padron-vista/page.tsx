@@ -27,7 +27,7 @@ interface PadronDocument {
 
 const PAGE_SIZE = 100;
 const COLLECTION_NAME = 'sheet1';
-const MAX_RECORDS = 20000;
+const MAX_RECORDS = 2000;
 
 const columnsToDisplay = [
     { key: 'CODIGO_SEC', label: 'SECC' },
@@ -159,12 +159,29 @@ export default function PadronVistaPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><Library className="h-8 w-8 text-primary" /> Vista Dinámica del Padrón</h1></div>
-        <div className="flex items-center gap-2"><div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm"><Filter className="h-4 w-4 ml-2 text-muted-foreground" /><Select value={selectedSeccional} onValueChange={setSelectedSeccional}><SelectTrigger className="w-[180px] h-9 border-none bg-transparent font-black"><SelectValue placeholder="Elegir SECC" /></SelectTrigger><SelectContent><SelectItem value="ALL">Seleccionar SECC...</SelectItem>{seccionales.map(s => <SelectItem key={s.id} value={s.nombre}>SECC {s.nombre}</SelectItem>)}</SelectContent></Select></div>
-            <DropdownMenu><DropdownMenuTrigger asChild><Button variant="default" className="h-11 font-black shadow-lg" disabled={isExporting || filteredData.length === 0}>{isExporting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <FileDown className="mr-2 h-4 w-4" />} EXPORTAR <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger>
+        <div className="flex items-center gap-2">
+            <div className="flex flex-col items-end">
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
+                    <Filter className="h-4 w-4 ml-2 text-muted-foreground" />
+                    <Select value={selectedSeccional} onValueChange={setSelectedSeccional}>
+                        <SelectTrigger className="w-[180px] h-9 border-none bg-transparent font-black">
+                            <SelectValue placeholder="Elegir SECC" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">Seleccionar SECC...</SelectItem>
+                            {seccionales.map(s => <SelectItem key={s.id} value={s.nombre}>SECC {s.nombre}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+                <p className="text-[8px] font-bold text-orange-600 uppercase mt-1 mr-1">Límite: 2,000 registros por SECC</p>
+            </div>
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild><Button variant="default" className="h-11 font-black shadow-lg" disabled={isExporting || filteredData.length === 0}>{isExporting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <FileDown className="mr-2 h-4 w-4" />} EXPORTAR <ChevronDown className="ml-2 h-4 w-4" /></Button></DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 font-bold">
                     <DropdownMenuItem onClick={() => { if(canExportExcel) { setCustomFilename(`PADRON_SECC_${selectedSeccional}`); setIsFilenameDialogOpen(true); } else toast({title: "Acceso Denegado", variant: "destructive"}); }} disabled={!canExportExcel} className={cn("cursor-pointer font-black", canExportExcel ? "text-green-600" : "text-muted-foreground")}>{canExportExcel ? <FileSpreadsheet className="mr-2 h-4 w-4 text-green-600" /> : <Lock className="mr-2 h-4 w-4" />} Excel (.csv)</DropdownMenuItem>
                     <DropdownMenuItem onClick={() => { if(canExportPDF) handleExportPDF(); else toast({title: "Acceso Denegado", variant: "destructive"}); }} disabled={!canExportPDF} className={cn("cursor-pointer font-black", canExportPDF ? "text-red-600" : "text-muted-foreground")}>{canExportPDF ? <FileText className="mr-2 h-4 w-4 text-red-600" /> : <Lock className="mr-2 h-4 w-4" />} PDF (.pdf)</DropdownMenuItem>
-                </DropdownMenuContent></DropdownMenu>
+                </DropdownMenuContent>
+            </DropdownMenu>
         </div>
       </div>
 

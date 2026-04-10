@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -60,6 +60,7 @@ export default function MapaGlobalPage() {
     const [selectedCoordinador, setSelectedCoordinador] = useState('ALL');
     const [selectedDirigente, setSelectedDirigente] = useState('ALL');
     
+    const [refreshKey, setRefreshKey] = useState(0);
     const [isLoadingFilters, setIsLoadingFilters] = useState(true);
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
@@ -71,9 +72,14 @@ export default function MapaGlobalPage() {
         if (!db) return null;
         // Solo traemos los que tienen coordenadas
         return collection(db, 'votos_confirmados');
-    }, [db]);
+    }, [db, refreshKey]);
 
-    const { data: rawPoints, isLoading: isLoadingPoints } = useCollection<ElectorUbicado>(pointsQuery);
+    const { data: rawPoints, isLoading: isLoadingPoints } = useCollectionOnce<ElectorUbicado>(pointsQuery);
+
+    const handleRefresh = () => {
+        setRefreshKey(prev => prev + 1);
+        toast({ title: "Actualizando puntos...", description: "Cargando datos desde el servidor." });
+    };
 
     useEffect(() => {
         const fetchMetadata = async () => {
@@ -81,8 +87,8 @@ export default function MapaGlobalPage() {
             setIsLoadingFilters(true);
             try {
                 const sSnap = await getDocs(collection(db, 'seccionales'));
-                const sList = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                sList.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), undefined, { numeric: true }));
+                const sList = sSnap.docs.map(doc => ({ id: doc.id, ...(doc.data() as any) }));
+                sList.sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), undefined, { numeric: true }));
                 setSeccionales(sList);
 
                 const uSnap = await getDocs(query(collection(db, 'users'), orderBy('name', 'asc')));
@@ -179,13 +185,17 @@ export default function MapaGlobalPage() {
                         {isDirigente && <Badge variant="secondary" className="font-black uppercase text-[9px] py-1.5 px-3">MIS CARGAS GPS</Badge>}
                     </div>
                 </div>
-                <div className="flex gap-2">
-                    <Badge variant="outline" className="px-4 border-primary/20 font-black uppercase text-[10px] bg-white shadow-sm flex items-center gap-2">
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        Puntos Visibles: {filteredMarkers.length}
-                    </Badge>
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefresh}
+                        disabled={isLoadingPoints}
+                        className="h-9 px-4 font-black uppercase border-primary/20 text-primary rounded-xl bg-white shadow-sm flex items-center gap-2"
+                    >
+                        <RefreshCw className={cn("h-3.5 w-3.5", isLoadingPoints && "animate-spin")} />
+                        RECUPERAR DATOS
+                    </Button>
                     {(isLoadingFilters || isLoadingPoints) && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
-                </div>
             </div>
 
             <Card className="flex-1 flex flex-col overflow-hidden border-primary/10 shadow-2xl rounded-3xl bg-white">

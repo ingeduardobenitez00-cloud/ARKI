@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from 'react';
-import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, orderBy, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -127,8 +127,8 @@ export default function AjustesInscripcionPage() {
     if (!db || !user) return;
     setIsRecalculating(true);
     try {
-        const snap = await getDocs(collection(db, 'inscripciones'));
-        const actualCount = snap.size;
+        const snap = await getCountFromServer(collection(db, 'inscripciones'));
+        const actualCount = (snap as any).data().count;
         const settingsRef = doc(db, SETTINGS_COLLECTION, 'global');
         await updateDoc(settingsRef, { public_registration_count: actualCount });
         setPublicRegistrationCount(actualCount);

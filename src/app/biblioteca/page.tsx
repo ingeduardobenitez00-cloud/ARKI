@@ -105,15 +105,24 @@ export default function BibliotecaPage() {
 
   useEffect(() => {
     if (!flyers || !db) return;
+    // OPTIMIZACIÓN: Solo reconstruimos los marcados como "OFICIALES" inicialmente
+    // El resto se carga bajo demanda al visualizar o usar.
     flyers.forEach(async (flyer) => {
         const flyerId = flyer.id;
+        const isOfficial = globalFlyerValue === `FLYER_ID:${flyerId}`;
+        
         if (urlsRef.current[flyerId] || processingRef.current.has(flyerId)) return;
+        
         if (!flyer.isChunked) {
             const url = flyer.url?.startsWith('data:') ? base64ToBlobUrl(flyer.url) : flyer.url;
             urlsRef.current[flyerId] = url;
             setReconstructedUrls(prev => ({ ...prev, [flyerId]: url }));
             return;
         }
+
+        // Si es cargado por primera vez y NO es oficial, no hacemos nada (ahorro de lecturas)
+        if (!isOfficial) return;
+
         processingRef.current.add(flyerId);
         try {
             const total = flyer.totalChunks || 1;
@@ -123,18 +132,44 @@ export default function BibliotecaPage() {
                 const chunkSnap = await getDoc(chunkRef);
                 if (chunkSnap.exists()) {
                     chunks.push(chunkSnap.data().data);
-                    setLoadingItemsProgress(prev => ({ ...prev, [flyerId]: Math.round(((i + 1) / total) * 100) }));
                 }
             }
             const blobUrl = base64ToBlobUrl(chunks.join(''));
             urlsRef.current[flyerId] = blobUrl;
             setReconstructedUrls(prev => ({ ...prev, [flyerId]: blobUrl }));
         } finally {
-            setLoadingItemsProgress(prev => { const n = { ...prev }; delete n[flyerId]; return n; });
             processingRef.current.delete(flyerId);
         }
     });
-  }, [flyers, db]);
+  }, [flyers, db, globalFlyerValue]);
+
+  const handleReconstructLazy = async (flyer: any) => {
+    if (!db || !flyer || urlsRef.current[flyer.id] || processingRef.current.has(flyer.id)) return;
+    
+    const flyerId = flyer.id;
+    processingRef.current.add(flyerId);
+    try {
+        setLoadingItemsProgress(prev => ({ ...prev, [flyerId]: 0 }));
+        const total = flyer.totalChunks || 1;
+        let chunks: string[] = [];
+        for (let i = 0; i < total; i++) {
+            const chunkRef = doc(db, FLYERS_COLLECTION, flyerId, 'chunks', i.toString().padStart(3, '0'));
+            const chunkSnap = await getDoc(chunkRef);
+            if (chunkSnap.exists()) {
+                chunks.push(chunkSnap.data().data);
+                setLoadingItemsProgress(prev => ({ ...prev, [flyerId]: Math.round(((i + 1) / total) * 100) }));
+            }
+        }
+        const blobUrl = base64ToBlobUrl(chunks.join(''));
+        urlsRef.current[flyerId] = blobUrl;
+        setReconstructedUrls(prev => ({ ...prev, [flyerId]: blobUrl }));
+    } catch (e) {
+        toast({ title: "Error al cargar archivo", variant: "destructive" });
+    } finally {
+        setLoadingItemsProgress(prev => { const n = { ...prev }; delete n[flyerId]; return n; });
+        processingRef.current.delete(flyerId);
+    }
+  };
 
   const confirmUpload = async () => {
     if (!pendingFile || !db || !user || !newImageName.trim()) return;
@@ -251,8 +286,15 @@ export default function BibliotecaPage() {
                                     <div className="absolute top-0 left-0 right-0 bg-black/60 p-1.5 truncate text-[9px] text-white uppercase">{f.name}</div>
                                     {!isItemLoading && url && (
                                         <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center gap-2">
-                                            <Button size="icon" variant="secondary" onClick={() => handleSetGlobalFlyer(f.id, f.name, f.type)}><CheckCircle2 className={cn("h-5 w-5", isOfficial && "text-green-600")} /></Button>
-                                            <Button size="icon" variant="destructive" onClick={() => handleDeleteFlyer(f)}><Trash2 className="h-5 w-5" /></Button>
+                                            {!url && (
+                                                <Button size="icon" variant="secondary" onClick={() => handleReconstructLazy(f)}><Upload className="h-5 w-5" /></Button>
+                                            )}
+                                            {url && (
+                                                <>
+                                                    <Button size="icon" variant="secondary" onClick={() => handleSetGlobalFlyer(f.id, f.name, f.type)}><CheckCircle2 className={cn("h-5 w-5", isOfficial && "text-green-600")} /></Button>
+                                                    <Button size="icon" variant="destructive" onClick={() => handleDeleteFlyer(f)}><Trash2 className="h-5 w-5" /></Button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>
