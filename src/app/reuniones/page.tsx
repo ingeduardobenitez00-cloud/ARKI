@@ -16,7 +16,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import Link from 'next/link';
 import { logAction } from '@/lib/audit';
 
 interface PadronData {
@@ -74,7 +75,7 @@ export default function ReunionesPage() {
         return q;
     }, [db, user, isAdmin]);
 
-    const { data: participantes, isLoading: isLoadingParticipantes } = useCollection<ParticipantData>(participantesQuery);
+    const { data: participantes, isLoading: isLoadingParticipantes } = useCollectionOnce<ParticipantData>(participantesQuery);
 
     const applyPhoneMask = (value: string) => {
         const cleanValue = value.replace(/\D/g, '').slice(0, 10);

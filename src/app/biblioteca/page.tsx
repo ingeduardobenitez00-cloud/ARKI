@@ -5,7 +5,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, addDoc, doc, deleteDoc, query, orderBy, setDoc, getDoc, serverTimestamp, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { useFirestore, useMemoFirebase, initializeFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { useAuth } from '@/hooks/use-auth';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -67,7 +67,7 @@ export default function BibliotecaPage() {
     return query(collection(db, FLYERS_COLLECTION), orderBy('createdAt', 'desc'));
   }, [db]);
 
-  const { data: flyers, isLoading } = useCollection(flyersQuery);
+  const { data: flyers, isLoading } = useCollectionOnce(flyersQuery);
 
   const currentPreviewItem = previewIndex !== null && flyers ? flyers[previewIndex] : null;
   const currentPreviewUrl = currentPreviewItem ? reconstructedUrls[currentPreviewItem.id] : null;

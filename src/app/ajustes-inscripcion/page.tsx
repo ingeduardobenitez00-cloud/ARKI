@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, doc, updateDoc, getDoc, setDoc, query, orderBy, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ export default function AjustesInscripcionPage() {
     return query(collection(db, FLYERS_COLLECTION), orderBy('createdAt', 'desc'));
   }, [db]);
 
-  const { data: availableFlyers } = useCollection(flyersQuery);
+  const { data: availableFlyers } = useCollectionOnce(flyersQuery);
 
   const base64ToBlobUrl = useCallback((base64: string) => {
     try {

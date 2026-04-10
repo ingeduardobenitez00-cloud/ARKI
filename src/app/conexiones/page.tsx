@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { useAuth } from '@/hooks/use-auth';
 import type { User } from '@/types';
 import { format } from 'date-fns';
@@ -48,8 +48,8 @@ export default function ConnectionsPage() {
         return query(collection(db, 'status'), where('state', '==', 'online'));
     }, [db]);
 
-    const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
-    const { data: statuses, isLoading: isLoadingStatuses } = useCollection<UserStatus>(statusQuery);
+    const { data: users, isLoading: isLoadingUsers } = useCollectionOnce<User>(usersQuery);
+    const { data: statuses, isLoading: isLoadingStatuses } = useCollectionOnce<UserStatus>(statusQuery);
 
     const mergedData = useMemo(() => {
         if (!users || !statuses) return [];

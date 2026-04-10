@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, orderBy, limit, startAfter, getDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -131,7 +131,7 @@ export default function DifusionPage() {
         return query(collection(db, FLYERS_COLLECTION), orderBy('createdAt', 'desc'));
     }, [db]);
 
-    const { data: availableFlyers } = useCollection(flyersQuery);
+    const { data: availableFlyers } = useCollectionOnce(flyersQuery);
 
     const base64ToBlobUrl = useCallback((base64: string) => {
         if (!base64 || typeof base64 !== 'string') return '';
@@ -181,8 +181,8 @@ export default function DifusionPage() {
             if (!db) return;
             try {
                 const sSnap = await getDocs(collection(db, 'seccionales'));
-                const list = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                list.sort((a, b) => String(a.nombre).localeCompare(String(b.nombre), undefined, { numeric: true }));
+                const list = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+                list.sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), undefined, { numeric: true }));
                 setSeccionales(list);
 
                 const settingsDoc = await getDoc(doc(db, SETTINGS_COLLECTION, 'global'));
@@ -316,7 +316,8 @@ export default function DifusionPage() {
                             const parts = getBirthDateParts(data.FECHA_NACI);
                             if (!parts || parts.month !== birthdayMonth || (birthdayDay !== 'ALL' && parts.day !== birthdayDay)) return;
                         }
-                        results.push({ id: docSnap.id, ...data });
+                        const { id, ...rest } = data as any;
+                        results.push({ ...rest, id: docSnap.id });
                     });
                     lastDoc = snap.docs[snap.docs.length - 1];
                     if (snap.docs.length < 500) hasMore = false;

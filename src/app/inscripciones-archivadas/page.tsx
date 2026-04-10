@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, writeBatch, doc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -72,7 +72,7 @@ export default function InscripcionesArchivadasPage() {
         return query(collection(db, 'archived_inscripciones_eventos'), orderBy('archivedAt', 'desc'));
     }, [db]);
 
-    const { data: archives, isLoading } = useCollection<ArchivedInscripcion>(archivesQuery);
+    const { data: archives, isLoading } = useCollectionOnce<ArchivedInscripcion>(archivesQuery);
 
     const formatTimestamp = (ts: any) => {
         if (!ts) return '---';
