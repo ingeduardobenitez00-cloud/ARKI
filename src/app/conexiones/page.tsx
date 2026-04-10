@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, query, orderBy, limit } from 'firebase/firestore';
+import { collection, query, orderBy, limit, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -45,7 +45,7 @@ export default function ConnectionsPage() {
 
     const statusQuery = useMemoFirebase(() => {
         if (!db) return null;
-        return collection(db, 'status');
+        return query(collection(db, 'status'), where('state', '==', 'online'));
     }, [db]);
 
     const { data: users, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);

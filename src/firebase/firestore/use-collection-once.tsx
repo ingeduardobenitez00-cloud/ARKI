@@ -23,6 +23,7 @@ export interface UseCollectionOnceResult<T> {
   data: WithId<T>[] | null; // Document data with ID, or null.
   isLoading: boolean;       // True if loading.
   error: FirestoreError | Error | null; // Error object, or null.
+  refetch: () => Promise<void>; // Function to manually trigger a refetch.
 }
 
 /**
@@ -55,6 +56,11 @@ export function useCollectionOnce<T = any>(
   const [data, setData] = useState<StateDataType>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
+  const [version, setVersion] = useState(0);
+
+  const refetch = async () => {
+    setVersion(v => v + 1);
+  };
 
   useEffect(() => {
     if (!memoizedTargetRefOrQuery) {
@@ -111,15 +117,12 @@ export function useCollectionOnce<T = any>(
     }
 
     fetchData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [memoizedTargetRefOrQuery]); 
+    return () => { isMounted = false; };
+  }, [memoizedTargetRefOrQuery, version]); 
 
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
     throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
   }
 
-  return { data, isLoading, error };
+  return { data, isLoading, error, refetch };
 }

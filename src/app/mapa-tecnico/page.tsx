@@ -196,9 +196,19 @@ export default function MapaTecnicoPage() {
                             <Button onClick={handleImportPointsFromGeoJSON} variant="outline" className="h-11 px-4 font-black uppercase border-blue-200 text-blue-600 rounded-xl shadow-sm bg-blue-50/50" disabled={isImportingPoints}>
                                 {isImportingPoints ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Globe className="mr-2 h-4 w-4" />} PUNTOS GEO
                             </Button>
-                            <Button onClick={handleSyncFromCaptures} variant="outline" className="h-11 px-4 font-black uppercase border-primary/20 text-primary rounded-xl shadow-sm" disabled={isSyncing}>
-                                {isSyncing ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCw className="mr-2 h-4 w-4" />} SINCRONIZAR VOTOS
-                            </Button>
+                            <div className="space-y-2">
+                                <Button 
+                                    onClick={handleSyncFromCaptures} 
+                                    disabled={isSyncing} 
+                                    className="h-11 px-4 font-black uppercase tracking-tighter shadow-lg bg-green-600 hover:bg-green-700"
+                                >
+                                    {isSyncing ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <RefreshCw className="mr-2 h-5 w-5" />}
+                                    SINCRONIZAR DATOS DE CAPTACIÓN
+                                </Button>
+                                <p className="text-[9px] text-center font-bold text-muted-foreground uppercase leading-tight px-4">
+                                     Nota: Esto realiza una lectura completa de la base de datos de captación para recalcular los totales. Úsalo solo cuando necesites ver datos finales.
+                                </p>
+                            </div>
                         </>
                     )}
                 </div>
