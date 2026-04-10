@@ -4,13 +4,14 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // 1. RECURSOS PÚBLICOS
-    match /system_settings/{document=**} { allow read: if true; }
-    match /flyer_library/{document=**} { allow read: if true; }
-    match /seccionales/{document=**} { allow read: if true; }
+    match /system_settings/{document=**} { allow get: if true; }
+    match /flyer_library/{document=**} { allow get: if true; }
+    match /seccionales/{document=**} { allow get: if true; }
+    match /status/{document=**} { allow get: if true; }
 
     // 2. PADRÓN (sheet1)
     match /sheet1/{docId} {
-      allow read: if true;
+      allow get: if true;
     }
 
     // 3. MAPA TÉCNICO POLÍTICO
