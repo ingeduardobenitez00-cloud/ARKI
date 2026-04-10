@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, query, where, limit } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, orderBy, startAfter, doc, getDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -55,6 +55,9 @@ export default function PadronVistaPage() {
   const [page, setPage] = useState(1);
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
+  const [lastVisible, setLastVisible] = useState<any>(null);
+  const [hasMore, setHasMore] = useState(true);
+  const [searchMode, setSearchMode] = useState(false);
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const canExportPDF = isAdmin || user?.moduleActions?.['/padron']?.includes('pdf');
@@ -74,35 +77,122 @@ export default function PadronVistaPage() {
     fetchInitial();
   }, [db]);
 
-  const loadSeccionalData = useCallback(async () => {
-    if (!db || !selectedSeccional || selectedSeccional === 'ALL') { setAllSeccionalData([]); return; }
-    setIsLoading(true); setPage(1); setSearchTerm('');
+  const loadSeccionalData = useCallback(async (isNextPage = false) => {
+    if (!db || !selectedSeccional || selectedSeccional === 'ALL') { 
+        setAllSeccionalData([]); 
+        setLastVisible(null);
+        setHasMore(false);
+        return; 
+    }
+    
+    setIsLoading(true); 
+    if (!isNextPage) {
+        setPage(1); 
+        setSearchTerm('');
+        setAllSeccionalData([]);
+        setLastVisible(null);
+    }
+    
     try {
         const valStr = String(selectedSeccional).trim();
         const dataCollection = collection(db, COLLECTION_NAME);
-        const qText = query(dataCollection, where('CODIGO_SEC', '==', valStr), limit(MAX_RECORDS));
-        const snapshotText = await getDocs(qText);
-        let records = snapshotText.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PadronDocument));
-        if (records.length === 0 && !isNaN(Number(valStr))) {
-            const qNum = query(dataCollection, where('CODIGO_SEC', '==', Number(valStr)), limit(MAX_RECORDS));
-            const snapshotNum = await getDocs(qNum);
-            records = snapshotNum.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PadronDocument));
+        
+        // Base query - Ordenar por APELLIDO y NOMBRE para paginación consistente
+        let baseQuery = query(
+            dataCollection, 
+            where('CODIGO_SEC', '==', valStr), 
+            orderBy('APELLIDO'), 
+            orderBy('NOMBRE'),
+            limit(PAGE_SIZE)
+        );
+
+        // Si falló la anterior (por tipo de dato), probamos con número
+        // Nota: En Firestore real, mezclar tipos de datos en la misma columna es problemático para índices.
+        
+        if (isNextPage && lastVisible) {
+            baseQuery = query(baseQuery, startAfter(lastVisible));
         }
-        records.sort((a, b) => String(a.APELLIDO || '').localeCompare(String(b.APELLIDO || '')) || String(a.NOMBRE || '').localeCompare(String(b.NOMBRE || '')));
-        setAllSeccionalData(records);
+
+        const snapshot = await getDocs(baseQuery);
+        const records = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as PadronDocument));
+        
+        setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+        setHasMore(records.length === PAGE_SIZE);
+        
+        if (isNextPage) {
+            setAllSeccionalData(prev => [...prev, ...records]);
+        } else {
+            setAllSeccionalData(records);
+        }
+    } catch (e: any) {
+        console.error("Error loading data", e);
+        // Fallback simple si el índice no existe o hay error de tipo
+        if (!isNextPage) {
+             const fallbackQuery = query(collection(db, COLLECTION_NAME), where('CODIGO_SEC', '==', selectedSeccional), limit(PAGE_SIZE));
+             const snap = await getDocs(fallbackQuery);
+             setAllSeccionalData(snap.docs.map(d => ({id: d.id, ...d.data()})));
+             setHasMore(false);
+        }
     } finally { setIsLoading(false); }
-  }, [db, selectedSeccional]);
+  }, [db, selectedSeccional, lastVisible]);
 
   useEffect(() => { loadSeccionalData(); }, [loadSeccionalData]);
 
   const filteredData = useMemo(() => {
     const term = searchTerm.trim().toUpperCase();
     if (!term) return allSeccionalData;
-    return allSeccionalData.filter(p => `${p.NOMBRE} ${p.APELLIDO}`.toUpperCase().includes(term) || String(p.CEDULA).includes(term));
+    return allSeccionalData.filter(p => 
+        (p.NOMBRE || '').toUpperCase().includes(term) || 
+        (p.APELLIDO || '').toUpperCase().includes(term) || 
+        String(p.CEDULA).includes(term)
+    );
   }, [allSeccionalData, searchTerm]);
 
-  const displayData = useMemo(() => filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredData, page]);
-  const totalPages = Math.ceil(filteredData.length / PAGE_SIZE);
+  const handleGlobalSearch = async () => {
+    const term = searchTerm.trim();
+    if (!term || !db) return;
+    
+    setIsLoading(true);
+    setSearchMode(true);
+    try {
+        // 1. Intentar búsqueda directa por ID (Cédula) - LA MÁS BARATA
+        const docRef = doc(db, COLLECTION_NAME, term);
+        const snap = await getDoc(docRef);
+        if (snap.exists()) {
+            setAllSeccionalData([{ id: snap.id, ...snap.data() } as PadronDocument]);
+            setHasMore(false);
+            return;
+        }
+
+        // 2. Si no es cédula, buscar por campo CEDULA exacto
+        const qCed = query(collection(db, COLLECTION_NAME), where('CEDULA', '==', term), limit(1));
+        const snapCed = await getDocs(qCed);
+        if (!snapCed.empty) {
+            setAllSeccionalData(snapCed.docs.map(d => ({ id: d.id, ...d.data() } as PadronDocument)));
+            setHasMore(false);
+            return;
+        }
+
+        // 3. Búsqueda por nombre (Limitada para evitar costos)
+        const qName = query(
+            collection(db, COLLECTION_NAME), 
+            where('APELLIDO', '>=', term.toUpperCase()), 
+            where('APELLIDO', '<=', term.toUpperCase() + '\uf8ff'),
+            limit(50)
+        );
+        const snapName = await getDocs(qName);
+        setAllSeccionalData(snapName.docs.map(d => ({ id: d.id, ...d.data() } as PadronDocument)));
+        setHasMore(false);
+        
+        if (snapName.empty) {
+            toast({ title: "No se encontraron resultados", description: "Prueba con la cédula o el apellido exacto." });
+        }
+    } finally { 
+        setIsLoading(false); 
+    }
+  };
+
+  // Eliminamos displayData y totalPages ya que usamos paginación de servidor
 
   const formatValue = (value: any, key: string): string => {
     if (value === null || typeof value === 'undefined' || String(value) === 'null') return '';
@@ -186,9 +276,82 @@ export default function PadronVistaPage() {
       </div>
 
       <Card className="border-primary/10 shadow-sm overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b pb-6"><div className="space-y-2 pt-4"><Label className="text-[10px] font-black uppercase text-muted-foreground">Búsqueda rápida en SECC {selectedSeccional}</Label><div className="flex gap-2"><div className="relative w-full md:w-1/2"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input placeholder="Nombre o Cédula..." className="pl-10 h-11 font-black" value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }} disabled={allSeccionalData.length === 0 && !isLoading} /></div></div></div></CardHeader>
-        <CardContent className="p-0"><div className="overflow-auto max-h-[600px]"><Table><TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase">{columnsToDisplay.map(col => <TableHead key={col.key} className="text-center">{col.label}</TableHead>)}</TableRow></TableHeader><TableBody>{isLoading ? Array.from({ length: 10 }).map((_, i) => <TableRow key={i}><TableCell colSpan={columnsToDisplay.length}><Skeleton className="h-10 w-full" /></TableCell></TableRow>) : displayData.length > 0 ? displayData.map((row) => (<TableRow key={row.id} className="hover:bg-muted/20 transition-colors">{columnsToDisplay.map(col => <TableCell key={col.key} className="text-[11px] font-bold uppercase py-3 whitespace-nowrap text-center">{formatValue(row[col.key], col.key)}</TableCell>)}</TableRow>)) : <TableRow><TableCell colSpan={columnsToDisplay.length} className="h-64 text-center opacity-20">Vacio</TableCell></TableRow>}</TableBody></Table></div></CardContent>
-         <CardFooter className="bg-muted/10 py-4 flex items-center justify-between"><div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{!isLoading && filteredData.length > 0 && <span>Página {page} de {totalPages}</span>}</div><div className="flex gap-2"><Button variant="outline" size="sm" onClick={() => { setPage(p => Math.max(1, p - 1)); window.scrollTo(0,0); }} disabled={page === 1 || isLoading} className="font-bold text-[10px]">ANTERIOR</Button><Button variant="outline" size="sm" onClick={() => { setPage(p => Math.min(totalPages, p + 1)); window.scrollTo(0,0); }} disabled={page === totalPages || isLoading || totalPages === 0} className="font-bold text-[10px]">SIGUIENTE</Button></div></CardFooter>
+        <CardHeader className="bg-muted/30 border-b pb-6">
+            <div className="space-y-2 pt-4">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground">Búsqueda rápida en SECC {selectedSeccional}</Label>
+                <div className="flex gap-2">
+                    <div className="relative w-full md:w-1/2">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                        <Input 
+                            placeholder="Nombre o Cédula..." 
+                            className="pl-10 h-11 font-black" 
+                            value={searchTerm} 
+                            onChange={(e) => setSearchTerm(e.target.value)} 
+                            onKeyDown={(e) => e.key === 'Enter' && handleGlobalSearch()}
+                        />
+                    </div>
+                    <Button onClick={handleGlobalSearch} disabled={isLoading || !searchTerm.trim()} className="h-11 font-black uppercase">
+                        Buscar
+                    </Button>
+                </div>
+            </div>
+        </CardHeader>
+        <CardContent className="p-0">
+            <div className="overflow-auto max-h-[600px]">
+                <Table>
+                    <TableHeader>
+                        <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
+                            {columnsToDisplay.map(col => <TableHead key={col.key} className="text-center">{col.label}</TableHead>)}
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {isLoading && allSeccionalData.length === 0 ? (
+                            Array.from({ length: 10 }).map((_, i) => (
+                                <TableRow key={i}><TableCell colSpan={columnsToDisplay.length}><Skeleton className="h-10 w-full" /></TableCell></TableRow>
+                            ))
+                        ) : filteredData.length > 0 ? (
+                            <>
+                                {filteredData.map((row) => (
+                                    <TableRow key={row.id} className="hover:bg-muted/20 transition-colors">
+                                        {columnsToDisplay.map(col => (
+                                            <TableCell key={col.key} className="text-[11px] font-bold uppercase py-3 whitespace-nowrap text-center">
+                                                {formatValue(row[col.key], col.key)}
+                                            </TableCell>
+                                        ))}
+                                    </TableRow>
+                                ))}
+                                {hasMore && !searchMode && (
+                                    <TableRow>
+                                        <TableCell colSpan={columnsToDisplay.length} className="p-4 text-center">
+                                            <Button 
+                                                variant="ghost" 
+                                                onClick={() => loadSeccionalData(true)} 
+                                                disabled={isLoading}
+                                                className="font-black text-primary hover:bg-primary/5 uppercase text-[10px]"
+                                            >
+                                                {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Cargar más registros de esta SECC...'}
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </>
+                        ) : (
+                            <TableRow><TableCell colSpan={columnsToDisplay.length} className="h-64 text-center opacity-20">Vacio</TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+            </div>
+        </CardContent>
+        <CardFooter className="bg-muted/10 py-4 flex items-center justify-between">
+            <div className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">
+                {allSeccionalData.length > 0 && <span>Mostrando {allSeccionalData.length} registros</span>}
+            </div>
+            {searchMode && (
+                <Button variant="link" onClick={() => { setSearchMode(false); loadSeccionalData(); }} className="text-[10px] font-black uppercase">
+                    Volver al listado por SECC
+                </Button>
+            )}
+        </CardFooter>
       </Card>
 
       <Dialog open={isFilenameDialogOpen} onOpenChange={setIsFilenameDialogOpen}>
