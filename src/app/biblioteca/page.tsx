@@ -2,8 +2,9 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { collection, addDoc, doc, deleteDoc, query, orderBy, setDoc, getDoc, serverTimestamp, getDocs, writeBatch } from 'firebase/firestore';
-import { useFirestore, useMemoFirebase } from '@/firebase';
+import { collection, addDoc, doc, deleteDoc, query, orderBy, setDoc, getDoc, serverTimestamp, getDocs, writeBatch, updateDoc } from 'firebase/firestore';
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
+import { useFirestore, useMemoFirebase, initializeFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
 
@@ -177,42 +178,63 @@ export default function BibliotecaPage() {
     setUploadProgress(5);
     setIsNameDialogOpen(false);
     
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-        const base64String = reader.result as string;
-        const fileType = pendingFile.type.startsWith('video/') ? 'video' : 'image';
-        const chunks: string[] = [];
-        for (let i = 0; i < base64String.length; i += CHUNK_SIZE) chunks.push(base64String.substring(i, i + CHUNK_SIZE));
-        const isChunked = chunks.length > 1;
+    const { storage } = initializeFirebase();
+    const fileType = pendingFile.type.startsWith('video/') ? 'video' : 'image';
+    
+    try {
+        // 1. Crear el documento en Firestore primero para obtener un ID único
         const flyerData = {
             name: newImageName.toUpperCase(),
             type: fileType,
             createdAt: serverTimestamp(),
             createdBy: user.name,
-            isChunked: isChunked,
-            totalChunks: chunks.length,
-            url: isChunked ? null : base64String
+            isChunked: false, // Los nuevos archivos NO van por trozos
+            storagePath: `flyers/${Date.now()}_${pendingFile.name}`,
+            url: null // Se llenará tras la subida
         };
 
-        try {
-            const docRef = await addDoc(collection(db, FLYERS_COLLECTION), flyerData);
-            if (isChunked) {
-                for (let i = 0; i < chunks.length; i++) {
-                    await setDoc(doc(db, FLYERS_COLLECTION, docRef.id, 'chunks', i.toString().padStart(3, '0')), { data: chunks[i] });
-                    setUploadProgress(Math.round(((i + 1) / chunks.length) * 100));
-                }
+        const docRef = await addDoc(collection(db, FLYERS_COLLECTION), flyerData);
+        
+        // 2. Subir a Firebase Storage
+        const storageRef = ref(storage, flyerData.storagePath);
+        const uploadTask = uploadBytesResumable(storageRef, pendingFile);
+
+        uploadTask.on('state_changed', 
+            (snapshot) => {
+                const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+                setUploadProgress(progress);
+            },
+            (error) => {
+                console.error("Storage upload error:", error);
+                toast({ title: "Error al subir a Storage", variant: "destructive" });
+                setIsUploading(false);
+            },
+            async () => {
+                // 3. Obtener URL final y actualizar Firestore
+                const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+                await updateDoc(doc(db, FLYERS_COLLECTION, docRef.id), {
+                    url: downloadURL
+                });
+                
+                logAction(db, { 
+                    userId: user.id, 
+                    userName: user.name, 
+                    module: 'BIBLIOTECA', 
+                    action: `SUBIÓ ${fileType.toUpperCase()}`, 
+                    targetName: newImageName 
+                });
+                
+                toast({ title: "¡Archivo subido a Storage con éxito!" });
+                setIsUploading(false);
+                setUploadProgress(0);
+                setPendingFile(null);
             }
-            logAction(db, { userId: user.id, userName: user.name, module: 'BIBLIOTECA', action: `SUBIÓ ${fileType.toUpperCase()}`, targetName: newImageName });
-            toast({ title: "¡Éxito!" });
-        } catch (error) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: FLYERS_COLLECTION, operation: 'create', requestResourceData: flyerData }));
-        } finally {
-            setIsUploading(false);
-            setUploadProgress(0);
-            setPendingFile(null);
-        }
-    };
-    reader.readAsDataURL(pendingFile);
+        );
+    } catch (error) {
+        console.error("Upload process error:", error);
+        toast({ title: "Error en el proceso de subida", variant: "destructive" });
+        setIsUploading(false);
+    }
   };
 
   const handleSetGlobalFlyer = (flyerId: string, name: string, type: string) => {
@@ -232,15 +254,26 @@ export default function BibliotecaPage() {
 
   const handleDeleteFlyer = async (flyer: any) => {
     if (!db || !user) return;
+    const { storage } = initializeFirebase();
+    
     try {
+        // ELIMINAR DE STORAGE SI EXISTE
+        if (flyer.storagePath) {
+            const storageRef = ref(storage, flyer.storagePath);
+            await deleteObject(storageRef).catch(e => console.warn("File was already gone from storage"));
+        }
+
+        // ELIMINAR CHUNKS SI EXISTE (COMPATIBILIDAD VIEJA)
         if (flyer.isChunked) {
             const chunksSnap = await getDocs(collection(db, FLYERS_COLLECTION, flyer.id, 'chunks'));
             const batch = writeBatch(db);
             chunksSnap.docs.forEach(d => batch.delete(d.ref));
             await batch.commit();
         }
+
+        // ELIMINAR DOCUMENTO
         await deleteDoc(doc(db, FLYERS_COLLECTION, flyer.id));
-        toast({ title: "Archivo eliminado" });
+        toast({ title: "Archivo eliminado físicamente" });
     } catch (e) {
         errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `${FLYERS_COLLECTION}/${flyer.id}`, operation: 'delete' }));
     }

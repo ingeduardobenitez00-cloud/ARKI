@@ -63,19 +63,7 @@ export default function PublicRegistrationPage() {
                     setRegistrationLimit(data.public_registration_limit || 0);
                     setRegistrationCount(data.public_registration_count || 0);
                     
-                    if (data.public_event_flyer_id && data.public_event_flyer_id !== 'NONE') {
-                        const flyerSnap = await getDoc(doc(db, FLYERS_COLLECTION, data.public_event_flyer_id));
-                        if (flyerSnap.exists()) {
-                            const fData = flyerSnap.data();
-                            if (fData.isChunked) {
-                                const chunksSnap = await getDocs(query(collection(db, FLYERS_COLLECTION, data.public_event_flyer_id, 'chunks'), orderBy('__name__', 'asc')));
-                                const fullBase64 = chunksSnap.docs.sort((a,b) => parseInt(a.id)-parseInt(b.id)).map(d => d.data().data).join('');
-                                setFlyerUrl(base64ToBlobUrl(fullBase64));
-                            } else {
-                                setFlyerUrl(fData.url?.startsWith('data:') ? base64ToBlobUrl(fData.url) : fData.url);
-                            }
-                        }
-                    }
+                    // NOTA: El flyer NO se carga aquí para ahorrar lecturas de bots.
                 }
             } catch (e) {
                 console.error("Error loading public settings");
@@ -84,7 +72,7 @@ export default function PublicRegistrationPage() {
             }
         };
         fetchSettings();
-    }, [db, base64ToBlobUrl]);
+    }, [db]);
 
     const handlePhoneMask = (val: string) => {
         const clean = val.replace(/\D/g, '').slice(0, 10);
@@ -127,6 +115,32 @@ export default function PublicRegistrationPage() {
 
                 setElectorData({ id: snap.id, ...padronData });
                 setTelefono(padronData.TELEFONO || '');
+                
+                // CARGA DIFERIDA DEL FLYER (OPTIMIZACIÓN)
+                // Solo llegamos aquí si es un usuario válido.
+                try {
+                    const settingsSnap = await getDoc(doc(db!, SETTINGS_COLLECTION, 'global'));
+                    if (settingsSnap.exists()) {
+                        const data = settingsSnap.data();
+                        if (data.public_event_flyer_id && data.public_event_flyer_id !== 'NONE') {
+                            const flyerSnap = await getDoc(doc(db!, FLYERS_COLLECTION, data.public_event_flyer_id));
+                            if (flyerSnap.exists()) {
+                                const fData = flyerSnap.data();
+                                if (fData.isChunked) {
+                                    const chunksSnap = await getDocs(query(collection(db!, FLYERS_COLLECTION, data.public_event_flyer_id, 'chunks'), orderBy('__name__', 'asc')));
+                                    const fullBase64 = chunksSnap.docs.sort((a,b) => parseInt(a.id)-parseInt(b.id)).map(d => d.data().data).join('');
+                                    setFlyerUrl(base64ToBlobUrl(fullBase64));
+                                } else {
+                                    // Soporta tanto nueva URL de Storage como base64 viejo
+                                    setFlyerUrl(fData.url?.startsWith('data:') ? base64ToBlobUrl(fData.url) : (fData.url || '/logo.png'));
+                                }
+                            }
+                        }
+                    }
+                } catch (errFlyer) {
+                    console.warn("Error loading flyer asset, using fallback", errFlyer);
+                }
+
                 setStep('form');
             } else {
                 toast({ 

@@ -1,0 +1,23 @@
+{
+  "name": "ARKI CONCEJAL 2026",
+  "short_name": "ARKI CONCEJAL",
+  "description": "Sistema de Gestión lISTA 2P - OPCION 2 - Equipo Arki Sotomayor",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ef4444",
+  "icons": [
+    {
+      "src": "/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
