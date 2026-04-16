@@ -24,7 +24,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle, X } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -588,7 +588,11 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     const s = searchTerm.toLowerCase();
-    return users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s) || u.username.toLowerCase().includes(s));
+    return users.filter(u => 
+        (u.name || '').toLowerCase().includes(s) || 
+        (u.email || '').toLowerCase().includes(s) || 
+        (u.username || '').toLowerCase().includes(s)
+    );
   }, [users, searchTerm]);
 
   const groupedUsers = useMemo(() => {
@@ -733,7 +737,7 @@ export default function UsersPage() {
                                                         <div className={cn("relative", user.active === false && "grayscale opacity-50")}>
                                                             <Avatar className="h-10 w-10 border-2 border-white shadow-sm font-black uppercase">
                                                                 <AvatarImage src={user.photoUrl} className="object-cover" />
-                                                                <AvatarFallback className="bg-primary/5 text-primary text-[10px]">{user.name.substring(0,2)}</AvatarFallback>
+                                                                <AvatarFallback className="bg-primary/5 text-primary text-[10px]">{ (user.name || '??').substring(0,2) }</AvatarFallback>
                                                             </Avatar>
                                                             {user.active === false && <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 border border-white shadow-sm"><X className="h-2 w-2 text-white" /></div>}
                                                         </div>
