@@ -2,8 +2,8 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, query, where, doc, updateDoc, orderBy, getDoc } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { collection, getDocs, query, where, doc, updateDoc, orderBy, getDoc, onSnapshot } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import type { Elector as ElectorType, Seccional } from '@/types';
 
@@ -122,24 +122,39 @@ export default function ControlVotacionPage() {
         if (seccionalReady) fetchMetadata();
     }, [selectedSeccional, user, fetchMetadata, isAdmin]);
 
-    const fetchElectores = useCallback(async () => {
+    useEffect(() => {
         const seccionalToQuery = isAdmin ? selectedSeccional : user?.seccional;
-        if (!seccionalToQuery || !selectedLocal || selectedMesa === null || !db) return;
-        setIsLoadingElectores(true); setElectores([]);
-        try {
-            const dataCollection = collection(db, 'sheet1');
-            const qNum = query(dataCollection, where('CODIGO_SEC', '==', seccionalToQuery), where('LOCAL', '==', selectedLocal), where('MESA', '==', selectedMesa));
-            const qStr = query(dataCollection, where('CODIGO_SEC', '==', seccionalToQuery), where('LOCAL', '==', selectedLocal), where('MESA', '==', String(selectedMesa)));
-            const [snapshotNum, snapshotStr] = await Promise.all([getDocs(qNum), getDocs(qStr)]);
-            const localMap = new Map<string, Elector>();
-            [...snapshotNum.docs, ...snapshotStr.docs].forEach(doc => {
-                if (!localMap.has(doc.id)) localMap.set(doc.id, { id: doc.id, ...doc.data(), estado_votacion: doc.data().estado_votacion || 'Pendiente' } as Elector);
-            });
-            setElectores(Array.from(localMap.values()));
-        } catch (error) { toast({ title: "Error", variant: "destructive" }); } finally { setIsLoadingElectores(false); }
-    }, [selectedSeccional, selectedLocal, selectedMesa, db, toast, user, isAdmin]);
+        if (!seccionalToQuery || !selectedLocal || selectedMesa === null || !db) {
+            setElectores([]);
+            return;
+        }
 
-    useEffect(() => { if (selectedMesa !== null) fetchElectores(); }, [selectedMesa, fetchElectores]);
+        setIsLoadingElectores(true);
+        
+        // Optimizamos usando 'in' para traer tanto Number como String en una sola consulta
+        const q = query(
+            collection(db, 'sheet1'), 
+            where('CODIGO_SEC', '==', seccionalToQuery), 
+            where('LOCAL', '==', selectedLocal), 
+            where('MESA', 'in', [selectedMesa, String(selectedMesa)])
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ 
+                id: doc.id, 
+                ...doc.data(), 
+                estado_votacion: doc.data().estado_votacion || 'Pendiente' 
+            } as Elector));
+            setElectores(list);
+            setIsLoadingElectores(false);
+        }, (error) => {
+            console.error("Error in real-time control votacion:", error);
+            setIsLoadingElectores(false);
+            toast({ title: "Error de conexión", variant: "destructive" });
+        });
+
+        return () => unsubscribe();
+    }, [selectedSeccional, selectedLocal, selectedMesa, db, toast, user, isAdmin]);
 
     const handleToggleVoto = (elector: Elector) => {
         if (isUpdating || !db || !user) return;
@@ -191,7 +206,7 @@ export default function ControlVotacionPage() {
                 <Card><CardHeader><CardTitle>SECC {seccionalToShow}</CardTitle><CardDescription>{selectedLocal} | MESA {selectedMesa}</CardDescription></CardHeader>
                 <CardContent>
                     <div className="grid grid-cols-10 sm:grid-cols-15 md:grid-cols-20 border-t border-l">
-                        {ordenes.map(orden => {
+                        {ordenes.map((orden: number) => {
                             const elector = electoresMap.get(orden);
                             const haVotado = elector?.estado_votacion === 'Ya Votó';
                             return <Button key={orden} onClick={() => elector && handleToggleVoto(elector)} disabled={isLoadingElectores || isUpdating || !elector} className={cn("h-10 w-full p-0 font-bold rounded-none border-b border-r text-xs", haVotado ? "bg-green-500 text-white" : "bg-white")} variant="outline">{orden}</Button>

@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { collection, query, limit, getCountFromServer } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -53,7 +53,7 @@ export default function ReportesPage() {
     return query(collection(db, 'votos_confirmados'), limit(300));
   }, [db, user, refreshKey]);
 
-  const { data: rawList, isLoading } = useCollectionOnce<VotoSeguroData>(registeredQuery);
+  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
 
   // CONTEO GLOBAL DESDE EL SERVIDOR
   useState(() => {

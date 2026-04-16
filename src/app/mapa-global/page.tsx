@@ -5,7 +5,7 @@ import { useState, useEffect, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ interface ElectorUbicado {
     CEDULA: number | string;
     NOMBRE: string;
     APELLIDO: string;
-    CODIGO_SEC?: string | number;
+    CODIGO_SEC?: string; // Normalizado como string para compatibilidad con mapa
     LATITUD: number;
     LONGITUD: number;
     registradoPor_nombre?: string;
@@ -67,14 +67,13 @@ export default function MapaGlobalPage() {
     const isCoordinador = user?.role === 'Coordinador';
     const isDirigente = user?.role === 'Dirigente';
 
-    // ESCUCHADOR EN TIEMPO REAL A LOS VOTOS CONFIRMADOS
     const pointsQuery = useMemoFirebase(() => {
         if (!db) return null;
-        // Solo traemos los que tienen coordenadas
-        return collection(db, 'votos_confirmados');
+        // Solo traemos los que tienen coordenadas. Límite de 1000 para seguridad de costos.
+        return query(collection(db, 'votos_confirmados'), limit(1000));
     }, [db, refreshKey]);
 
-    const { data: rawPoints, isLoading: isLoadingPoints } = useCollectionOnce<ElectorUbicado>(pointsQuery);
+    const { data: rawPoints, isLoading: isLoadingPoints } = useCollection<ElectorUbicado>(pointsQuery);
 
     const handleRefresh = () => {
         setRefreshKey(prev => prev + 1);

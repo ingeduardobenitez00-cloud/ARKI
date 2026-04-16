@@ -4,7 +4,7 @@
 import { useState, useMemo } from 'react';
 import { collection, doc, updateDoc, deleteDoc, getCountFromServer, query, limit, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -67,6 +67,7 @@ export default function VotoSeguroPage() {
   const [customFilename, setCustomFilename] = useState('');
   const [totalCount, setTotalCount] = useState<number | null>(null);
   const [limitCount, setLimitCount] = useState(50);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS CON LÍMITE
   const registeredQuery = useMemoFirebase(() => {
@@ -76,9 +77,9 @@ export default function VotoSeguroPage() {
         orderBy('APELLIDO', 'asc'),
         limit(limitCount)
     );
-  }, [db, user, limitCount]);
+  }, [db, user, limitCount, refreshKey]);
 
-  const { data: rawList, isLoading, refetch } = useCollectionOnce<VotoSeguroData>(registeredQuery);
+  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
 
   // CONTEO EFICIENTE DESDE EL SERVIDOR (PLAN BLAZE OPTIMIZADO)
   useState(() => {
@@ -200,7 +201,7 @@ export default function VotoSeguroPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookHeart className="h-8 w-8 text-primary" /> Listado de Voto Seguro</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control optimizado de captación por operador.</p></div>
         <div className="flex gap-2">
-            <Button onClick={() => refetch()} variant="outline" className="font-black uppercase text-[10px] h-9 border-primary/20"><Loader2 className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} /> REFRESCAR</Button>
+            <Button onClick={() => setRefreshKey(v => v + 1)} variant="outline" className="font-black uppercase text-[10px] h-9 border-primary/20"><Loader2 className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} /> REFRESCAR</Button>
             <Button onClick={() => setIsFilenameDialogOpen(true)} disabled={filteredList.length === 0 || isExporting} variant="default" className="font-black uppercase text-[10px] h-9 shadow-lg"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
         </div>
       </div>
