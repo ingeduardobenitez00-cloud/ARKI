@@ -696,7 +696,7 @@ export default function UsersPage() {
                 <Skeleton className="h-20 w-full rounded-2xl" />
             </div>
         ) : groupedUsers.sortedKeys.length > 0 ? (
-            <Accordion type="multiple" defaultValue={['PC']} className="space-y-4">
+            <Accordion type="multiple" defaultValue={[]} className="space-y-4">
                 {groupedUsers.sortedKeys.map(key => {
                     const usersInGroup = groupedUsers.groups[key];
                     let label = '';
