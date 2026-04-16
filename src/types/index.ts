@@ -14,6 +14,7 @@ export interface User {
   permissions: string[]; // Array of hrefs for allowed modules
   moduleActions?: Record<string, ('create' | 'update' | 'delete' | 'pdf' | 'excel')[]>; // Granular actions per module path
   actions: ('create' | 'update' | 'delete' | 'pdf' | 'excel')[]; // Global actions (legacy support)
+  active?: boolean; // Whether the account is active or suspended
 }
 
 export interface Seccional {

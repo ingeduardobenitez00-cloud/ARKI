@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { allMenuItems, userRoles, menuCategories } from '@/lib/menu-data';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where, orderBy } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { useFirestore, useStorage } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -24,7 +24,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,6 +60,17 @@ type EditUserFormData = z.infer<typeof editUserSchema>;
 
 const USERS_COLLECTION_NAME = 'users';
 const PADRON_COLLECTION = 'sheet1';
+
+const ROLE_HIERARCHY: Record<string, number> = {
+  'Super-Admin': 0,
+  'Admin': 0,
+  'Presidente': 1,
+  'Coordinador': 2,
+  'Dirigente': 3,
+  'Recepcionista': 4,
+  'Mesario': 5,
+  'Comunicaciones': 6,
+};
 
 function UserFormContent({ control, register, errors, editingUser, watch, setValue, seccionales }: {
     control: any;
@@ -117,6 +128,21 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
         };
         fetchMetadata();
     }, [assignedSeccionales, db]);
+
+    const [rolePresets, setRolePresets] = useState<any[]>([]);
+    useEffect(() => {
+        if (!db) return;
+        getDocs(query(collection(db, 'role_presets'), orderBy('name', 'asc'))).then(snap => {
+            setRolePresets(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        });
+    }, [db]);
+
+    const applyPreset = (preset: any) => {
+        setValue('role', preset.role);
+        setValue('permissions', preset.permissions || []);
+        setValue('moduleActions', preset.moduleActions || {});
+        toast({ title: "Perfil Aplicado", description: `Se cargaron los permisos de: ${preset.name}` });
+    };
 
     const locales = useMemo(() => metadata?.locales || [], [metadata]);
     const mesas = useMemo(() => {
@@ -211,6 +237,29 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
 
     return (
         <div className="space-y-6">
+            {rolePresets.length > 0 && (
+                <div className="space-y-3 p-5 border-2 border-dashed border-primary/20 rounded-3xl bg-primary/[0.02]">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                        <ShieldCheck className="h-3.5 w-3.5" />
+                        Botones de Perfil Rápido
+                    </Label>
+                    <div className="flex flex-wrap gap-2">
+                        {rolePresets.map(p => (
+                            <Button 
+                                key={p.id} 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => applyPreset(p)}
+                                className="h-9 px-4 font-black uppercase text-[9px] rounded-xl border-primary/10 hover:bg-primary hover:text-white transition-all shadow-sm"
+                            >
+                                {p.name}
+                            </Button>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             <div className="bg-primary/5 p-6 rounded-[2rem] border border-primary/10 space-y-4">
                 <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
                     <UserPlus className="h-3.5 w-3.5" />
@@ -418,17 +467,17 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
 
     const defaultValues = useMemo(() => {
         const base = editingUser 
-            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), local: editingUser.local || '', mesas: editingUser.mesas || [] } 
-            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista', seccionales: [], local: '', mesas: [], permissions: [], moduleActions: {} };
+            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role as any || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), local: editingUser.local || '', mesas: editingUser.mesas || [] } 
+            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista' as any, seccionales: [], local: '', mesas: [], permissions: [], moduleActions: {} };
         return base;
     }, [editingUser]);
 
     const { register, handleSubmit, control, setValue, watch, reset, formState: { errors } } = useForm<UserFormData | EditUserFormData>({
         resolver: zodResolver(editingUser ? editUserSchema : userSchema),
-        defaultValues,
+        defaultValues: defaultValues as any,
     });
     
-    useEffect(() => { if (isOpen) reset(defaultValues); }, [isOpen, editingUser, reset, defaultValues]);
+    useEffect(() => { if (isOpen) reset(defaultValues as any); }, [isOpen, editingUser, reset, defaultValues]);
 
     const onSubmit = async (data: UserFormData | EditUserFormData) => {
         if (!currentUser || !db || !storage) return;
@@ -532,6 +581,61 @@ export default function UsersPage() {
     return users.filter(u => u.name.toLowerCase().includes(s) || u.email.toLowerCase().includes(s) || u.username.toLowerCase().includes(s));
   }, [users, searchTerm]);
 
+  const groupedUsers = useMemo(() => {
+    const groups: Record<string, User[]> = {};
+    
+    filteredUsers.forEach(u => {
+        let key = '';
+        if (u.role === 'Admin' || u.role === 'Super-Admin') {
+            key = 'PC';
+        } else {
+            const secs = u.seccionales || (u.seccional ? [u.seccional] : []);
+            if (secs.length > 1) {
+                key = 'MULTI';
+            } else if (secs.length === 1) {
+                key = String(secs[0]);
+            } else {
+                key = 'GLOBAL';
+            }
+        }
+        
+        if (!groups[key]) groups[key] = [];
+        groups[key].push(u);
+    });
+    
+    const sortedKeys = Object.keys(groups).sort((a, b) => {
+        if (a === 'PC') return -1;
+        if (b === 'PC') return 1;
+        if (a === 'GLOBAL') return 1;
+        if (b === 'GLOBAL') return -1;
+        if (a === 'MULTI') return b === 'GLOBAL' ? -1 : 1;
+        if (b === 'MULTI') return a === 'GLOBAL' ? 1 : -1;
+        return a.localeCompare(b, undefined, { numeric: true });
+    });
+    
+    sortedKeys.forEach(k => {
+        groups[k].sort((a, b) => (ROLE_HIERARCHY[a.role] || 99) - (ROLE_HIERARCHY[b.role] || 99));
+    });
+    
+    return { groups, sortedKeys };
+  }, [filteredUsers]);
+
+  const toggleActive = async (user: User) => {
+    if (!db) return;
+    const newState = user.active === false; // If undefined or true, it becomes false. If false, becomes true.
+    try {
+        await updateDoc(doc(db, USERS_COLLECTION_NAME, user.id), {
+            active: newState
+        });
+        toast({ 
+            title: newState ? "Operador Activado" : "Operador Suspendido", 
+            description: `El acceso para ${user.name} ha sido ${newState ? 'reestablecido' : 'revocado'}.` 
+        });
+    } catch (e) {
+        toast({ title: "Error", description: "No se pudo cambiar el estado del usuario.", variant: "destructive" });
+    }
+  };
+
   const handleDelete = async () => {
     if (userToDelete && currentUser) {
         const userRef = doc(db, USERS_COLLECTION_NAME, userToDelete.id);
@@ -553,38 +657,141 @@ export default function UsersPage() {
 
       <div className="relative w-full max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input placeholder="Buscar por nombre o usuario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-12 font-bold rounded-2xl border-primary/10" autoComplete="off" /></div>
 
-      <div className="border rounded-[2.5rem] bg-card shadow-2xl overflow-hidden border-primary/5">
-        <Table>
-          <TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase"><TableHead className="pl-8 py-5">Operador / Identidad</TableHead><TableHead>Rol del Sistema</TableHead><TableHead>Jurisdicción (SECC)</TableHead><TableHead>Acciones Habilitadas</TableHead><TableHead className="text-right pr-8">Opciones</TableHead></TableRow></TableHeader>
-          <TableBody>
-            {isLoading ? Array.from({ length: 5 }).map((_, i) => <TableRow key={i}><TableCell colSpan={5} className="px-8 py-4"><Skeleton className="h-14 w-full rounded-2xl" /></TableCell></TableRow>) :
-            filteredUsers.length > 0 ? filteredUsers.map(user => (
-                <TableRow key={user.id} className="hover:bg-primary/[0.02] transition-colors border-b">
-                  <TableCell className="py-5 pl-8"><div className="flex items-center gap-4"><Avatar className="h-11 w-11 border-2 border-white shadow-md"><AvatarImage src={user.photoUrl} className="object-cover" /><AvatarFallback className="bg-primary/10 text-primary font-black text-xs">{user.name.substring(0,2)}</AvatarFallback></Avatar><div className="flex flex-col"><span className="font-black text-sm uppercase tracking-tight text-slate-900">{user.name}</span><span className="text-[10px] text-muted-foreground font-bold">{user.email}</span></div></div></TableCell>
-                  <TableCell><Badge variant="secondary" className="font-black text-[9px] uppercase tracking-widest px-3 py-1 bg-primary/5 text-primary border-primary/10">{user.role}</Badge></TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1 max-w-[200px]">
-                        {(() => {
-                            const raw = (user.seccionales || (user.seccional ? [user.seccional] : []));
-                            if (raw.length === 0) return <span className="text-[9px] font-bold text-muted-foreground uppercase">Global</span>;
-                            return raw.map(s => {
-                                const clean = String(s).toUpperCase().replace('SECCIONAL', '').trim();
-                                return <Badge key={clean} variant="outline" className="text-[8px] font-black uppercase border-slate-200 bg-white">SECC {clean}</Badge>;
-                            });
-                        })()}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex gap-1.5 flex-wrap max-w-xs">
-                        {user.permissions?.slice(0, 3).map(p => <Badge key={p} variant="outline" className="text-[8px] font-black uppercase border-slate-200">{p.replace('/', '') || 'DASHBOARD'}</Badge>)}
-                        {user.permissions?.length > 3 && <span className="text-[10px] font-black text-muted-foreground">+ {user.permissions.length - 3}</span>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right pr-8"><DropdownMenu><DropdownMenuTrigger asChild><Button variant="ghost" className="h-10 w-10 p-0 rounded-full hover:bg-primary/5"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger><DropdownMenuContent align="end" className="w-48 font-black uppercase text-[10px] rounded-2xl shadow-2xl border-primary/10 p-2"><DropdownMenuItem onClick={() => { setEditingUser(user); setIsDialogOpen(true); }} className="cursor-pointer rounded-xl"><Edit className="w-4 h-4 mr-3 text-primary" /> EDITAR FICHA</DropdownMenuItem><DropdownMenuItem className="text-red-500 cursor-pointer rounded-xl" onClick={() => { setUserToDelete(user); setIsAlertOpen(true); }}><Trash2 className="w-4 h-4 mr-3" /> ELIMINAR CUENTA</DropdownMenuItem></DropdownMenuContent></DropdownMenu></TableCell>
-                </TableRow>
-            )) : <TableRow><TableCell colSpan={5} className="h-64 text-center opacity-30"><Users className="w-16 h-16 mx-auto mb-2"/><p className="font-black uppercase text-xs tracking-widest">Sin registros hallados</p></TableCell></TableRow>}
-          </TableBody>
-        </Table>
+      <div className="space-y-4">
+        {isLoading ? (
+            <div className="border rounded-[2.5rem] bg-card p-8 shadow-2xl border-primary/5">
+                <Skeleton className="h-20 w-full rounded-2xl mb-4" />
+                <Skeleton className="h-20 w-full rounded-2xl mb-4" />
+                <Skeleton className="h-20 w-full rounded-2xl" />
+            </div>
+        ) : groupedUsers.sortedKeys.length > 0 ? (
+            <Accordion type="multiple" defaultValue={['PC']} className="space-y-4">
+                {groupedUsers.sortedKeys.map(key => {
+                    const usersInGroup = groupedUsers.groups[key];
+                    let label = '';
+                    let icon = <Users className="h-5 w-5 text-primary" />;
+                    
+                    if (key === 'PC') {
+                      label = 'PC (Puesto de Comando)';
+                      icon = <ShieldCheck className="h-5 w-5 text-primary" />;
+                    } else if (key === 'MULTI') {
+                      label = 'Dirigentes Múltiples Seccionales';
+                      icon = <Layers className="h-5 w-5 text-primary" />;
+                    } else if (key === 'GLOBAL') {
+                      label = 'Operadores Globales';
+                      icon = <UserCircle className="h-5 w-5 text-primary" />;
+                    } else {
+                      label = `Seccional ${key}`;
+                      icon = <MapPin className="h-5 w-5 text-primary" />;
+                    }
+
+                    return (
+                        <AccordionItem key={key} value={key} className="border rounded-[2.5rem] bg-card shadow-xl overflow-hidden border-primary/5 px-0">
+                            <AccordionTrigger className="hover:no-underline py-6 px-8 group">
+                                <div className="flex items-center gap-4">
+                                    <div className="p-2.5 rounded-2xl bg-primary/5 group-data-[state=open]:bg-primary/10 transition-colors">
+                                        {icon}
+                                    </div>
+                                    <div className="flex flex-col items-start translate-y-0.5 text-left">
+                                        <span className="font-black uppercase tracking-tight text-lg text-slate-800">{label}</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{usersInGroup.length} Operadores</span>
+                                            {usersInGroup.some(u => u.active === false) && (
+                                                <Badge variant="destructive" className="h-3 px-1.5 text-[7px] font-black animate-pulse">ALERTA SUSPENSIÓN</Badge>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-0 border-t bg-slate-50/10">
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="bg-muted/30 text-[9px] font-black uppercase border-b">
+                                            <TableHead className="pl-8 py-4">Operador / Identidad</TableHead>
+                                            <TableHead>Rol del Sistema</TableHead>
+                                            <TableHead>Jurisdicción (SECC)</TableHead>
+                                            <TableHead>Acciones Habilitadas</TableHead>
+                                            <TableHead className="text-right pr-8">Opciones</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {usersInGroup.map(user => (
+                                            <TableRow key={user.id} className="hover:bg-primary/[0.01] transition-colors border-b last:border-0 bg-white/50">
+                                                <TableCell className="py-4 pl-8">
+                                                    <div className="flex items-center gap-4">
+                                                        <div className={cn("relative", user.active === false && "grayscale opacity-50")}>
+                                                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm font-black uppercase">
+                                                                <AvatarImage src={user.photoUrl} className="object-cover" />
+                                                                <AvatarFallback className="bg-primary/5 text-primary text-[10px]">{user.name.substring(0,2)}</AvatarFallback>
+                                                            </Avatar>
+                                                            {user.active === false && <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 border border-white shadow-sm"><X className="h-2 w-2 text-white" /></div>}
+                                                        </div>
+                                                        <div className="flex flex-col">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={cn("font-black text-xs uppercase tracking-tight leading-none", user.active === false ? "text-slate-400 line-through" : "text-slate-900")}>{user.name}</span>
+                                                                {user.active === false && <Badge variant="destructive" className="h-3 px-1 text-[6px] font-black uppercase">SUSPENDIDO</Badge>}
+                                                            </div>
+                                                            <span className="text-[9px] text-muted-foreground font-bold">{user.email}</span>
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="font-black text-[8px] uppercase tracking-widest px-2 py-0.5 bg-primary/5 text-primary border-primary/5">
+                                                        {user.role}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex flex-wrap gap-1 max-w-[180px]">
+                                                        {(() => {
+                                                            const raw = (user.seccionales || (user.seccional ? [user.seccional] : []));
+                                                            if (raw.length === 0) return <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">Global</span>;
+                                                            return raw.map(s => {
+                                                                const clean = String(s).toUpperCase().replace('SECCIONAL', '').trim();
+                                                                return <Badge key={clean} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-white shadow-sm">SECC {clean}</Badge>;
+                                                            });
+                                                        })()}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex gap-1 flex-wrap max-w-[150px]">
+                                                        {user.permissions?.slice(0, 2).map(p => (
+                                                            <Badge key={p} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-slate-50">
+                                                                {p.replace('/', '') || 'DASHBOARD'}
+                                                            </Badge>
+                                                        ))}
+                                                        {user.permissions?.length > 2 && <span className="text-[8px] font-black text-muted-foreground opacity-50">+ {user.permissions.length - 2}</span>}
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right pr-8">
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-primary/5"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="w-48 font-black uppercase text-[10px] rounded-2xl shadow-2xl border-primary/10 p-2">
+                                                            <DropdownMenuItem onClick={() => { setEditingUser(user); setIsDialogOpen(true); }} className="cursor-pointer rounded-xl"><Edit className="w-3.5 h-3.5 mr-3 text-primary" /> EDITAR FICHA</DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => toggleActive(user)} className={cn("cursor-pointer rounded-xl", user.active === false ? "text-green-600" : "text-amber-600")}>
+                                                                {user.active === false ? <CheckCircle2 className="w-3.5 h-3.5 mr-3" /> : <ShieldCheck className="w-3.5 h-3.5 mr-3" />}
+                                                                {user.active === false ? 'ACTIVAR CUENTA' : 'INACTIVAR CUENTA'}
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem className="text-red-500 cursor-pointer rounded-xl" onClick={() => { setUserToDelete(user); setIsAlertOpen(true); }}><Trash2 className="w-3.5 h-3.5 mr-3" /> ELIMINAR CUENTA</DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </AccordionContent>
+                        </AccordionItem>
+                    );
+                })}
+            </Accordion>
+        ) : (
+            <div className="border rounded-[2.5rem] bg-card p-20 text-center opacity-30 shadow-xl border-primary/5">
+                <Users className="w-16 h-16 mx-auto mb-4 text-primary" />
+                <p className="font-black uppercase text-sm tracking-widest">Sin operadores registrados bajo este criterio</p>
+            </div>
+        )}
       </div>
       
       <UserDialog isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} editingUser={editingUser} onSuccess={fetchUsersAndSeccionales} seccionales={seccionales} />

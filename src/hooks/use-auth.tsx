@@ -42,6 +42,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (userDoc.exists()) {
           const userData = { id: userDoc.id, ...userDoc.data() } as User;
           
+          // Verificar si la cuenta está suspendida
+          if (userData.active === false) {
+            console.warn(`Cuenta suspendida detectada: ${userData.id}`);
+            signOut(firebaseAuth).then(() => {
+                setAppUser(null);
+                setIsAuthLoading(false);
+                router.replace('/login?error=account_suspended');
+            });
+            return;
+          }
+          
           // Determinar permisos base por rol si no existen
           let permissions = [...(userData.permissions || [])];
           if (userData.role && permissions.length === 0) {
