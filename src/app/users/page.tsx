@@ -614,33 +614,53 @@ export default function UsersPage() {
 
   const groupedUsers = useMemo(() => {
     const groups: Record<string, User[]> = {};
-    
+    const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Super-Admin';
+    const isLocalLeader = currentUser?.role === 'Presidente' || currentUser?.role === 'Coordinador';
+    const userSeccionales = currentUser?.seccionales || [];
+
+    // 2. Inicializar grupos de Seccionales y Grupos Especiales
+    if (isAdmin) {
+        seccionales.forEach(s => { groups[String(s.id)] = []; });
+    } else if (isLocalLeader) {
+        userSeccionales.forEach(sId => { groups[String(sId)] = []; });
+    }
+    groups['PC'] = [];
+    groups['MULTI'] = [];
+    groups['GLOBAL'] = [];
+
+    // 3. Procesar usuarios
     filteredUsers.forEach(u => {
-        let key = '';
-        if (u.role === 'Admin' || u.role === 'Super-Admin' || u.role === 'Presidente') {
-            key = 'PC';
-        } else {
-            const secs = u.seccionales || (u.seccional ? [u.seccional] : []);
-            if (secs.length > 1) {
-                key = 'MULTI';
-            } else if (secs.length === 1) {
-                key = String(secs[0]);
-            } else {
-                key = 'GLOBAL';
-            }
-        }
+        const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
         
-        if (!groups[key]) groups[key] = [];
-        groups[key].push(u);
+        if (uSecs.length > 1) {
+            // Grupo de Dirigentes con Varias Seccionales
+            groups['MULTI'].push(u);
+        } else if (uSecs.length === 1) {
+            // Grupo de Seccional Única
+            const key = String(uSecs[0]);
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(u);
+        } else {
+            // Sin seccionales asignadas
+            const key = (u.role === 'Admin' || u.role === 'Super-Admin' || u.role === 'Presidente') ? 'PC' : 'GLOBAL';
+            if (!groups[key]) groups[key] = [];
+            groups[key].push(u);
+        }
     });
+
+    // 4. Limpieza: Quitar GLOBAL o PC si están vacíos (MULTI se queda si el usuario pidió apartarlos)
+    if (groups['GLOBAL'] && groups['GLOBAL'].length === 0) delete groups['GLOBAL'];
+    if (groups['PC'] && groups['PC'].length === 0 && !isAdmin) delete groups['PC'];
+    if (groups['MULTI'] && groups['MULTI'].length === 0) delete groups['MULTI'];
     
     const sortedKeys = Object.keys(groups).sort((a, b) => {
         if (a === 'PC') return -1;
         if (b === 'PC') return 1;
+        if (a === 'MULTI') return -1;
+        if (b === 'MULTI') return 1;
         if (a === 'GLOBAL') return 1;
         if (b === 'GLOBAL') return -1;
-        if (a === 'MULTI') return b === 'GLOBAL' ? -1 : 1;
-        if (b === 'MULTI') return a === 'GLOBAL' ? 1 : -1;
+        
         return a.localeCompare(b, undefined, { numeric: true });
     });
     
@@ -679,6 +699,30 @@ export default function UsersPage() {
     }
   };
 
+  const stats = useMemo(() => {
+    const totalUsers = users.length;
+    const seccionalIdsWithExclusiveUsers = new Set<string>();
+    
+    users.forEach(u => {
+      const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
+      // Solo contamos seccionales que tienen operadores exclusivos (según el deseo del usuario de identificar vacíos reales)
+      if (uSecs.length === 1 && uSecs[0]) {
+        seccionalIdsWithExclusiveUsers.add(String(uSecs[0]));
+      }
+    });
+
+    const activeCount = seccionalIdsWithExclusiveUsers.size;
+    const totalSecs = seccionales.length;
+
+    return {
+      totalUsers,
+      activeSeccionalesCount: activeCount,
+      emptySeccionalesCount: Math.max(0, totalSecs - activeCount),
+      totalSeccionales: totalSecs,
+      seccionalIdsWithExclusiveUsers
+    };
+  }, [users, seccionales]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -686,7 +730,44 @@ export default function UsersPage() {
         <Button onClick={() => { setEditingUser(null); setIsDialogOpen(true); }} className="font-black h-12 px-8 shadow-xl rounded-2xl active:scale-95 transition-all"><PlusCircle className="w-5 h-5 mr-2" /> CREAR OPERADOR</Button>
       </div>
 
-      <div className="relative w-full max-w-md"><Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" /><Input placeholder="Buscar por nombre o usuario..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10 h-12 font-bold rounded-2xl border-primary/10" autoComplete="off" /></div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="bg-emerald-50/50 border border-emerald-100 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm">
+            <div className="bg-emerald-100 p-3 rounded-2xl text-emerald-600"><CheckCircle2 className="h-6 w-6" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase text-emerald-700 leading-none mb-1.5 tracking-wider">Seccionales con Usuario</p>
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-2xl font-black text-emerald-900 leading-none">{stats.activeSeccionalesCount}</p>
+                <span className="text-[10px] font-bold text-emerald-700/60 uppercase">Cubiertas</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-amber-50/50 border border-amber-100 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm">
+            <div className="bg-amber-100 p-3 rounded-2xl text-amber-600"><UserPlus className="h-6 w-6" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase text-amber-700 leading-none mb-1.5 tracking-wider">Seccionales sin Usuario</p>
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-2xl font-black text-amber-900 leading-none">{stats.emptySeccionalesCount}</p>
+                <span className="text-[10px] font-bold text-amber-700/60 uppercase">Por cubrir</span>
+              </div>
+            </div>
+          </div>
+          <div className="bg-white border border-primary/5 rounded-[1.5rem] p-4 flex items-center gap-4 shadow-sm">
+            <div className="bg-primary/5 p-3 rounded-2xl text-primary"><Users className="h-6 w-6" /></div>
+            <div>
+              <p className="text-[9px] font-black uppercase text-muted-foreground leading-none mb-1.5 tracking-wider">Total de Usuarios</p>
+              <div className="flex items-baseline gap-1.5">
+                <p className="text-2xl font-black text-slate-900 leading-none">{stats.totalUsers}</p>
+                <span className="text-[10px] font-bold text-muted-foreground uppercase">Registrados</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center">
+            <div className="relative w-full">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input placeholder="Buscar..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-12 h-14 font-bold rounded-[1.5rem] border-primary/5 shadow-sm bg-white" autoComplete="off" />
+            </div>
+          </div>
+        </div>
 
       <div className="space-y-4">
         {isLoading ? (
@@ -702,11 +783,14 @@ export default function UsersPage() {
                     let label = '';
                     let icon = <Users className="h-5 w-5 text-primary" />;
                     
+                    const isSpecial = ['PC', 'MULTI', 'GLOBAL'].includes(key);
+                    const isEmpty = usersInGroup.length === 0 && !isSpecial;
+
                     if (key === 'PC') {
                       label = 'PC (Puesto de Comando)';
                       icon = <ShieldCheck className="h-5 w-5 text-primary" />;
                     } else if (key === 'MULTI') {
-                      label = 'Dirigentes Múltiples Seccionales';
+                      label = 'Dirigentes con Varias Seccionales';
                       icon = <Layers className="h-5 w-5 text-primary" />;
                     } else if (key === 'GLOBAL') {
                       label = 'Operadores Globales';
@@ -718,16 +802,35 @@ export default function UsersPage() {
                     }
 
                     return (
-                        <AccordionItem key={key} value={key} className="border rounded-[2.5rem] bg-card shadow-xl overflow-hidden border-primary/5 px-0">
+                        <AccordionItem 
+                            key={key} 
+                            value={key} 
+                            className={cn(
+                                "border rounded-[2.5rem] bg-card shadow-xl overflow-hidden transition-all duration-300 px-0",
+                                isEmpty ? "border-amber-200 bg-amber-50/20 opacity-80" : "border-primary/5 shadow-primary/[0.02]"
+                            )}
+                        >
                             <AccordionTrigger className="hover:no-underline py-6 px-8 group">
                                 <div className="flex items-center gap-4">
-                                    <div className="p-2.5 rounded-2xl bg-primary/5 group-data-[state=open]:bg-primary/10 transition-colors">
-                                        {icon}
+                                    <div className={cn(
+                                        "p-2.5 rounded-2xl transition-colors",
+                                        isEmpty ? "bg-amber-100 text-amber-600" : "bg-primary/5 text-primary group-data-[state=open]:bg-primary/10"
+                                    )}>
+                                        {isEmpty ? <UserPlus className="h-5 w-5" /> : icon}
                                     </div>
                                     <div className="flex flex-col items-start translate-y-0.5 text-left">
-                                        <span className="font-black uppercase tracking-tight text-lg text-slate-800">{label}</span>
+                                        <span className={cn(
+                                            "font-black uppercase tracking-tight text-lg",
+                                            isEmpty ? "text-amber-800" : "text-slate-800"
+                                        )}>{label}</span>
                                         <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{usersInGroup.length} Operadores</span>
+                                            {isEmpty ? (
+                                                <Badge variant="outline" className="h-4 border-amber-300 text-amber-600 bg-amber-50 text-[7px] font-black uppercase tracking-widest px-1.5 ring-1 ring-amber-100">SIN USUARIO</Badge>
+                                            ) : (
+                                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                                  {usersInGroup.length} Usuarios
+                                                </span>
+                                            )}
                                             {usersInGroup.some(u => u.active === false) && (
                                                 <Badge variant="destructive" className="h-3 px-1.5 text-[7px] font-black animate-pulse">ALERTA SUSPENSIÓN</Badge>
                                             )}
@@ -747,70 +850,81 @@ export default function UsersPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {usersInGroup.map(user => (
-                                            <TableRow key={user.id} className="hover:bg-primary/[0.01] transition-colors border-b last:border-0 bg-white/50">
-                                                <TableCell className="py-4 pl-8">
-                                                    <div className="flex items-center gap-4">
-                                                        <div className={cn("relative", user.active === false && "grayscale opacity-50")}>
-                                                            <Avatar className="h-10 w-10 border-2 border-white shadow-sm font-black uppercase">
-                                                                <AvatarImage src={user.photoUrl} className="object-cover" />
-                                                                <AvatarFallback className="bg-primary/5 text-primary text-[10px]">{ (user.name || '??').substring(0,2) }</AvatarFallback>
-                                                            </Avatar>
-                                                            {user.active === false && <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 border border-white shadow-sm"><X className="h-2 w-2 text-white" /></div>}
-                                                        </div>
-                                                        <div className="flex flex-col">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className={cn("font-black text-xs uppercase tracking-tight leading-none", user.active === false ? "text-slate-400 line-through" : "text-slate-900")}>{user.name}</span>
-                                                                {user.active === false && <Badge variant="destructive" className="h-3 px-1 text-[6px] font-black uppercase">SUSPENDIDO</Badge>}
+                                        {usersInGroup.length > 0 ? (
+                                            usersInGroup.map(user => (
+                                                <TableRow key={user.id} className="hover:bg-primary/[0.01] transition-colors border-b last:border-0 bg-white/50">
+                                                    <TableCell className="py-4 pl-8">
+                                                        <div className="flex items-center gap-4">
+                                                            <div className={cn("relative", user.active === false && "grayscale opacity-50")}>
+                                                                <Avatar className="h-10 w-10 border-2 border-white shadow-sm font-black uppercase">
+                                                                    <AvatarImage src={user.photoUrl} className="object-cover" />
+                                                                    <AvatarFallback className="bg-primary/5 text-primary text-[10px]">{ (user.name || '??').substring(0,2) }</AvatarFallback>
+                                                                </Avatar>
+                                                                {user.active === false && <div className="absolute -top-1 -right-1 bg-destructive rounded-full p-0.5 border border-white shadow-sm"><X className="h-2 w-2 text-white" /></div>}
                                                             </div>
-                                                            <span className="text-[9px] text-muted-foreground font-bold">{user.email}</span>
+                                                            <div className="flex flex-col">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className={cn("font-black text-xs uppercase tracking-tight leading-none", user.active === false ? "text-slate-400 line-through" : "text-slate-900")}>{user.name}</span>
+                                                                    {user.active === false && <Badge variant="destructive" className="h-3 px-1 text-[6px] font-black uppercase">SUSPENDIDO</Badge>}
+                                                                </div>
+                                                                <span className="text-[9px] text-muted-foreground font-bold">{user.email}</span>
+                                                            </div>
                                                         </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <Badge variant="secondary" className="font-black text-[8px] uppercase tracking-widest px-2 py-0.5 bg-primary/5 text-primary border-primary/5">
+                                                            {user.role}
+                                                        </Badge>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex flex-wrap gap-1 max-w-[180px]">
+                                                            {(() => {
+                                                                const raw = (user.seccionales || (user.seccional ? [user.seccional] : []));
+                                                                if (raw.length === 0) return <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">Global</span>;
+                                                                return raw.map(s => {
+                                                                    const clean = String(s).toUpperCase().replace('SECCIONAL', '').trim();
+                                                                    return <Badge key={clean} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-white shadow-sm">SECC {clean}</Badge>;
+                                                                });
+                                                            })()}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        <div className="flex gap-1 flex-wrap max-w-[150px]">
+                                                            {user.permissions?.slice(0, 2).map(p => (
+                                                                <Badge key={p} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-slate-50">
+                                                                    {p.replace('/', '') || 'DASHBOARD'}
+                                                                </Badge>
+                                                            ))}
+                                                            {user.permissions?.length > 2 && <span className="text-[8px] font-black text-muted-foreground opacity-50">+ {user.permissions.length - 2}</span>}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right pr-8">
+                                                        <DropdownMenu>
+                                                            <DropdownMenuTrigger asChild>
+                                                                <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-primary/5"><MoreHorizontal className="h-4 w-4" /></Button>
+                                                            </DropdownMenuTrigger>
+                                                            <DropdownMenuContent align="end" className="w-48 font-black uppercase text-[10px] rounded-2xl shadow-2xl border-primary/10 p-2">
+                                                                <DropdownMenuItem onClick={() => { setEditingUser(user); setIsDialogOpen(true); }} className="cursor-pointer rounded-xl"><Edit className="w-3.5 h-3.5 mr-3 text-primary" /> EDITAR FICHA</DropdownMenuItem>
+                                                                <DropdownMenuItem onClick={() => toggleActive(user)} className={cn("cursor-pointer rounded-xl", user.active === false ? "text-green-600" : "text-amber-600")}>
+                                                                    {user.active === false ? <CheckCircle2 className="w-3.5 h-3.5 mr-3" /> : <ShieldCheck className="w-3.5 h-3.5 mr-3" />}
+                                                                    {user.active === false ? 'ACTIVAR CUENTA' : 'INACTIVAR CUENTA'}
+                                                                </DropdownMenuItem>
+                                                                <DropdownMenuItem className="text-red-500 cursor-pointer rounded-xl" onClick={() => { setUserToDelete(user); setIsAlertOpen(true); }}><Trash2 className="w-3.5 h-3.5 mr-3" /> ELIMINAR CUENTA</DropdownMenuItem>
+                                                            </DropdownMenuContent>
+                                                        </DropdownMenu>
+                                                    </TableCell>
+                                                </TableRow>
+                                            ))
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={5} className="py-12 text-center">
+                                                    <div className="flex flex-col items-center justify-center opacity-30 grayscale italic">
+                                                        <Users className="h-12 w-12 mb-2 text-muted-foreground" />
+                                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Sin usuarios</p>
                                                     </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <Badge variant="secondary" className="font-black text-[8px] uppercase tracking-widest px-2 py-0.5 bg-primary/5 text-primary border-primary/5">
-                                                        {user.role}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex flex-wrap gap-1 max-w-[180px]">
-                                                        {(() => {
-                                                            const raw = (user.seccionales || (user.seccional ? [user.seccional] : []));
-                                                            if (raw.length === 0) return <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">Global</span>;
-                                                            return raw.map(s => {
-                                                                const clean = String(s).toUpperCase().replace('SECCIONAL', '').trim();
-                                                                return <Badge key={clean} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-white shadow-sm">SECC {clean}</Badge>;
-                                                            });
-                                                        })()}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex gap-1 flex-wrap max-w-[150px]">
-                                                        {user.permissions?.slice(0, 2).map(p => (
-                                                            <Badge key={p} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-slate-50">
-                                                                {p.replace('/', '') || 'DASHBOARD'}
-                                                            </Badge>
-                                                        ))}
-                                                        {user.permissions?.length > 2 && <span className="text-[8px] font-black text-muted-foreground opacity-50">+ {user.permissions.length - 2}</span>}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right pr-8">
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" className="h-8 w-8 p-0 rounded-full hover:bg-primary/5"><MoreHorizontal className="h-4 w-4" /></Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="w-48 font-black uppercase text-[10px] rounded-2xl shadow-2xl border-primary/10 p-2">
-                                                            <DropdownMenuItem onClick={() => { setEditingUser(user); setIsDialogOpen(true); }} className="cursor-pointer rounded-xl"><Edit className="w-3.5 h-3.5 mr-3 text-primary" /> EDITAR FICHA</DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => toggleActive(user)} className={cn("cursor-pointer rounded-xl", user.active === false ? "text-green-600" : "text-amber-600")}>
-                                                                {user.active === false ? <CheckCircle2 className="w-3.5 h-3.5 mr-3" /> : <ShieldCheck className="w-3.5 h-3.5 mr-3" />}
-                                                                {user.active === false ? 'ACTIVAR CUENTA' : 'INACTIVAR CUENTA'}
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem className="text-red-500 cursor-pointer rounded-xl" onClick={() => { setUserToDelete(user); setIsAlertOpen(true); }}><Trash2 className="w-3.5 h-3.5 mr-3" /> ELIMINAR CUENTA</DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
-                                        ))}
+                                        )}
                                     </TableBody>
                                 </Table>
                             </AccordionContent>
