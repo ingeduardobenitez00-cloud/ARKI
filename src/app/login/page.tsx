@@ -22,7 +22,19 @@ export default function LoginPage() {
 
   useEffect(() => {
     setLogoVersion(Date.now().toString());
-  }, []);
+    
+    // Verificar si venimos redirigidos por suspensión de cuenta
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('error') === 'account_suspended') {
+      toast({
+        title: 'CUENTA SUSPENDIDA',
+        description: 'Tu acceso ha sido revocado por la administración. Contacta con el Puesto de Comando.',
+        variant: 'destructive',
+      });
+      // Limpiar el parámetro de la URL
+      window.history.replaceState({}, '', '/login');
+    }
+  }, [toast]);
 
 
   const handleLogin = async (e: React.FormEvent) => {
