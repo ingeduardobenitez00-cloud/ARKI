@@ -588,12 +588,29 @@ export default function UsersPage() {
 
   const filteredUsers = useMemo(() => {
     const s = searchTerm.toLowerCase();
-    return users.filter(u => 
-        (u.name || '').toLowerCase().includes(s) || 
-        (u.email || '').toLowerCase().includes(s) || 
-        (u.username || '').toLowerCase().includes(s)
-    );
-  }, [users, searchTerm]);
+    const isAdmin = currentUser?.role === 'Admin' || currentUser?.role === 'Super-Admin';
+    const isLocalLeader = currentUser?.role === 'Presidente' || currentUser?.role === 'Coordinador';
+    const userSeccionales = currentUser?.seccionales || [];
+
+    return users.filter(u => {
+        // 1. Filtro de búsqueda texto
+        const searchMatch = (u.name || '').toLowerCase().includes(s) || 
+                           (u.email || '').toLowerCase().includes(s) || 
+                           (u.username || '').toLowerCase().includes(s);
+        if (!searchMatch) return false;
+
+        // 2. Filtro de Jurisdicción
+        if (isAdmin) return true;
+        if (isLocalLeader) {
+            const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
+            // Si el usuario pertenece a alguna de las seccionales del líder local, es visible
+            return uSecs.some(s => userSeccionales.includes(String(s)));
+        }
+
+        // Por defecto, otros (Dirigentes) solo se ven a sí mismos o nada (si tienen acceso)
+        return u.id === currentUser?.id;
+    });
+  }, [users, searchTerm, currentUser]);
 
   const groupedUsers = useMemo(() => {
     const groups: Record<string, User[]> = {};

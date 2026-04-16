@@ -50,7 +50,7 @@ export default function ReportesPage() {
   // 1. ESCUCHADOR EN TIEMPO REAL CON LÍMITE PARA ESTABILIDAD DE COSTOS
   const registeredQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return query(collection(db, 'votos_confirmados'), limit(300));
+    return query(collection(db, 'votos_confirmados'), limit(2000));
   }, [db, user, refreshKey]);
 
   const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
@@ -67,7 +67,8 @@ export default function ReportesPage() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
+  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
+  const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
   const isDirigente = user?.role === 'Dirigente';
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
@@ -76,9 +77,11 @@ export default function ReportesPage() {
   const filteredList = useMemo(() => {
     if (!rawList || !user) return [];
     
+    // PC Central ve TODO
     if (isAdmin) return rawList;
 
-    if (isCoordinador) {
+    // Presidentes y Coordinadores ven solo su JURISDICCIÓN
+    if (isPresidente || isCoordinador) {
         return rawList.filter((item: VotoSeguroData) => {
             const itemSec = String(item.CODIGO_SEC || '');
             return userSeccionales.includes(itemSec);
@@ -164,9 +167,6 @@ export default function ReportesPage() {
                 <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
                     {totalCaptures !== null ? `${totalCaptures} CAPTURAS TOTALES` : (filteredList.length + ' CARGADAS')}
                 </Badge>
-                {totalCaptures !== null && totalCaptures > 300 && (
-                    <span className="text-[9px] font-bold text-orange-600 uppercase">Mostrando últimos 300 (Usa filtros para más detalle)</span>
-                )}
             </div>
             <Button 
                 variant="ghost" 

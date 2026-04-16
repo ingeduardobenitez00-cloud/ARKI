@@ -66,7 +66,7 @@ export default function VotoSeguroPage() {
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
   const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [limitCount, setLimitCount] = useState(50);
+  const [limitCount, setLimitCount] = useState(2000);
   const [refreshKey, setRefreshKey] = useState(0);
 
   // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS CON LÍMITE
@@ -89,7 +89,8 @@ export default function VotoSeguroPage() {
     });
   });
 
-  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
+  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
+  const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
   const isDirigente = user?.role === 'Dirigente';
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
@@ -98,21 +99,24 @@ export default function VotoSeguroPage() {
   const filteredList = useMemo(() => {
     if (!rawList || !user) return [];
     
+    // Admins (PC Central) ven TODO
     if (isAdmin) return rawList;
 
-    if (isCoordinador) {
+    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS
+    if (isPresidente || isCoordinador) {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
             return userSeccionales.includes(itemSec);
         });
     }
 
+    // Dirigentes solo ven LO SUYO
     if (isDirigente) {
         return rawList.filter(item => item.registradoPor_id === user.id);
     }
 
     return [];
-  }, [rawList, user, isAdmin, isCoordinador, isDirigente, userSeccionales]);
+  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales]);
 
   // AGRUPAMIENTO POR USUARIO CON CÍRCULO DE SECCIONAL
   const groupedData = useMemo(() => {
@@ -215,16 +219,6 @@ export default function VotoSeguroPage() {
                         {totalCount !== null ? `${totalCount} TOTALES` : filteredList.length + ' CARGADOS'}
                     </Badge>
                 </div>
-                {totalCount !== null && totalCount > limitCount && (
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        onClick={() => setLimitCount(prev => prev + 50)}
-                        className="h-8 font-black text-[9px] uppercase border-primary/20 hover:bg-primary/5"
-                    >
-                        Cargar más (+50)
-                    </Button>
-                )}
             </div>
         </CardHeader>
         <CardContent className="p-0">
