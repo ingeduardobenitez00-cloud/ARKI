@@ -600,7 +600,7 @@ export default function UsersPage() {
     
     filteredUsers.forEach(u => {
         let key = '';
-        if (u.role === 'Admin' || u.role === 'Super-Admin') {
+        if (u.role === 'Admin' || u.role === 'Super-Admin' || u.role === 'Presidente') {
             key = 'PC';
         } else {
             const secs = u.seccionales || (u.seccional ? [u.seccional] : []);
