@@ -482,7 +482,17 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
     const onSubmit = async (data: UserFormData | EditUserFormData) => {
         if (!currentUser || !db || !storage) return;
         setIsSubmitting(true);
-        const dataToSave = { ...data };
+        
+        // NORMALIZAR SECCIONALES (Regularización de nomenclatura)
+        const normalizedSeccionales = (data.seccionales || []).map(s => 
+            String(s).toUpperCase().replace('SECCIONAL', '').trim()
+        );
+        
+        const dataToSave = { 
+            ...data, 
+            seccionales: normalizedSeccionales,
+            updatedAt: new Date().toISOString()
+        };
 
         // OFF-LOAD MEDIA: SUBIR IMAGEN A FIREBASE STORAGE SI ES BASE64
         if (dataToSave.photoUrl && dataToSave.photoUrl.startsWith('data:image')) {
@@ -681,7 +691,8 @@ export default function UsersPage() {
                       label = 'Operadores Globales';
                       icon = <UserCircle className="h-5 w-5 text-primary" />;
                     } else {
-                      label = `Seccional ${key}`;
+                      const cleanKey = String(key).toUpperCase().replace('SECCIONAL', '').trim();
+                      label = `Seccional ${cleanKey}`;
                       icon = <MapPin className="h-5 w-5 text-primary" />;
                     }
 
