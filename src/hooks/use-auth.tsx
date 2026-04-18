@@ -31,20 +31,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     let unsubscribe: () => void = () => {};
+    let safetyTimeout: NodeJS.Timeout;
 
     if (firebaseUser) {
       setIsAuthLoading(true);
+      
+      // Seguridad: Forzar fin de carga tras 10 segundos si firestore no responde
+      safetyTimeout = setTimeout(() => {
+        console.warn("Safety timeout: Sincronización de perfil lenta, liberando UI.");
+        setIsAuthLoading(false);
+      }, 10000);
+
       const userRef = doc(db, 'users', firebaseUser.uid);
       
-      // Optimizamos usando onSnapshot para aprovechar el caché local de Firestore
-      // Esto hace que el inicio de sesión sea mucho más rápido en recargas
       unsubscribe = onSnapshot(userRef, (userDoc) => {
+        if (safetyTimeout) clearTimeout(safetyTimeout);
+        
         if (userDoc.exists()) {
           const userData = { id: userDoc.id, ...userDoc.data() } as User;
           
-          // Verificar si la cuenta está suspendida
           if (userData.active === false) {
-            console.warn(`Cuenta suspendida detectada: ${userData.id}`);
             signOut(firebaseAuth).then(() => {
                 setAppUser(null);
                 setIsAuthLoading(false);
@@ -53,30 +59,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             return;
           }
           
-          // Determinar permisos base por rol si no existen
           let permissions = [...(userData.permissions || [])];
           if (userData.role && permissions.length === 0) {
             permissions = userRoles[userData.role]?.permissions || [];
           }
           
-          // Permisos obligatorios mínimos
-          const mandatory = ['/', '/ayuda', '/perfil'];
+          const mandatory = ['/', '/perfil'];
           mandatory.forEach(p => {
               if (!permissions.includes(p)) permissions.push(p);
           });
 
-          // Normalización de seccionales
           const rawSecc = userData.seccionales || (userData.seccional ? [userData.seccional] : []);
           const seccionales = rawSecc.map(s => String(s).toUpperCase().replace('SECCIONAL', '').trim());
 
           setAppUser({ ...userData, permissions, seccionales });
         } else {
-          // Si el documento no existe pero hay sesión de Auth, algo está mal
-          console.warn(`Perfil no encontrado para el usuario: ${firebaseUser.uid}`);
           setAppUser(null);
         }
         setIsAuthLoading(false);
       }, (error) => {
+        if (safetyTimeout) clearTimeout(safetyTimeout);
         console.error("Error en sincronización de perfil:", error);
         setIsAuthLoading(false);
       });
@@ -85,8 +87,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (!isUserLoading) setIsAuthLoading(false);
     }
 
-    return () => unsubscribe();
-  }, [firebaseUser, isUserLoading, db]);
+    return () => {
+      unsubscribe();
+      if (safetyTimeout) clearTimeout(safetyTimeout);
+    };
+  }, [firebaseUser, isUserLoading, db, firebaseAuth, router]);
 
   useEffect(() => {
     const isLoadingCombined = isAuthLoading || isUserLoading;
