@@ -73,7 +73,7 @@ export const menuCategories = [
     items: ['/padron', '/padron-export']
   },
   {
-    label: 'Gestión Territorial',
+    label: 'Carga de Votos Seguros',
     icon: Database,
     items: ['/consulta', '/voto-seguro']
   },

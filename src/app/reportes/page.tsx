@@ -157,7 +157,7 @@ export default function ReportesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookCheck className="h-8 w-8 text-primary" /> Reporte de Gestión Territorial</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control de participación real de votos seguros.</p></div>
+        <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookCheck className="h-8 w-8 text-primary" /> Reporte de Carga de Votos Seguros</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control de participación real de votos seguros.</p></div>
       </div>
 
       <Card className="border-primary/10 shadow-sm overflow-hidden">

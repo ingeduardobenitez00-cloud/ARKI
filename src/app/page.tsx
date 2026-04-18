@@ -29,7 +29,7 @@ export default function PanelControlPage() {
         cat.items.includes(item.href) && user.permissions.includes(item.href) && item.href !== '/'
       );
       return { ...cat, items };
-    }).filter(cat => cat.items.length > 0);
+    }).filter(cat => cat.items.length > 0 && cat.label !== 'Principal');
   }, [user]);
 
   if (isLoading || !isAuthenticated) {

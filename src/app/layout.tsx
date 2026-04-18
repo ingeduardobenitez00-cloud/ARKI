@@ -5,7 +5,7 @@ import { AuthProvider, useAuth } from '@/hooks/use-auth';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { allMenuItems, menuCategories } from '@/lib/menu-data';
-import { LogOut, Loader2, ChevronRight, UserCircle, Menu, Bell } from 'lucide-react';
+import { LogOut, Loader2, ChevronRight, UserCircle, Menu, Bell, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { usePathname, useRouter } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -79,7 +79,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
     
     return menuCategories.map(cat => {
       const permittedItems = allMenuItems.filter(item => 
-        cat.items.includes(item.href) && user.permissions.includes(item.href)
+        cat.items.includes(item.href) && user.permissions.includes(item.href) && item.href !== '/'
       );
       return { ...cat, permittedItems };
     }).filter(cat => cat.permittedItems.length > 0);
@@ -184,7 +184,19 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   return (
       <div className="min-h-screen flex flex-col bg-[#f8fafc] font-medium">
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b bg-white/80 backdrop-blur-md px-4 sm:px-8 shadow-sm">
+        <header className="sticky top-0 z-40 flex h-16 items-center gap-2 sm:gap-4 border-b bg-white/80 backdrop-blur-md px-4 sm:px-8 shadow-sm">
+          {pathname !== '/' && (
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => router.push('/')}
+              className="h-10 gap-2 font-black text-[10px] uppercase border bg-white hover:bg-slate-50 flex rounded-xl shrink-0"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden xs:inline">Volver</span>
+            </Button>
+          )}
+
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild>
               <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-slate-100 transition-all border bg-white">

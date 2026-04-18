@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { allMenuItems, userRoles, menuCategories } from '@/lib/menu-data';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where, orderBy } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where, orderBy, addDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { useFirestore, useStorage } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -51,6 +51,7 @@ const userSchema = z.object({
   mesas: z.array(z.coerce.number()).optional(),
   permissions: z.array(z.string()).min(1, 'Debes seleccionar al menos un permiso.'),
   moduleActions: z.record(z.array(z.enum(['create', 'update', 'delete', 'pdf', 'excel']))).optional(),
+  clasificacion: z.string().optional(),
 });
 
 const editUserSchema = userSchema.omit({ password: true });
@@ -143,6 +144,14 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
         setValue('moduleActions', preset.moduleActions || {});
         toast({ title: "Perfil Aplicado", description: `Se cargaron los permisos de: ${preset.name}` });
     };
+    
+    const [customClassifications, setCustomClassifications] = useState<string[]>([]);
+    useEffect(() => {
+        if (!db) return;
+        getDocs(collection(db, 'user_classifications')).then(snap => {
+            setCustomClassifications(snap.docs.map(d => d.data().name).filter(Boolean));
+        });
+    }, [db]);
 
     const locales = useMemo(() => metadata?.locales || [], [metadata]);
     const mesas = useMemo(() => {
@@ -324,15 +333,59 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                     <div><Label htmlFor="password">Contraseña Inicial</Label><Input id="password" type="password" {...register('password')} autoComplete="new-password" /></div>
                 )}
 
-                <div>
-                    <Label htmlFor="role">Rol del Sistema</Label>
-                    <Controller name="role" control={control} render={({ field }) => (
-                        <Select onValueChange={field.onChange} value={field.value}>
-                            <SelectTrigger className="font-bold h-11"><SelectValue placeholder="Selecciona un rol" /></SelectTrigger>
-                            <SelectContent>{Object.keys(userRoles).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
-                        </Select>
-                    )} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <Label htmlFor="role">Rol del Sistema</Label>
+                        <Controller name="role" control={control} render={({ field }) => (
+                            <Select onValueChange={field.onChange} value={field.value}>
+                                <SelectTrigger className="font-bold h-11"><SelectValue placeholder="Selecciona un rol" /></SelectTrigger>
+                                <SelectContent>{Object.keys(userRoles).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                            </Select>
+                        )} />
+                    </div>
+                    <div>
+                        <Label htmlFor="clasificacion">Clasificación Estratégica</Label>
+                        <Controller name="clasificacion" control={control} render={({ field }) => (
+                            <div className="space-y-2">
+                                <Select 
+                                    onValueChange={(val) => {
+                                        if (val === 'CUSTOM') {
+                                            field.onChange('NUEVO GRUPO');
+                                        } else {
+                                            field.onChange(val);
+                                        }
+                                    }} 
+                                    value={customClassifications.includes(field.value) || ['SIN CLASIFICAR', 'PC', 'DIRIGENTE', 'COORDINADOR', 'MESARIO', 'COMUNICACIONES'].includes(field.value) ? field.value : (field.value ? 'CUSTOM' : '')}
+                                >
+                                    <SelectTrigger className="font-bold h-11">
+                                        <SelectValue placeholder="Ej: PC, DIRIGENTE, etc." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="SIN CLASIFICAR">SIN CLASIFICAR</SelectItem>
+                                        <SelectItem value="PC">PC (PUESTO DE COMANDO)</SelectItem>
+                                        <SelectItem value="DIRIGENTE">DIRIGENTE</SelectItem>
+                                        <SelectItem value="COORDINADOR">COORDINADOR</SelectItem>
+                                        <SelectItem value="MESARIO">MESARIO</SelectItem>
+                                        <SelectItem value="COMUNICACIONES">COMUNICACIONES</SelectItem>
+                                        {customClassifications.map(c => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                        <SelectItem value="CUSTOM">+ OTRA CLASIFICACIÓN...</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                {(field.value === 'CUSTOM_NEW' || field.value === 'NUEVO GRUPO' || (!['SIN CLASIFICAR', 'PC', 'DIRIGENTE', 'COORDINADOR', 'MESARIO', 'COMUNICACIONES'].includes(field.value) && !customClassifications.includes(field.value) && field.value)) && (
+                                    <Input 
+                                        placeholder="ESCRIBIR NUEVA CLASIFICACIÓN..." 
+                                        value={(field.value === 'CUSTOM_NEW' || field.value === 'NUEVO GRUPO') ? '' : field.value}
+                                        onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+                                        className="font-bold border-primary/30 h-10 animate-in slide-in-from-top-1"
+                                    />
+                                )}
+                            </div>
+                        )} />
+                    </div>
                 </div>
+            </div>
                 
                 <div className="space-y-4 p-5 border rounded-3xl bg-muted/5">
                     <div>
@@ -451,7 +504,6 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                         })}
                     </Accordion>
                 </div>
-            </div>
 
             <CameraCaptureDialog isOpen={isCameraOpen} onOpenChange={setIsCameraOpen} onCapture={(base64) => setValue('photoUrl', base64)} />
         </div>
@@ -467,8 +519,8 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
 
     const defaultValues = useMemo(() => {
         const base = editingUser 
-            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role as any || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), local: editingUser.local || '', mesas: editingUser.mesas || [] } 
-            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista' as any, seccionales: [], local: '', mesas: [], permissions: [], moduleActions: {} };
+            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role as any || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), local: editingUser.local || '', mesas: editingUser.mesas || [], clasificacion: editingUser.clasificacion || 'SIN CLASIFICAR' } 
+            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista' as any, seccionales: [], local: '', mesas: [], permissions: [], moduleActions: {}, clasificacion: 'SIN CLASIFICAR' };
         return base;
     }, [editingUser]);
 
@@ -479,58 +531,75 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
     
     useEffect(() => { if (isOpen) reset(defaultValues as any); }, [isOpen, editingUser, reset, defaultValues]);
 
-    const onSubmit = async (data: UserFormData | EditUserFormData) => {
-        if (!currentUser || !db || !storage) return;
+    const onSubmit = async (data: any) => {
+        if (!currentUser || !db) return;
         setIsSubmitting(true);
+        const safetyTimer = setTimeout(() => setIsSubmitting(false), 20000); // 20s safety
         
-        // NORMALIZAR SECCIONALES (Regularización de nomenclatura)
-        const normalizedSeccionales = (data.seccionales || []).map(s => 
-            String(s).toUpperCase().replace('SECCIONAL', '').trim()
-        );
-        
-        const dataToSave = { 
-            ...data, 
-            seccionales: normalizedSeccionales,
-            updatedAt: new Date().toISOString()
-        };
+        try {
+            // 1. Saneamiento de Seccionales
+            const normalizedSecs = (data.seccionales || []).map((s: any) => 
+                String(s).toUpperCase().replace('SECCIONAL', '').trim()
+            );
 
-        // OFF-LOAD MEDIA: SUBIR IMAGEN A FIREBASE STORAGE SI ES BASE64
-        if (dataToSave.photoUrl && dataToSave.photoUrl.startsWith('data:image')) {
-            try {
-                const storageRef = ref(storage, `users/${dataToSave.email || (dataToSave as any).username}/profile_${Date.now()}.jpg`);
-                const uploadTask = await uploadString(storageRef, dataToSave.photoUrl, 'data_url');
-                const downloadUrl = await getDownloadURL(uploadTask.ref);
-                dataToSave.photoUrl = downloadUrl;
-            } catch (error) {
-                console.error("Error uploading image:", error);
-                toast({ title: "Error de Imagen", description: "No se pudo subir la foto, se usará el respaldo local.", variant: "destructive" });
+            // 2. Construir Payload Robusto (Solo campos necesarios)
+            const payload: any = {
+                name: data.name,
+                email: data.email,
+                username: data.username,
+                telefono: data.telefono || '',
+                role: data.role,
+                seccionales: normalizedSecs,
+                clasificacion: data.clasificacion || 'SIN CLASIFICAR',
+                permissions: data.permissions || [],
+                moduleActions: data.moduleActions || {},
+                local: data.local || '',
+                mesas: data.mesas || [],
+                updatedAt: new Date().toISOString()
+            };
+
+            // 3. Manejo de Foto (Evitar uploads pesados innecesarios)
+            if (data.photoUrl && data.photoUrl.startsWith('https')) {
+                payload.photoUrl = data.photoUrl;
+            } else if (data.photoUrl && data.photoUrl.startsWith('data:image') && storage) {
+                const storageRef = ref(storage, `users/${data.email}/profile_${Date.now()}.jpg`);
+                await uploadString(storageRef, data.photoUrl, 'data_url');
+                payload.photoUrl = await getDownloadURL(storageRef);
             }
-        }
-        
-        if (editingUser) {
-            const userRef = doc(db, USERS_COLLECTION_NAME, editingUser.id);
-            updateDoc(userRef, dataToSave as any)
-                .then(() => {
-                    logAction(db, { userId: currentUser.id, userName: currentUser.name, module: 'USUARIOS', action: 'EDITÓ USUARIO Y PERMISOS', targetId: editingUser.id, targetName: data.name });
-                    toast({ title: '¡Usuario actualizado!' });
-                    onSuccess();
-                    onOpenChange(false);
-                })
-                .catch(async (error) => { errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'update', requestResourceData: dataToSave })); })
-                .finally(() => setIsSubmitting(false));
-        } else {
-            const { password, ...userData } = data as UserFormData;
-            const secondaryApp = initializeApp(firebaseConfig, `create-${Date.now()}`);
-            const secondaryAuth = getAuthSecondary(secondaryApp);
-            try {
-                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, userData.email, password);
-                await setDoc(doc(db, USERS_COLLECTION_NAME, userCredential.user.uid), userData);
-                logAction(db, { userId: currentUser.id, userName: currentUser.name, module: 'USUARIOS', action: 'CREÓ USUARIO CON PERMISOS', targetId: userCredential.user.uid, targetName: userData.name });
-                toast({ title: '¡Usuario creado!' });
+
+            if (editingUser) {
+                const userRef = doc(db, USERS_COLLECTION_NAME, editingUser.id);
+                // Usar setDoc con merge es más seguro para evitar colisiones
+                await setDoc(userRef, payload, { merge: true });
+                
+                // Registro de auditoría (sin bloquear)
+                logAction(db, { userId: currentUser.id, userName: currentUser.name, module: 'USUARIOS', action: 'EDITÓ OPERADOR', targetId: editingUser.id, targetName: data.name });
+
+                toast({ title: '¡Guardado Exitoso!', description: "Ficha de operador actualizada correctamente." });
                 onSuccess();
                 onOpenChange(false);
-            } catch (error: any) { toast({ title: 'Error', description: error.message, variant: 'destructive' }); }
-            finally { await deleteApp(secondaryApp); setIsSubmitting(false); }
+            } else {
+                // Flujo creación
+                const secondaryApp = initializeApp(firebaseConfig, `create-${Date.now()}`);
+                const secondaryAuth = getAuthSecondary(secondaryApp);
+                try {
+                    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password);
+                    await setDoc(doc(db, USERS_COLLECTION_NAME, userCredential.user.uid), { ...payload, createdAt: new Date().toISOString() });
+                    toast({ title: '¡Usuario Creado!' });
+                    onSuccess();
+                    onOpenChange(false);
+                } finally { await deleteApp(secondaryApp); }
+            }
+        } catch (error: any) {
+            console.error("Save Error:", error);
+            toast({ 
+                title: 'Error al Guardar', 
+                description: error.message || 'Error de conexión con la base de datos.',
+                variant: 'destructive' 
+            });
+        } finally {
+            clearTimeout(safetyTimer);
+            setIsSubmitting(false);
         }
     };
 
@@ -593,10 +662,11 @@ export default function UsersPage() {
     const userSeccionales = currentUser?.seccionales || [];
 
     return users.filter(u => {
-        // 1. Filtro de búsqueda texto
-        const searchMatch = (u.name || '').toLowerCase().includes(s) || 
-                           (u.email || '').toLowerCase().includes(s) || 
-                           (u.username || '').toLowerCase().includes(s);
+        // 1. Filtro de búsqueda texto (soporta múltiples términos como nombre y apellido)
+        const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+        const searchTerms = normalize(s).split(' ').filter(Boolean);
+        const userIdentity = normalize(`${u.name || ''} ${u.email || ''} ${u.username || ''} ${u.clasificacion || ''}`);
+        const searchMatch = searchTerms.every(term => userIdentity.includes(term));
         if (!searchMatch) return false;
 
         // 2. Filtro de Jurisdicción
@@ -619,33 +689,38 @@ export default function UsersPage() {
     const userSeccionales = currentUser?.seccionales || [];
 
     // 2. Inicializar grupos de Seccionales y Grupos Especiales
-    if (isAdmin) {
-        seccionales.forEach(s => { groups[String(s.id)] = []; });
-    } else if (isLocalLeader) {
-        userSeccionales.forEach(sId => { groups[String(sId)] = []; });
+    // Solo inicializamos grupos vacíos si NO hay una búsqueda activa, 
+    // para permitir al admin ver huecos de cobertura. Si hay búsqueda, limpiamos el ruido.
+    if (!searchTerm) {
+        if (isAdmin) {
+            seccionales.forEach(s => { groups[String(s.id)] = []; });
+        } else if (isLocalLeader) {
+            userSeccionales.forEach(sId => { groups[String(sId)] = []; });
+        }
     }
     groups['PC'] = [];
     groups['MULTI'] = [];
     groups['GLOBAL'] = [];
 
-    // 3. Procesar usuarios
     filteredUsers.forEach(u => {
         const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
         
-        if (uSecs.length > 1) {
-            // Grupo de Dirigentes con Varias Seccionales
-            groups['MULTI'].push(u);
-        } else if (uSecs.length === 1) {
-            // Grupo de Seccional Única
-            const key = String(uSecs[0]);
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(u);
-        } else {
-            // Sin seccionales asignadas
-            const key = (u.role === 'Admin' || u.role === 'Super-Admin' || u.role === 'Presidente') ? 'PC' : 'GLOBAL';
-            if (!groups[key]) groups[key] = [];
-            groups[key].push(u);
+        let groupKey = u.clasificacion;
+        const isAutomatic = !groupKey || groupKey === 'SIN CLASIFICAR';
+
+        if (isAutomatic) {
+            if (uSecs.length > 1) {
+                groupKey = 'MULTI';
+            } else if (uSecs.length === 1) {
+                groupKey = String(uSecs[0]);
+            } else {
+                groupKey = (u.role === 'Admin' || u.role === 'Super-Admin' || u.role === 'Presidente') ? 'PC' : 'GLOBAL';
+            }
         }
+        
+        const finalKey = groupKey || 'GLOBAL';
+        if (!groups[finalKey]) groups[finalKey] = [];
+        groups[finalKey].push(u);
     });
 
     // 4. Limpieza: Quitar GLOBAL o PC si están vacíos (MULTI se queda si el usuario pidió apartarlos)
@@ -777,7 +852,7 @@ export default function UsersPage() {
                 <Skeleton className="h-20 w-full rounded-2xl" />
             </div>
         ) : groupedUsers.sortedKeys.length > 0 ? (
-            <Accordion type="multiple" defaultValue={[]} className="space-y-4">
+            <Accordion type="multiple" value={searchTerm ? groupedUsers.sortedKeys : undefined} defaultValue={[]} className="space-y-4">
                 {groupedUsers.sortedKeys.map(key => {
                     const usersInGroup = groupedUsers.groups[key];
                     let label = '';
@@ -795,6 +870,9 @@ export default function UsersPage() {
                     } else if (key === 'GLOBAL') {
                       label = 'Operadores Globales';
                       icon = <UserCircle className="h-5 w-5 text-primary" />;
+                    } else if (isNaN(Number(key))) {
+                      label = key;
+                      icon = <Layers className="h-5 w-5 text-primary" />;
                     } else {
                       const cleanKey = String(key).toUpperCase().replace('SECCIONAL', '').trim();
                       label = `Seccional ${cleanKey}`;
@@ -872,9 +950,16 @@ export default function UsersPage() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell>
-                                                        <Badge variant="secondary" className="font-black text-[8px] uppercase tracking-widest px-2 py-0.5 bg-primary/5 text-primary border-primary/5">
-                                                            {user.role}
-                                                        </Badge>
+                                                        <div className="flex flex-col gap-1">
+                                                            <Badge variant="secondary" className="w-fit font-black text-[8px] uppercase tracking-widest px-2 py-0.5 bg-primary/5 text-primary border-primary/5">
+                                                                {user.role}
+                                                            </Badge>
+                                                            {user.clasificacion && user.clasificacion !== 'SIN CLASIFICAR' && (
+                                                                <Badge variant="outline" className="w-fit font-black text-[7px] uppercase tracking-tighter px-1.5 py-0 border-orange-200 text-orange-600 bg-orange-50">
+                                                                    {user.clasificacion}
+                                                                </Badge>
+                                                            )}
+                                                        </div>
                                                     </TableCell>
                                                     <TableCell>
                                                         <div className="flex flex-wrap gap-1 max-w-[180px]">

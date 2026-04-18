@@ -15,6 +15,7 @@ export interface User {
   moduleActions?: Record<string, ('create' | 'update' | 'delete' | 'pdf' | 'excel')[]>; // Granular actions per module path
   actions: ('create' | 'update' | 'delete' | 'pdf' | 'excel')[]; // Global actions (legacy support)
   active?: boolean; // Whether the account is active or suspended
+  clasificacion?: string; // Clasificación del usuario (PC, Dirigente, etc)
 }
 
 export interface Seccional {
