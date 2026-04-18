@@ -30,8 +30,6 @@ import {
 
 export const allMenuItems = [
   { href: '/', label: 'Dashboard', icon: LayoutDashboard, tooltip: 'PANEL DE CONTROL PRINCIPAL Y VISTA GENERAL.' },
-  { href: '/ayuda', label: 'Manual de Uso', icon: HelpCircle, tooltip: 'CONSULTA LA GUÍA DE FUNCIONAMIENTO DEL SISTEMA.' },
-  { href: '/caracteristicas', label: 'Especificaciones', icon: Cpu, tooltip: 'CONSULTA LA ARQUITECTURA TÉCNICA DEL SISTEMA.' },
   { href: '/mapa-tecnico', label: 'Mapa Técnico', icon: MapIcon, tooltip: 'GESTIÓN TERRITORIAL TÉCNICA Y POLÍTICA POR DISTRITOS.' },
   { href: '/padron', label: 'Consulta Padrón', icon: LayoutGrid, tooltip: 'EXPLORA Y BUSCA EN EL PADRÓN ELECTORAL COMPLETO.' },
   { href: '/padron-export', label: 'Padrón Exportar', icon: FileDown, tooltip: 'GENERA REPORTES EN EXCEL Y PDF POR SECCIONAL.' },
@@ -59,7 +57,7 @@ export const menuCategories = [
   {
     label: 'Principal',
     icon: LayoutDashboard,
-    items: ['/', '/ayuda', '/caracteristicas'],
+    items: ['/'],
     href: '/'
   },
   {
@@ -110,18 +108,18 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/ayuda', '/caracteristicas', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil']
   },
   'Dirigente': {
-    permissions: ['/', '/ayuda', '/caracteristicas', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
   },
   'Mesario': {
-    permissions: ['/', '/ayuda', '/control-votacion', '/perfil']
+    permissions: ['/', '/control-votacion', '/perfil']
   },
   'Recepcionista': {
-    permissions: ['/', '/ayuda', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
+    permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
   },
   'Comunicaciones': {
-    permissions: ['/', '/ayuda', '/telefonos', '/biblioteca', '/difusion', '/perfil']
+    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/perfil']
   }
 };
