@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Loader2, QrCode, ClipboardCheck, History, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { updateElectoralTotals } from '@/services/electoral-service';
 
 export default function EscanerActasPage() {
     const { user } = useAuth();
@@ -115,6 +116,9 @@ export default function EscanerActasPage() {
                 [`${activeModule}_cargado`]: true,
                 last_updated: serverTimestamp()
             }, { merge: true });
+
+            // Update Atomic Totals for real-time dashboard efficiency
+            await updateElectoralTotals(db, data, activeModule === 'intendencia' ? 'Intendente' : 'Junta');
 
             toast({ title: "Éxito", description: "Resultado guardado correctamente" });
             setActiveModule(null);

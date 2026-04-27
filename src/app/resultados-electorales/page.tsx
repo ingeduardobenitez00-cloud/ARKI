@@ -12,15 +12,14 @@ import { Users, Vote, Percent, TrendingUp } from 'lucide-react';
 
 export default function ResultadosElectoralesPage() {
     const db = useFirestore();
-    const [actasIntendente, setActasIntendente] = useState<any[]>([]);
-    const [actasJunta, setActasJunta] = useState<any[]>([]);
+    const [totals, setTotals] = useState<any>(null);
     const [totalMesasGlobal, setTotalMesasGlobal] = useState(0);
     const [totalElectoresGlobal, setTotalElectoresGlobal] = useState(0);
 
     useEffect(() => {
         if (!db) return;
 
-        // Fetch Total Mesas from Metadata
+        // Fetch Total Mesas from Metadata (Static)
         getDocs(collection(db, 'seccionales_metadata')).then(snap => {
             let totalM = 0;
             let totalE = 0;
@@ -29,51 +28,41 @@ export default function ResultadosElectoralesPage() {
                 if (data.mesas_por_local) {
                     data.mesas_por_local.forEach((l: any) => {
                         totalM += (l.mesas?.length || 0);
-                        // Approximate if total_electores not directly on local
                         totalE += (l.mesas?.length || 0) * 300; 
                     });
                 }
-                // If seccional has a direct elector count
                 if (data.total_electores) totalE = (totalE - ((data.mesas_por_local?.length || 0) * 300)) + data.total_electores;
             });
             setTotalMesasGlobal(totalM);
             setTotalElectoresGlobal(totalE);
         });
 
-        const unsubInt = onSnapshot(collection(db, 'actas_intendencia'), (snap) => {
-            setActasIntendente(snap.docs.map(doc => doc.data()));
+        // Listen only to ONE document for ALL results (Fastest & Cheapest)
+        const unsub = onSnapshot(doc(db, 'electoral_stats', 'totals'), (snap) => {
+            if (snap.exists()) setTotals(snap.data());
         });
-        const unsubJunta = onSnapshot(collection(db, 'actas_junta'), (snap) => {
-            setActasJunta(snap.docs.map(doc => doc.data()));
-        });
-        return () => { unsubInt(); unsubJunta(); };
+
+        return () => unsub();
     }, [db]);
 
-    // Totals for Intendente
     const intendenteTotals = useMemo(() => {
-        const totals: Record<string, number> = { nulos: 0, blancos: 0 };
-        actasIntendente.forEach(acta => {
-            Object.entries(acta.votes || {}).forEach(([id, v]: [string, any]) => {
-                totals[id] = (totals[id] || 0) + v;
-            });
-            totals.nulos += acta.nulos || 0;
-            totals.blancos += acta.blancos || 0;
-        });
-        return totals;
-    }, [actasIntendente]);
+        return totals?.intendente || { votos_nulos: 0, votos_blancos: 0 };
+    }, [totals]);
 
     const juntaTotals = useMemo(() => {
-        const totals: Record<string, number> = {};
-        actasJunta.forEach(acta => {
-            Object.entries(acta.votes || {}).forEach(([listId, opts]: [string, any]) => {
-                const listTotal = Object.values(opts || {}).reduce((a: number, b: any) => a + (parseInt(b) || 0), 0);
-                totals[listId] = (totals[listId] || 0) + listTotal;
+        const res: Record<string, number> = {};
+        if (totals?.junta) {
+            Object.keys(totals.junta).forEach(listId => {
+                res[listId] = totals.junta[listId].total || 0;
             });
-        });
-        return totals;
-    }, [actasJunta]);
+        }
+        return res;
+    }, [totals]);
 
-    const totalVotosIntendente = Object.values(intendenteTotals).reduce((a, b) => a + b, 0);
+    const totalVotosIntendente = useMemo(() => {
+        if (!totals?.intendente) return 0;
+        return Object.values(totals.intendente).reduce((a: any, b: any) => a + (typeof b === 'number' ? b : 0), 0);
+    }, [totals]);
 
     const intendenteChartData = useMemo(() => {
         return INTENDENTE_CANDIDATES.map(c => ({
@@ -96,7 +85,7 @@ export default function ResultadosElectoralesPage() {
                 <div className="flex gap-4">
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                         <div className="text-[10px] uppercase font-bold text-slate-400">Mesas Procesadas</div>
-                        <div className="text-2xl font-black">{actasIntendente.length} <span className="text-sm font-normal text-slate-400">/ {totalMesasGlobal || '...'}</span></div>
+                        <div className="text-2xl font-black">{totals?.processedMesas || 0} <span className="text-sm font-normal text-slate-400">/ {totalMesasGlobal || '...'}</span></div>
                     </div>
                 </div>
             </div>
@@ -228,11 +217,11 @@ export default function ResultadosElectoralesPage() {
                         <CardContent className="p-6 space-y-4 text-sm">
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="font-bold text-slate-600 uppercase tracking-tighter">Votos en Blanco</span>
-                                <span className="text-lg font-black">{intendenteTotals.blancos.toLocaleString()}</span>
+                                <span className="text-lg font-black">{(intendenteTotals.votos_blancos || 0).toLocaleString()}</span>
                             </div>
                             <div className="flex justify-between items-center p-3 bg-slate-50 rounded-xl">
                                 <span className="font-bold text-slate-600 uppercase tracking-tighter">Votos Nulos</span>
-                                <span className="text-lg font-black">{intendenteTotals.nulos.toLocaleString()}</span>
+                                <span className="text-lg font-black">{(intendenteTotals.votos_nulos || 0).toLocaleString()}</span>
                             </div>
                         </CardContent>
                     </Card>
@@ -246,9 +235,9 @@ export default function ResultadosElectoralesPage() {
                             <div className="space-y-1">
                                 <div className="flex justify-between text-xs font-bold uppercase">
                                     <span>Escaneadas</span>
-                                    <span>{actasIntendente.length} de {totalMesasGlobal || '...'}</span>
+                                    <span>{totals?.processedMesas || 0} de {totalMesasGlobal || '...'}</span>
                                 </div>
-                                <Progress value={totalMesasGlobal ? (actasIntendente.length / totalMesasGlobal) * 100 : 0} className="h-2 bg-white/20" />
+                                <Progress value={totalMesasGlobal ? ((totals?.processedMesas || 0) / totalMesasGlobal) * 100 : 0} className="h-2 bg-white/20" />
                             </div>
                             <p className="text-[10px] text-white/60 leading-relaxed">
                                 Datos actualizados instantáneamente desde los centros de votación vía escaneo de actas QR.
