@@ -427,6 +427,12 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                         Matriz de Permisos y Acciones
                     </Label>
                     
+                    {errors.permissions && (
+                        <p className="text-xs font-bold text-red-500 bg-red-50 p-2 rounded-lg border border-red-100 animate-pulse">
+                            ⚠️ {errors.permissions.message}
+                        </p>
+                    )}
+                    
                     <Accordion type="multiple" className="w-full space-y-2">
                         {menuCategories.map(category => {
                             const categoryItems = allMenuItems.filter(item => category.items.includes(item.href));
@@ -532,75 +538,50 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
     useEffect(() => { if (isOpen) reset(defaultValues as any); }, [isOpen, editingUser, reset, defaultValues]);
 
     const onSubmit = async (data: any) => {
-        if (!currentUser || !db) return;
+        if (!currentUser || !db || !editingUser) return;
         setIsSubmitting(true);
-        const safetyTimer = setTimeout(() => setIsSubmitting(false), 20000); // 20s safety
+        console.log("Simplified Save Start", data);
         
         try {
-            // 1. Saneamiento de Seccionales
-            const normalizedSecs = (data.seccionales || []).map((s: any) => 
-                String(s).toUpperCase().replace('SECCIONAL', '').trim()
-            );
-
-            // 2. Construir Payload Robusto (Solo campos necesarios)
-            const payload: any = {
-                name: data.name,
-                email: data.email,
-                username: data.username,
-                telefono: data.telefono || '',
+            const userRef = doc(db, USERS_COLLECTION_NAME, editingUser.id);
+            
+            // Payload mínimo para diagnosticar
+            const simplePayload = {
+                name: data.name || '',
+                username: data.username || '',
                 role: data.role,
-                seccionales: normalizedSecs,
-                clasificacion: data.clasificacion || 'SIN CLASIFICAR',
-                permissions: data.permissions || [],
+                permissions: Array.isArray(data.permissions) ? data.permissions : [],
                 moduleActions: data.moduleActions || {},
-                local: data.local || '',
-                mesas: data.mesas || [],
                 updatedAt: new Date().toISOString()
             };
 
-            // 3. Manejo de Foto (Evitar uploads pesados innecesarios)
-            if (data.photoUrl && data.photoUrl.startsWith('https')) {
-                payload.photoUrl = data.photoUrl;
-            } else if (data.photoUrl && data.photoUrl.startsWith('data:image') && storage) {
-                const storageRef = ref(storage, `users/${data.email}/profile_${Date.now()}.jpg`);
-                await uploadString(storageRef, data.photoUrl, 'data_url');
-                payload.photoUrl = await getDownloadURL(storageRef);
-            }
+            console.log("Sending simple payload:", simplePayload);
+            await setDoc(userRef, simplePayload, { merge: true });
+            console.log("Save successful!");
 
-            if (editingUser) {
-                const userRef = doc(db, USERS_COLLECTION_NAME, editingUser.id);
-                // Usar setDoc con merge es más seguro para evitar colisiones
-                await setDoc(userRef, payload, { merge: true });
-                
-                // Registro de auditoría (sin bloquear)
-                logAction(db, { userId: currentUser.id, userName: currentUser.name, module: 'USUARIOS', action: 'EDITÓ OPERADOR', targetId: editingUser.id, targetName: data.name });
-
-                toast({ title: '¡Guardado Exitoso!', description: "Ficha de operador actualizada correctamente." });
-                onSuccess();
-                onOpenChange(false);
-            } else {
-                // Flujo creación
-                const secondaryApp = initializeApp(firebaseConfig, `create-${Date.now()}`);
-                const secondaryAuth = getAuthSecondary(secondaryApp);
-                try {
-                    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password);
-                    await setDoc(doc(db, USERS_COLLECTION_NAME, userCredential.user.uid), { ...payload, createdAt: new Date().toISOString() });
-                    toast({ title: '¡Usuario Creado!' });
-                    onSuccess();
-                    onOpenChange(false);
-                } finally { await deleteApp(secondaryApp); }
-            }
+            toast({ title: '¡Guardado Exitoso!', description: "Permisos actualizados." });
+            onSuccess();
+            onOpenChange(false);
         } catch (error: any) {
-            console.error("Save Error:", error);
+            console.error("Critical Save Error:", error);
             toast({ 
                 title: 'Error al Guardar', 
-                description: error.message || 'Error de conexión con la base de datos.',
+                description: error.message || 'Error en Firestore',
                 variant: 'destructive' 
             });
         } finally {
-            clearTimeout(safetyTimer);
             setIsSubmitting(false);
         }
+    };
+
+    const onInvalid = (errors: any) => {
+        console.warn("Form Validation Errors:", errors);
+        const errorList = Object.values(errors).map((e: any) => e.message).join(', ');
+        toast({ 
+            title: "Revisa los campos", 
+            description: "Hay errores de validación: " + errorList,
+            variant: "destructive"
+        });
     };
 
     return (
@@ -617,7 +598,7 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
                 </div>
                 <DialogFooter className="p-8 pt-4 border-t bg-muted/10 shrink-0 gap-3">
                     <DialogClose asChild><Button type="button" variant="outline" className="font-black uppercase text-xs h-12 px-8 rounded-2xl">CANCELAR</Button></DialogClose>
-                    <Button type="button" onClick={handleSubmit(onSubmit)} disabled={isSubmitting} className="font-black uppercase text-xs h-12 px-10 rounded-2xl shadow-xl">
+                    <Button type="button" onClick={handleSubmit(onSubmit, onInvalid)} disabled={isSubmitting} className="font-black uppercase text-xs h-12 px-10 rounded-2xl shadow-xl">
                         {isSubmitting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
                         {editingUser ? 'GUARDAR CAMBIOS' : 'CREAR USUARIO'}
                     </Button>

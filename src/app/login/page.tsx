@@ -16,6 +16,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const { login, isLoading } = useAuth();
   const { toast } = useToast();
   const router = useRouter();
@@ -40,6 +41,7 @@ export default function LoginPage() {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoggingIn(true);
     try {
       const success = await login(email, password);
       if (success) {
@@ -54,6 +56,7 @@ export default function LoginPage() {
         description: err.message || 'Usuario o contraseña incorrectos.',
         variant: 'destructive',
       });
+      setIsLoggingIn(false);
     }
   };
 
@@ -140,8 +143,8 @@ export default function LoginPage() {
           </CardContent>
           
           <CardFooter className="flex flex-col gap-4 pt-6 pb-10 px-8">
-            <Button type="submit" className="w-full h-12 rounded-2xl font-medium uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 group" disabled={isLoading}>
-              {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : (
+            <Button type="submit" className="w-full h-12 rounded-2xl font-medium uppercase tracking-[0.2em] text-[10px] shadow-lg shadow-primary/20 hover:shadow-xl hover:shadow-primary/30 transition-all active:scale-95 group" disabled={isLoading || isLoggingIn}>
+              {(isLoading || isLoggingIn) ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : (
                   <>
                     <ShieldCheck className="mr-2 h-4 w-4 opacity-50 group-hover:opacity-100 transition-opacity" />
                     INGRESAR AHORA

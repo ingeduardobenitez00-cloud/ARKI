@@ -25,7 +25,10 @@ import {
     UserPlus,
     History,
     AppWindow,
-    MapIcon
+    MapIcon,
+    QrCode,
+    BarChart3,
+    Image as ImageIcon
 } from 'lucide-react';
 
 export const allMenuItems = [
@@ -43,6 +46,9 @@ export const allMenuItems = [
   { href: '/reuniones', label: 'Reuniones', icon: Users, tooltip: 'GESTIONA LA LISTA DE PARTICIPANTES PARA LA REUNIÓN ACTUAL.' },
   { href: '/reuniones-archivadas', label: 'Reuniones Archivadas', icon: Archive, tooltip: 'CONSULTA EL HISTORIAL DE REUNIONES PASADAS.' },
   { href: '/control-votacion', label: 'Control Votación', icon: ClipboardCheck, tooltip: 'CONTROLA EL ESTADO DE VOTACIÓN POR MESA.' },
+  { href: '/escaner-actas', label: 'Escaner de Actas', icon: QrCode, tooltip: 'ESCANEO DE ACTAS TREP Y CARGA DE RESULTADOS.' },
+  { href: '/resultados-electorales', label: 'Resultados en Vivo', icon: BarChart3, tooltip: 'VISUALIZA LOS RESULTADOS ELECTORALES EN TIEMPO REAL.' },
+  { href: '/configuracion-electoral', label: 'Metadata Electoral', icon: ImageIcon, tooltip: 'GESTIONA FOTOS Y NOMBRES DE CANDIDATOS.' },
   { href: '/voto-seguro', label: 'Lista Voto Seguro', icon: BookHeart, tooltip: 'VISUALIZA LA LISTA DE VOTOS SEGUROS (PERSONAL O DE TU SECC).' },
   { href: '/mapa-global', label: 'Mapa Territorial', icon: LucideMapIcon, tooltip: 'VISUALIZA EN EL MAPA A LOS ELECTORES (PERSONAL O DE TU SECC).' },
   { href: '/reportes', label: 'Reportes', icon: BookCheck, tooltip: 'GENERA REPORTES DE VOTOS SEGUROS POR SECCIONAL.' },
@@ -83,7 +89,7 @@ export const menuCategories = [
   {
     label: 'Operación Día D',
     icon: ClipboardCheck,
-    items: ['/control-votacion', '/reportes']
+    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/configuracion-electoral', '/reportes']
   },
   {
     label: 'Asistencia y Eventos',
@@ -114,7 +120,7 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
   },
   'Mesario': {
-    permissions: ['/', '/control-votacion', '/perfil']
+    permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']
   },
   'Recepcionista': {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
