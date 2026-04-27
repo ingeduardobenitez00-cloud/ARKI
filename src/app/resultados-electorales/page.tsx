@@ -1,14 +1,15 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, onSnapshot, query, getDocs } from 'firebase/firestore';
+import { collection, onSnapshot, query, getDocs, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { INTENDENTE_CANDIDATES, JUNTA_LISTS, getJuntaOptions } from '@/data/electoral-metadata';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Users, Vote, Percent, TrendingUp } from 'lucide-react';
+import { Users, Vote, Percent, TrendingUp, Gavel, Medal } from 'lucide-react';
+import { calculateDHondt, rankCandidatesByPreferential, ListResult } from '@/lib/electoral-math';
 
 export default function ResultadosElectoralesPage() {
     const db = useFirestore();
@@ -61,7 +62,29 @@ export default function ResultadosElectoralesPage() {
 
     const totalVotosIntendente = useMemo(() => {
         if (!totals?.intendente) return 0;
-        return Object.values(totals.intendente).reduce((a: any, b: any) => a + (typeof b === 'number' ? b : 0), 0);
+        return Object.values(totals.intendente).reduce((a: number, b: any) => a + (typeof b === 'number' ? b : 0), 0);
+    }, [totals]);
+
+    const dHondtResults = useMemo(() => {
+        if (!totals?.junta) return [];
+        const lists: ListResult[] = JUNTA_LISTS.map(l => ({
+            id: l.id,
+            name: l.name,
+            totalVotes: totals.junta[l.id]?.total || 0,
+            options: totals.junta[l.id]?.opciones || {}
+        }));
+        return calculateDHondt(lists, 24);
+    }, [totals]);
+
+    const preferentialRankings = useMemo(() => {
+        if (!totals?.junta) return {};
+        const rankings: Record<string, any[]> = {};
+        JUNTA_LISTS.forEach(list => {
+            const options = totals.junta[list.id]?.opciones || {};
+            const candidates = getJuntaOptions(list.id);
+            rankings[list.id] = rankCandidatesByPreferential(options, candidates);
+        });
+        return rankings;
     }, [totals]);
 
     const intendenteChartData = useMemo(() => {
@@ -71,6 +94,23 @@ export default function ResultadosElectoralesPage() {
             color: c.list.includes('2') ? '#ef4444' : c.list.includes('7') ? '#3b82f6' : '#10b981'
         })).sort((a, b) => b.votos - a.votos);
     }, [intendenteTotals]);
+
+    const electedConcejales = useMemo(() => {
+        const elected: any[] = [];
+        dHondtResults.forEach(res => {
+            const listRanked = preferentialRankings[res.listId] || [];
+            const winners = listRanked.slice(0, res.seats);
+            winners.forEach((w, index) => {
+                elected.push({
+                    ...w,
+                    listId: res.listId,
+                    listNumber: JUNTA_LISTS.find(l => l.id === res.listId)?.listNumber,
+                    position: index + 1
+                });
+            });
+        });
+        return elected;
+    }, [dHondtResults, preferentialRankings]);
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto bg-slate-50/50 min-h-screen">
@@ -192,6 +232,35 @@ export default function ResultadosElectoralesPage() {
                 <div className="space-y-6">
                     <Card className="border-none shadow-sm overflow-hidden bg-white">
                         <CardHeader className="border-b bg-slate-50/50">
+                            <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 flex items-center gap-2">
+                                <Medal className="w-4 h-4" /> Concejales Provisorios (Top 24)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-100">
+                                {electedConcejales.map((c, i) => (
+                                    <div key={`${c.listId}-${c.name}`} className="p-3 flex items-center gap-4 hover:bg-blue-50/30 transition-colors">
+                                        <div className="w-6 h-6 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center text-[10px] font-black">
+                                            {i + 1}
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="text-xs font-black text-slate-800 uppercase leading-none">{c.name}</div>
+                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Lista {c.listNumber} • Pos. {c.position}</div>
+                                        </div>
+                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700">ELECTO</Badge>
+                                    </div>
+                                ))}
+                                {electedConcejales.length === 0 && (
+                                    <div className="p-8 text-center text-slate-400 text-xs italic">
+                                        Esperando datos de escrutinio...
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="border-b bg-slate-50/50">
                             <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 text-center">Resumen Junta Municipal</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
@@ -207,6 +276,28 @@ export default function ResultadosElectoralesPage() {
                                     </div>
                                 );
                             })}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-none shadow-sm overflow-hidden bg-white">
+                        <CardHeader className="border-b bg-slate-50/50">
+                            <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 flex items-center gap-2">
+                                <Gavel className="w-4 h-4" /> Bancadas (D&apos;Hondt)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 space-y-3">
+                            {dHondtResults.map(res => (
+                                <div key={res.listId} className="flex justify-between items-center p-3 rounded-xl bg-slate-50">
+                                    <div className="flex flex-col">
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">{res.listName}</span>
+                                        <span className="text-sm font-black text-slate-700">LISTA {JUNTA_LISTS.find(l => l.id === res.listId)?.listNumber}</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-2xl font-black text-primary">{res.seats}</span>
+                                        <span className="text-[10px] font-bold text-slate-400 uppercase">Escaños</span>
+                                    </div>
+                                </div>
+                            ))}
                         </CardContent>
                     </Card>
 
