@@ -31,6 +31,8 @@ export default function ConfiguracionElectoralPage() {
         }
     };
 
+    const [version, setVersion] = useState(Date.now());
+
     const handleSave = async () => {
         if (!selectedCandidate || !canvasRef.current) return;
         
@@ -42,17 +44,16 @@ export default function ConfiguracionElectoralPage() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     image: dataUrl,
-                    imagePath: selectedCandidate.photo.split('?')[0] // Remove cache busting part if exists
+                    imagePath: selectedCandidate.photo.split('?')[0] 
                 }),
             });
 
             const result = await response.json();
             if (result.success) {
                 toast({ title: "Foto Guardada", description: `Se ha actualizado la foto de ${selectedCandidate.name}` });
+                setVersion(Date.now()); // Force refresh of image URLs
                 setSelectedCandidate(null);
                 setSourceImage(null);
-                // Trigger global refresh if needed
-                window.location.reload(); 
             } else {
                 throw new Error(result.error);
             }
@@ -71,7 +72,7 @@ export default function ConfiguracionElectoralPage() {
                     <CardContent className="p-2 flex flex-col items-center">
                         <div className="w-20 h-20 bg-muted rounded overflow-hidden mb-2 relative">
                             {c.photo ? (
-                                <img src={c.photo} alt={c.name} className="w-full h-full object-cover" />
+                                <img src={`${c.photo}?v=${version}`} alt={c.name} className="w-full h-full object-cover" />
                             ) : (
                                 <User className="w-full h-full p-4 text-muted-foreground" />
                             )}
