@@ -8,17 +8,26 @@ import { JUNTA_LISTS, getJuntaOptions } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
 import { AlertCircle, Save, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Badge } from '@/components/ui/badge';
 
 interface JuntaFormProps {
     mesa: number;
     local: string;
     onSave: (data: any) => void;
     isSaving?: boolean;
+    initialData?: any; // New prop for QR auto-fill
 }
 
-export function JuntaForm({ mesa, local, onSave, isSaving }: JuntaFormProps) {
-    const [votes, setVotes] = useState<Record<string, Record<number, number>>>({});
-    const [extra, setExtra] = useState({ nulos: 0, blancos: 0, total_general: 0 });
+export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaFormProps) {
+    const [votes, setVotes] = useState<Record<string, Record<number, number>>>(initialData?.votes || {});
+    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+
+    React.useEffect(() => {
+        if (initialData) {
+            if (initialData.votes) setVotes(initialData.votes);
+            if (initialData.extra) setExtra(initialData.extra);
+        }
+    }, [initialData]);
 
     const handleVoteChange = (listId: string, option: number, value: string) => {
         setVotes(prev => ({
@@ -42,7 +51,14 @@ export function JuntaForm({ mesa, local, onSave, isSaving }: JuntaFormProps) {
         <Card className="w-full max-w-6xl mx-auto border-t-4 border-t-blue-600">
             <CardHeader className="pb-2">
                 <CardTitle className="flex justify-between items-center text-blue-600">
-                    <span>Junta Municipal</span>
+                    <div className="flex items-center gap-2">
+                        <span>Junta Municipal</span>
+                        {initialData && (
+                            <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 border-blue-200 text-[10px] py-0 h-5">
+                                CARGADO POR QR
+                            </Badge>
+                        )}
+                    </div>
                     <span className="text-sm font-normal text-muted-foreground">Mesa {mesa} | {local}</span>
                 </CardTitle>
             </CardHeader>
@@ -86,7 +102,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving }: JuntaFormProps) {
                         <Input 
                             type="number" 
                             value={extra.nulos || ''} 
-                            onChange={(e) => setExtra(p => ({...p, nulos: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, nulos: parseInt(e.target.value) || 0}))} 
                         />
                     </div>
                     <div className="space-y-2">
@@ -94,7 +110,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving }: JuntaFormProps) {
                         <Input 
                             type="number" 
                             value={extra.blancos || ''} 
-                            onChange={(e) => setExtra(p => ({...p, blancos: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, blancos: parseInt(e.target.value) || 0}))} 
                         />
                     </div>
                     <div className="space-y-2">
@@ -108,7 +124,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving }: JuntaFormProps) {
                         <Input 
                             type="number" 
                             value={extra.total_general || ''} 
-                            onChange={(e) => setExtra(p => ({...p, total_general: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, total_general: parseInt(e.target.value) || 0}))} 
                             className={`font-black text-lg ${isTotalValid ? 'border-green-500 ring-green-500' : 'border-red-500'}`}
                         />
                     </div>

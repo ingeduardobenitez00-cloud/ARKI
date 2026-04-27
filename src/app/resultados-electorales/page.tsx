@@ -233,7 +233,7 @@ export default function ResultadosElectoralesPage() {
                     <Card className="border-none shadow-sm overflow-hidden bg-white">
                         <CardHeader className="border-b bg-slate-50/50">
                             <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 flex items-center gap-2">
-                                <Medal className="w-4 h-4" /> Concejales Provisorios (Top 24)
+                                <Medal className="w-4 h-4" /> Votos Preferencias Concejales
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">

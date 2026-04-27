@@ -72,24 +72,54 @@ export default function EscanerActasPage() {
         return localData?.mesas || [];
     }, [metadata, selectedLocal]);
 
+    const [qrInitialData, setQrInitialData] = useState<any>(null);
+
     const handleQRResult = (text: string) => {
-        // Example TREP QR parsing logic
-        // format expected: MESA:123|LOCAL:Colegio X|TIPO:INTENDENTE
         try {
+            // Intelligent Parsing for zero-manual-entry
             const parts = text.split('|');
-            const mesaPart = parts.find(p => p.startsWith('MESA:'));
-            const typePart = parts.find(p => p.startsWith('TIPO:'));
+            const data: any = { votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 } };
             
-            if (mesaPart && typePart) {
-                const mesaNo = parseInt(mesaPart.split(':')[1]);
-                const type = typePart.split(':')[1].toLowerCase() as 'intendencia' | 'junta';
-                
-                setSelectedMesa(mesaNo);
-                setActiveModule(type === 'intendencia' ? 'intendencia' : 'junta');
-                setIsScannerOpen(false);
-                toast({ title: "QR Detectado", description: `Cargando ${type} para Mesa ${mesaNo}` });
+            // 1. Identification
+            const mesaPart = parts.find(p => p.includes('MESA:'))?.split(':')[1];
+            const typePart = parts.find(p => p.includes('TIPO:'))?.split(':')[1];
+            const localPart = parts.find(p => p.includes('LOCAL:'))?.split(':')[1];
+
+            if (mesaPart) setSelectedMesa(parseInt(mesaPart));
+            if (localPart) setSelectedLocal(localPart);
+            
+            const moduleType = typePart?.toLowerCase().includes('inten') ? 'intendencia' : 'junta';
+            setActiveModule(moduleType);
+
+            // 2. Data Extraction (Fuzzy Matching)
+            // Example format: ...|VOTOS:L1=100;L2=50;L10=10;N=2;B=1;T=163
+            const votesPart = parts.find(p => p.includes('VOTOS:'))?.split(':')[1];
+            if (votesPart) {
+                const pairs = votesPart.split(';');
+                pairs.forEach(pair => {
+                    const [key, val] = pair.split('=');
+                    const numVal = parseInt(val) || 0;
+                    
+                    if (key.startsWith('L')) {
+                        // Map to internal IDs (List 1 -> list_1, List 2 -> list_2)
+                        const listId = `list_${key.substring(1)}`;
+                        if (moduleType === 'intendencia') {
+                            data.votes[listId] = numVal;
+                        } else {
+                            // For Junta, assume the QR gives the list total or option 1 as a baseline
+                            // Real official TREP often gives list totals first
+                            data.votes[listId] = { 1: numVal }; 
+                        }
+                    } else if (key === 'N') data.extra.nulos = numVal;
+                    else if (key === 'B') data.extra.blancos = numVal;
+                    else if (key === 'T') data.extra.total_general = numVal;
+                });
+                setQrInitialData(data);
             }
+
+            toast({ title: "Acta Detectada", description: `Auto-completando Mesa ${mesaPart || selectedMesa}` });
         } catch (e) {
+            console.error("QR Error:", e);
             toast({ title: "Error en QR", description: "Formato no reconocido", variant: "destructive" });
         }
     };
@@ -122,6 +152,7 @@ export default function EscanerActasPage() {
 
             toast({ title: "Éxito", description: "Resultado guardado correctamente" });
             setActiveModule(null);
+            setQrInitialData(null); // Clear for next scan
         } catch (e) {
             toast({ title: "Error", description: "No se pudo guardar el resultado", variant: "destructive" });
         } finally {
@@ -269,6 +300,7 @@ export default function EscanerActasPage() {
                                     local={selectedLocal!} 
                                     onSave={handleSaveResult}
                                     isSaving={isSaving}
+                                    initialData={qrInitialData}
                                 />
                             ) : (
                                 <JuntaForm 
@@ -276,6 +308,7 @@ export default function EscanerActasPage() {
                                     local={selectedLocal!} 
                                     onSave={handleSaveResult}
                                     isSaving={isSaving}
+                                    initialData={qrInitialData}
                                 />
                             )}
                         </div>

@@ -6,17 +6,27 @@ import { Label } from '@/components/ui/label';
 import { INTENDENTE_CANDIDATES } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
 import { AlertCircle, Save } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface IntendenteFormProps {
     mesa: number;
     local: string;
     onSave: (data: any) => void;
     isSaving?: boolean;
+    initialData?: any; // New prop for QR auto-fill
 }
 
-export function IntendenteForm({ mesa, local, onSave, isSaving }: IntendenteFormProps) {
-    const [votes, setVotes] = useState<Record<string, number>>({});
-    const [extra, setExtra] = useState({ nulos: 0, blancos: 0, total_general: 0 });
+export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: IntendenteFormProps) {
+    const [votes, setVotes] = useState<Record<string, number>>(initialData?.votes || {});
+    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+
+    // Handle incoming QR data asynchronously
+    React.useEffect(() => {
+        if (initialData) {
+            if (initialData.votes) setVotes(initialData.votes);
+            if (initialData.extra) setExtra(initialData.extra);
+        }
+    }, [initialData]);
 
     const handleVoteChange = (candidateId: string, value: string) => {
         setVotes(prev => ({ ...prev, [candidateId]: parseInt(value) || 0 }));
@@ -29,7 +39,14 @@ export function IntendenteForm({ mesa, local, onSave, isSaving }: IntendenteForm
         <Card className="w-full max-w-4xl mx-auto border-t-4 border-t-primary">
             <CardHeader>
                 <CardTitle className="flex justify-between items-center">
-                    <span>Intendencia Municipal</span>
+                    <div className="flex items-center gap-2">
+                        <span>Intendencia Municipal</span>
+                        {initialData && (
+                            <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-green-200 text-[10px] py-0 h-5">
+                                CARGADO POR QR
+                            </Badge>
+                        )}
+                    </div>
                     <span className="text-sm font-normal text-muted-foreground">Mesa {mesa} | {local}</span>
                 </CardTitle>
             </CardHeader>
@@ -53,7 +70,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving }: IntendenteForm
                         <Input 
                             type="number" 
                             value={extra.nulos || ''} 
-                            onChange={(e) => setExtra(p => ({...p, nulos: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, nulos: parseInt(e.target.value) || 0}))} 
                             className="font-bold"
                         />
                     </div>
@@ -62,7 +79,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving }: IntendenteForm
                         <Input 
                             type="number" 
                             value={extra.blancos || ''} 
-                            onChange={(e) => setExtra(p => ({...p, blancos: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, blancos: parseInt(e.target.value) || 0}))} 
                             className="font-bold"
                         />
                     </div>
@@ -71,7 +88,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving }: IntendenteForm
                         <Input 
                             type="number" 
                             value={extra.total_general || ''} 
-                            onChange={(e) => setExtra(p => ({...p, total_general: parseInt(e.target.value) || 0}))} 
+                            onChange={(e) => setExtra((p: any) => ({...p, total_general: parseInt(e.target.value) || 0}))} 
                             className={`font-black text-lg ${isTotalValid ? 'border-green-500 ring-green-500' : 'border-red-500'}`}
                         />
                     </div>

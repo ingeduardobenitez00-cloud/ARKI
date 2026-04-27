@@ -21,7 +21,7 @@ export function QRScanner({ onResult, onError }: QRScannerProps) {
 
             await html5QrCode.start(
                 { facingMode: "environment" },
-                { fps: 10, qrbox: { width: 250, height: 250 } },
+                { fps: 15, qrbox: { width: 300, height: 300 } },
                 (decodedText) => {
                     onResult(decodedText);
                 },
@@ -34,6 +34,20 @@ export function QRScanner({ onResult, onError }: QRScannerProps) {
             console.error("Error al iniciar cámara:", err);
             setCameraError("No se pudo acceder a la cámara. Verifica los permisos.");
             if (onError) onError(String(err));
+        }
+    };
+
+    const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        const html5QrCode = new Html5Qrcode("qr-reader-internal");
+        try {
+            const decodedText = await html5QrCode.scanFile(file, true);
+            onResult(decodedText);
+        } catch (err) {
+            console.error("Error al escanear archivo:", err);
+            if (onError) onError("No se detectó QR en la foto. Intenta de nuevo.");
         }
     };
 
@@ -78,10 +92,15 @@ export function QRScanner({ onResult, onError }: QRScannerProps) {
                     </div>
                 )}
 
-                {/* Scanning Frame Overlay */}
+                {/* Scanning Frame Overlay (updated to 300px) */}
                 {isStarted && (
                     <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                        <div className="w-64 h-64 border-2 border-primary rounded-lg border-dashed opacity-50"></div>
+                        <div className="w-[300px] h-[300px] border-2 border-primary rounded-lg border-dashed opacity-50 relative">
+                            <div className="absolute -top-1 -left-1 w-4 h-4 border-t-4 border-l-4 border-primary"></div>
+                            <div className="absolute -top-1 -right-1 w-4 h-4 border-t-4 border-r-4 border-primary"></div>
+                            <div className="absolute -bottom-1 -left-1 w-4 h-4 border-b-4 border-l-4 border-primary"></div>
+                            <div className="absolute -bottom-1 -right-1 w-4 h-4 border-b-4 border-r-4 border-primary"></div>
+                        </div>
                         <div className="absolute top-4 left-4 right-4 flex justify-between">
                             <span className="text-[10px] bg-primary/20 text-primary px-2 py-1 rounded-full font-bold">ESCANEANDO...</span>
                         </div>
@@ -89,8 +108,32 @@ export function QRScanner({ onResult, onError }: QRScannerProps) {
                 )}
             </div>
             
-            <div className="p-4 text-center text-xs text-muted-foreground font-bold uppercase tracking-widest bg-muted/30 border-t">
-                Apunta la cámara al código QR del acta
+            <div className="p-4 space-y-4 bg-muted/30 border-t">
+                <div className="text-center text-xs text-muted-foreground font-bold uppercase tracking-widest">
+                    Apunta la cámara al código QR del acta
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                    <input 
+                        type="file" 
+                        accept="image/*" 
+                        capture="environment"
+                        className="hidden" 
+                        id="qr-upload" 
+                        onChange={handleFileUpload}
+                    />
+                    <Button 
+                        variant="outline" 
+                        className="w-full border-primary/20 text-primary hover:bg-primary/5 font-bold"
+                        onClick={() => document.getElementById('qr-upload')?.click()}
+                    >
+                        <Camera className="w-4 h-4 mr-2" />
+                        CAPTURAR QR (FOTO)
+                    </Button>
+                    <p className="text-[10px] text-center text-muted-foreground italic">
+                        Usa este botón si el escaneo en vivo falla
+                    </p>
+                </div>
             </div>
         </div>
     );
