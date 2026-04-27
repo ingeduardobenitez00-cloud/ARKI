@@ -124,6 +124,8 @@ export default function EscanerActasPage() {
         }
     };
 
+    const [saveSuccess, setSaveSuccess] = useState(false);
+
     const handleSaveResult = async (data: any) => {
         if (!db || !selectedLocal || !selectedMesa || !activeModule) return;
         setIsSaving(true);
@@ -147,12 +149,18 @@ export default function EscanerActasPage() {
                 last_updated: serverTimestamp()
             }, { merge: true });
 
-            // Update Atomic Totals for real-time dashboard efficiency
             await updateElectoralTotals(db, data, activeModule === 'intendencia' ? 'Intendente' : 'Junta');
 
+            setSaveSuccess(true);
             toast({ title: "Éxito", description: "Resultado guardado correctamente" });
-            setActiveModule(null);
-            setQrInitialData(null); // Clear for next scan
+            
+            // Smooth transition: Wait 1.5s before clearing to allow user to see success
+            setTimeout(() => {
+                setSaveSuccess(false);
+                setActiveModule(null);
+                setQrInitialData(null);
+            }, 1500);
+
         } catch (e) {
             toast({ title: "Error", description: "No se pudo guardar el resultado", variant: "destructive" });
         } finally {
@@ -274,7 +282,17 @@ export default function EscanerActasPage() {
                 </div>
 
                 {/* Main Form Area */}
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 relative">
+                    {saveSuccess && (
+                        <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/90 backdrop-blur-sm rounded-xl animate-in fade-in duration-300">
+                            <div className="bg-green-100 p-4 rounded-full mb-4">
+                                <CheckCircle className="w-12 h-12 text-green-600 animate-bounce" />
+                            </div>
+                            <h3 className="text-xl font-black text-slate-800">Resultado Guardado</h3>
+                            <p className="text-sm text-slate-500">Actualizando totales en tiempo real...</p>
+                        </div>
+                    )}
+                    
                     {!activeModule ? (
                         <div className="h-full flex flex-col items-center justify-center p-12 border-2 border-dashed rounded-xl bg-muted/20">
                             <QrCode className="w-16 h-16 text-muted-foreground/30 mb-4" />
