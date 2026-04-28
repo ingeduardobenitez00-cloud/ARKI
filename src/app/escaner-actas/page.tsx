@@ -105,7 +105,7 @@ export default function EscanerActasPage() {
             isProcessingQR.current = true;
             // Intelligent Parsing for zero-manual-entry (now with manual confirmation)
             const parts = text.split('|');
-            const data: any = { votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 }, raw: { local: '', mesa: '' } };
+            const data: any = { rawText: text, votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 }, raw: { local: '', mesa: '' } };
             
             // 1. Identification
             const mesaPart = parts.find(p => p.includes('MESA:'))?.split(':')[1];
@@ -397,6 +397,12 @@ export default function EscanerActasPage() {
                                 <div>{pendingQRData?.extra.blancos}</div>
                                 <div className="font-bold text-muted-foreground">Votos Nulos:</div>
                                 <div>{pendingQRData?.extra.nulos}</div>
+                            </div>
+                            
+                            {/* RAW DATA DEBUG */}
+                            <div className="bg-slate-900 text-green-400 p-2 rounded-md mt-2">
+                                <p className="text-[10px] font-bold mb-1 text-slate-400">DATOS CRUDOS DEL QR (COPIA ESTO):</p>
+                                <p className="text-[11px] font-mono break-all">{pendingQRData?.rawText || 'No hay texto puro detectado'}</p>
                             </div>
                         </div>
                         <DialogFooter>
