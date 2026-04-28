@@ -98,16 +98,106 @@ export default function EscanerActasPage() {
     const [qrInitialData, setQrInitialData] = useState<any>(null);
     const isProcessingQR = useRef(false);
 
+    // MSA Binary QR Parser (provisional - ~15% confidence on vote totals)
+    const parseMSABinaryQR = (hexStr: string): any | null => {
+        try {
+            const bytes = new Uint8Array(hexStr.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+            
+            // Find zlib magic bytes 0x78 0x9C
+            let zlibPos = -1;
+            for (let i = 0; i < bytes.length - 1; i++) {
+                if (bytes[i] === 0x78 && bytes[i + 1] === 0x9C) { zlibPos = i; break; }
+            }
+            if (zlibPos < 0) return null;
+
+            const headerLen = zlibPos;
+            const header = Array.from(bytes.slice(0, headerLen));
+
+            // Module type detection from header bytes [11-14] (new 15-byte format)
+            // Group A: [92, 181, 154, 129] = 0x5CB59A81
+            // Group B: [255, 53, 167, 218] = 0xFF35A7DA
+            let moduleType = 'junta';
+            if (headerLen === 15) {
+                const sig = header.slice(11, 15).join(',');
+                const sigA = [92, 181, 154, 129].join(',');
+                moduleType = sig === sigA ? 'junta' : 'intendencia';
+            }
+
+            // Mesa number: header[6] in new format (provisional)
+            const mesaNum = headerLen === 15 ? header[6] : (header[3] || 0);
+
+            // Decompress zlib block using pako (available in browser)
+            let decompressed: number[] = [];
+            try {
+                // Use native DecompressionStream if available
+                const zlibData = bytes.slice(zlibPos);
+                // Fallback: try to read zlib stored block
+                // zlib stored block: 78 9C <flag=01> <len_lo> <len_hi> <nlen_lo> <nlen_hi> <data...>
+                if (zlibData[2] === 0x01) {
+                    const dataLen = zlibData[3] | (zlibData[4] << 8);
+                    decompressed = Array.from(zlibData.slice(5, 5 + dataLen));
+                }
+            } catch {}
+
+            // Best-effort vote extraction from decompressed block (provisional mapping)
+            // Based on reverse engineering of ANR 2026 internals acta sample
+            const provisional = true;
+            const extraVals: Record<string, number> = {};
+            const voteVals: Record<string, number> = {};
+
+            if (decompressed.length >= 6) {
+                // Header: dec[0-1]=0,0; dec[2]=format; dec[3]=0; dec[4-5]=district codes
+                // Vote data occurs from dec[6] onwards in short-form actas
+                const votePart = decompressed.slice(6);
+                // Try to read individual list totals at sequential byte positions
+                votePart.forEach((v, i) => {
+                    if (v > 0 && v < 500 && i < 20) {
+                        voteVals[`pos_${i}`] = v;
+                    }
+                });
+                // NUL/BLC from header in old format
+                if (headerLen === 22) {
+                    extraVals.nulos = header[7] || 0;
+                }
+            }
+
+            return {
+                moduleType,
+                provisional,
+                raw: { mesa: mesaNum.toString(), local: 'Desconocido (binario MSA)' },
+                extra: { nulos: extraVals.nulos || 0, blancos: 0, total_general: 0 },
+                votes: {},
+                provisionalVotes: voteVals,
+                rawText: hexStr,
+            };
+        } catch (e) {
+            console.error('MSA binary parse error:', e);
+            return null;
+        }
+    };
+
     const handleQRResult = (text: string) => {
         if (isProcessingQR.current) return;
         
         try {
             isProcessingQR.current = true;
-            // Intelligent Parsing for zero-manual-entry (now with manual confirmation)
+
+            // ── MSA Binary Format (REC <hex>) ──────────────────────────────
+            const recMatch = text.trim().match(/^REC\s+([0-9A-Fa-f]+)$/);
+            if (recMatch) {
+                const parsed = parseMSABinaryQR(recMatch[1]);
+                if (parsed) {
+                    parsed.rawText = text;
+                    setPendingQRData(parsed);
+                    setIsScannerOpen(false);
+                    return;
+                }
+            }
+
+            // ── Legacy text pipe-delimited format ──────────────────────────
             const parts = text.split('|');
             const data: any = { rawText: text, votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 }, raw: { local: '', mesa: '' } };
             
-            // 1. Identification
             const mesaPart = parts.find(p => p.includes('MESA:'))?.split(':')[1];
             const typePart = parts.find(p => p.includes('TIPO:'))?.split(':')[1];
             const localPart = parts.find(p => p.includes('LOCAL:'))?.split(':')[1];
@@ -116,28 +206,20 @@ export default function EscanerActasPage() {
             data.raw.mesa = mesaPart || 'Desconocida';
             data.moduleType = typePart?.toLowerCase().includes('inten') ? 'intendencia' : 'junta';
 
-            // 2. Data Extraction
             const votesPart = parts.find(p => p.includes('VOTOS:'))?.split(':')[1];
             if (votesPart) {
-                const pairs = votesPart.split(';');
-                pairs.forEach(pair => {
+                votesPart.split(';').forEach(pair => {
                     const [key, val] = pair.split('=');
                     const numVal = parseInt(val) || 0;
-                    
                     if (key.startsWith('L')) {
                         const listId = `list_${key.substring(1)}`;
-                        if (data.moduleType === 'intendencia') {
-                            data.votes[listId] = numVal;
-                        } else {
-                            data.votes[listId] = { 1: numVal }; 
-                        }
+                        data.votes[listId] = data.moduleType === 'intendencia' ? numVal : { 1: numVal };
                     } else if (key === 'N') data.extra.nulos = numVal;
                     else if (key === 'B') data.extra.blancos = numVal;
                     else if (key === 'T') data.extra.total_general = numVal;
                 });
             }
 
-            // Show preview modal instead of auto-applying
             setPendingQRData(data);
             setIsScannerOpen(false);
 
@@ -384,25 +466,48 @@ export default function EscanerActasPage() {
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
+                            {pendingQRData?.provisional && (
+                                <div className="bg-red-50 text-red-800 p-3 rounded-md text-sm border border-red-300 font-bold flex items-start gap-2">
+                                    <span className="text-red-500 text-lg leading-none">⚠</span>
+                                    <div>
+                                        <p>PARSER PROVISIONAL (MSA Binario)</p>
+                                        <p className="font-normal text-xs mt-1">El formato binario del QR está siendo decodificado de forma experimental. Módulo detectado: <strong className="uppercase">{pendingQRData?.moduleType}</strong>. Los totales de votos deben ingresarse manualmente comparando con el papel. Este sistema se calibrará en mayo con actas reales.</p>
+                                    </div>
+                                </div>
+                            )}
                             <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm border border-yellow-200">
                                 <p><strong>Aviso:</strong> Los datos se cargarán a la <strong>Mesa {selectedMesa}</strong> del local <strong>{selectedLocal}</strong>, según tu configuración manual.</p>
-                                <p className="mt-2 text-xs opacity-80">El código QR indica pertenecer a: <i>{pendingQRData?.raw.local} (Mesa {pendingQRData?.raw.mesa})</i></p>
+                                <p className="mt-2 text-xs opacity-80">QR indica: <i>{pendingQRData?.raw.local} (Mesa {pendingQRData?.raw.mesa})</i></p>
                             </div>
+
+                            {pendingQRData?.provisionalVotes && Object.keys(pendingQRData.provisionalVotes).length > 0 && (
+                                <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
+                                    <p className="text-xs font-bold text-blue-700 mb-2">Valores extraídos del QR (provisional — verificar con el papel):</p>
+                                    <div className="grid grid-cols-2 gap-1 text-xs">
+                                        {Object.entries(pendingQRData.provisionalVotes).map(([k, v]) => (
+                                            <div key={k} className="flex justify-between bg-white rounded px-2 py-1 border border-blue-100">
+                                                <span className="text-slate-500 font-mono">{k}</span>
+                                                <span className="font-bold">{String(v)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
                             <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 p-3 rounded-lg border">
-                                <div className="font-bold text-muted-foreground">Módulo Escaneado:</div>
+                                <div className="font-bold text-muted-foreground">Módulo:</div>
                                 <div className="uppercase font-semibold">{pendingQRData?.moduleType}</div>
-                                <div className="font-bold text-muted-foreground">Total General Votos:</div>
-                                <div>{pendingQRData?.extra.total_general}</div>
-                                <div className="font-bold text-muted-foreground">Votos en Blanco:</div>
-                                <div>{pendingQRData?.extra.blancos}</div>
-                                <div className="font-bold text-muted-foreground">Votos Nulos:</div>
+                                <div className="font-bold text-muted-foreground">Nulos:</div>
                                 <div>{pendingQRData?.extra.nulos}</div>
+                                <div className="font-bold text-muted-foreground">Blancos:</div>
+                                <div>{pendingQRData?.extra.blancos}</div>
+                                <div className="font-bold text-muted-foreground">Total:</div>
+                                <div>{pendingQRData?.extra.total_general}</div>
                             </div>
-                            
-                            {/* RAW DATA DEBUG */}
-                            <div className="bg-slate-900 text-green-400 p-2 rounded-md mt-2">
-                                <p className="text-[10px] font-bold mb-1 text-slate-400">DATOS CRUDOS DEL QR (COPIA ESTO):</p>
-                                <p className="text-[11px] font-mono break-all">{pendingQRData?.rawText || 'No hay texto puro detectado'}</p>
+
+                            <div className="bg-slate-900 text-green-400 p-2 rounded-md">
+                                <p className="text-[10px] font-bold mb-1 text-slate-400">DATOS CRUDOS DEL QR:</p>
+                                <p className="text-[11px] font-mono break-all">{pendingQRData?.rawText || '—'}</p>
                             </div>
                         </div>
                         <DialogFooter>
