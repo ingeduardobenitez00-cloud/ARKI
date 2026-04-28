@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { collection, query, where, doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
@@ -96,9 +96,13 @@ export default function EscanerActasPage() {
     }, [allMetadata, selectedSeccional, selectedLocal]);
 
     const [qrInitialData, setQrInitialData] = useState<any>(null);
+    const isProcessingQR = useRef(false);
 
     const handleQRResult = (text: string) => {
+        if (isProcessingQR.current) return;
+        
         try {
+            isProcessingQR.current = true;
             // Intelligent Parsing for zero-manual-entry (now with manual confirmation)
             const parts = text.split('|');
             const data: any = { votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 }, raw: { local: '', mesa: '' } };
@@ -140,6 +144,7 @@ export default function EscanerActasPage() {
         } catch (e) {
             console.error("QR Error:", e);
             toast({ title: "Error en QR", description: "Formato no reconocido", variant: "destructive" });
+            isProcessingQR.current = false;
         }
     };
 
@@ -395,14 +400,15 @@ export default function EscanerActasPage() {
                             </div>
                         </div>
                         <DialogFooter>
-                            <Button variant="outline" onClick={() => setPendingQRData(null)}>
+                            <Button type="button" variant="outline" onClick={() => { setPendingQRData(null); isProcessingQR.current = false; }}>
                                 Descartar
                             </Button>
-                            <Button onClick={() => {
+                            <Button type="button" onClick={() => {
                                 if (pendingQRData) {
                                     setQrInitialData(pendingQRData);
                                     setActiveModule(pendingQRData.moduleType);
                                     setPendingQRData(null);
+                                    isProcessingQR.current = false;
                                 }
                             }}>
                                 Confirmar Datos QR
