@@ -153,12 +153,27 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
         });
     }, [db]);
 
-    const locales = useMemo(() => metadata?.locales || [], [metadata]);
+    const locales = useMemo(() => {
+        if (!metadata?.locales) return [];
+        // `locales` can be an array of strings or an array of objects ({name, seccional})
+        // Based on recent refactoring, it might be strings per seccional_metadata document.
+        return metadata.locales.map((l: any) => typeof l === 'string' ? l : l.name);
+    }, [metadata]);
     const mesas = useMemo(() => {
         if (!selectedLocal || !metadata?.mesas_por_local) return [];
         const localData = metadata.mesas_por_local.find((item: any) => item.localName === selectedLocal);
         return localData ? localData.mesas : [];
     }, [metadata, selectedLocal]);
+    const assignedMesas = watch('mesas') || [];
+
+    const toggleMesa = (m: number) => {
+        const current = [...assignedMesas];
+        if (current.includes(m)) {
+            setValue('mesas', current.filter(mesa => mesa !== m));
+        } else {
+            setValue('mesas', [...current, m]);
+        }
+    };
 
     const filteredSeccionales = useMemo(() => {
         if (!seccionalSearch) return seccionales;
@@ -339,7 +354,13 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                         <Controller name="role" control={control} render={({ field }) => (
                             <Select onValueChange={field.onChange} value={field.value}>
                                 <SelectTrigger className="font-bold h-11"><SelectValue placeholder="Selecciona un rol" /></SelectTrigger>
-                                <SelectContent>{Object.keys(userRoles).map(role => <SelectItem key={role} value={role}>{role}</SelectItem>)}</SelectContent>
+                                <SelectContent>
+                                    {Object.keys(userRoles).map(role => (
+                                        <SelectItem key={role} value={role}>
+                                            {role === 'Mesario' ? 'Mesario (TREP)' : role}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
                             </Select>
                         )} />
                     </div>
@@ -420,6 +441,62 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                         </ScrollArea>
                     </div>
                 </div>
+
+                {selectedRole === 'Mesario' && (
+                    <div className="space-y-4 p-5 border rounded-3xl bg-blue-50/30 border-blue-100/50">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700 flex items-center gap-2 mb-3">
+                            <MapPin className="h-3 w-3" />
+                            Asignación Específica TREP (Local y Mesas)
+                        </Label>
+                        
+                        <div className="space-y-4">
+                            <div>
+                                <Label className="text-xs font-bold text-slate-600 mb-1 block">Local de Votación</Label>
+                                <Controller name="local" control={control} render={({ field }) => (
+                                    <Select 
+                                        onValueChange={(val) => { field.onChange(val); setValue('mesas', []); }} 
+                                        value={field.value || ''}
+                                        disabled={!assignedSeccionales[0]}
+                                    >
+                                        <SelectTrigger className="font-bold border-blue-200 bg-white">
+                                            <SelectValue placeholder={!assignedSeccionales[0] ? "Selecciona una Jurisdicción primero" : "Selecciona el Local"} />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {locales.map((l: string) => (
+                                                <SelectItem key={l} value={l}>{l}</SelectItem>
+                                            ))}
+                                            {locales.length === 0 && assignedSeccionales[0] && (
+                                                <SelectItem value="none" disabled>No se encontraron locales...</SelectItem>
+                                            )}
+                                        </SelectContent>
+                                    </Select>
+                                )} />
+                            </div>
+
+                            {selectedLocal && mesas.length > 0 && (
+                                <div className="space-y-2">
+                                    <Label className="text-xs font-bold text-slate-600 mb-1 block">Mesas Asignadas (Opcional)</Label>
+                                    <ScrollArea className="h-32 border border-blue-100 rounded-xl bg-white p-3 shadow-inner">
+                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                            {mesas.map((m: number) => (
+                                                <div key={m} className="flex items-center space-x-2">
+                                                    <Checkbox 
+                                                        id={`mesa-${m}`} 
+                                                        checked={assignedMesas.includes(m)} 
+                                                        onCheckedChange={() => toggleMesa(m)}
+                                                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                                                    />
+                                                    <Label htmlFor={`mesa-${m}`} className="text-[10px] font-bold cursor-pointer">MESA {m}</Label>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </ScrollArea>
+                                    <p className="text-[9px] text-blue-600 font-medium">Si no asignas ninguna mesa explícita, podrá ver el listado de todas las mesas de este local y elegirlas a mano.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
 
                 <div className="space-y-3">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">

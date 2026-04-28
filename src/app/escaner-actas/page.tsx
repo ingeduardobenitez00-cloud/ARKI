@@ -1,17 +1,18 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, query, where, doc, getDoc, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, query, where, doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { QRScanner } from '@/components/electoral/QRScanner';
 import { IntendenteForm } from '@/components/electoral/IntendenteForm';
 import { JuntaForm } from '@/components/electoral/JuntaForm';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, QrCode, ClipboardCheck, History, X } from 'lucide-react';
+import { Loader2, QrCode, ClipboardCheck, History, X, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { updateElectoralTotals } from '@/services/electoral-service';
@@ -25,24 +26,41 @@ export default function EscanerActasPage() {
     const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
     const [selectedMesa, setSelectedMesa] = useState<number | null>(null);
     const [activeModule, setActiveModule] = useState<'intendencia' | 'junta' | null>(null);
+    const [pendingQRData, setPendingQRData] = useState<any>(null);
 
     // Data State
-    const [metadata, setMetadata] = useState<any>(null);
+    const [selectedSeccional, setSelectedSeccional] = useState<string | null>(null);
+    const [allMetadata, setAllMetadata] = useState<Record<string, any>>({});
     const [mesasStatus, setMesasStatus] = useState<Record<string, any>>({});
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
 
-    // Fetch Metadata (similar to ControlVotacion)
+    // Fetch Metadata
     useEffect(() => {
-        const seccionalToQuery = isAdmin ? user?.seccional || '1' : user?.seccional; // Fallback to 1 for admin testing if needed
-        if (!seccionalToQuery || !db) return;
+        if (!db) return;
 
-        const metaDocRef = doc(db, 'seccionales_metadata', seccionalToQuery);
-        getDoc(metaDocRef).then(snap => {
-            if (snap.exists()) setMetadata(snap.data());
-        });
+        if (isAdmin) {
+            getDocs(collection(db, 'seccionales_metadata')).then(snap => {
+                const combinedData: Record<string, any> = {};
+                snap.docs.forEach(docSnap => {
+                    combinedData[docSnap.id] = docSnap.data();
+                });
+                setAllMetadata(combinedData);
+            });
+        } else {
+            const seccionalToQuery = user?.seccional;
+            if (!seccionalToQuery) return;
+
+            const metaDocRef = doc(db, 'seccionales_metadata', seccionalToQuery);
+            getDoc(metaDocRef).then(snap => {
+                if (snap.exists()) {
+                    setAllMetadata({ [seccionalToQuery]: snap.data() });
+                    setSelectedSeccional(seccionalToQuery);
+                }
+            });
+        }
     }, [isAdmin, user, db]);
 
     // Fetch Mesas Progress Status real-time
@@ -65,34 +83,36 @@ export default function EscanerActasPage() {
         return () => unsubscribe();
     }, [db, selectedLocal]);
 
-    const locales = useMemo(() => metadata?.locales || [], [metadata]);
+    const allSeccionalesList = useMemo(() => Object.keys(allMetadata).sort((a,b)=>a.localeCompare(b, undefined, {numeric: true})), [allMetadata]);
+    const locales = useMemo(() => {
+        if (!selectedSeccional) return [];
+        return allMetadata[selectedSeccional]?.locales || [];
+    }, [allMetadata, selectedSeccional]);
+
     const currentLocalMesas = useMemo(() => {
-        if (!selectedLocal || !metadata?.mesas_por_local) return [];
-        const localData = metadata.mesas_por_local.find((l: any) => l.localName === selectedLocal);
+        if (!selectedLocal || !selectedSeccional) return [];
+        const localData = allMetadata[selectedSeccional]?.mesas_por_local?.find((l: any) => l.localName === selectedLocal);
         return localData?.mesas || [];
-    }, [metadata, selectedLocal]);
+    }, [allMetadata, selectedSeccional, selectedLocal]);
 
     const [qrInitialData, setQrInitialData] = useState<any>(null);
 
     const handleQRResult = (text: string) => {
         try {
-            // Intelligent Parsing for zero-manual-entry
+            // Intelligent Parsing for zero-manual-entry (now with manual confirmation)
             const parts = text.split('|');
-            const data: any = { votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 } };
+            const data: any = { votes: {}, extra: { nulos: 0, blancos: 0, total_general: 0 }, raw: { local: '', mesa: '' } };
             
             // 1. Identification
             const mesaPart = parts.find(p => p.includes('MESA:'))?.split(':')[1];
             const typePart = parts.find(p => p.includes('TIPO:'))?.split(':')[1];
             const localPart = parts.find(p => p.includes('LOCAL:'))?.split(':')[1];
 
-            if (mesaPart) setSelectedMesa(parseInt(mesaPart));
-            if (localPart) setSelectedLocal(localPart);
-            
-            const moduleType = typePart?.toLowerCase().includes('inten') ? 'intendencia' : 'junta';
-            setActiveModule(moduleType);
+            data.raw.local = localPart || 'Desconocido';
+            data.raw.mesa = mesaPart || 'Desconocida';
+            data.moduleType = typePart?.toLowerCase().includes('inten') ? 'intendencia' : 'junta';
 
-            // 2. Data Extraction (Fuzzy Matching)
-            // Example format: ...|VOTOS:L1=100;L2=50;L10=10;N=2;B=1;T=163
+            // 2. Data Extraction
             const votesPart = parts.find(p => p.includes('VOTOS:'))?.split(':')[1];
             if (votesPart) {
                 const pairs = votesPart.split(';');
@@ -101,23 +121,22 @@ export default function EscanerActasPage() {
                     const numVal = parseInt(val) || 0;
                     
                     if (key.startsWith('L')) {
-                        // Map to internal IDs (List 1 -> list_1, List 2 -> list_2)
                         const listId = `list_${key.substring(1)}`;
-                        if (moduleType === 'intendencia') {
+                        if (data.moduleType === 'intendencia') {
                             data.votes[listId] = numVal;
                         } else {
-                            // For Junta, assume the QR gives the list total or option 1 as a baseline
-                            // Real official TREP often gives list totals first
                             data.votes[listId] = { 1: numVal }; 
                         }
                     } else if (key === 'N') data.extra.nulos = numVal;
                     else if (key === 'B') data.extra.blancos = numVal;
                     else if (key === 'T') data.extra.total_general = numVal;
                 });
-                setQrInitialData(data);
             }
 
-            toast({ title: "Acta Detectada", description: `Auto-completando Mesa ${mesaPart || selectedMesa}` });
+            // Show preview modal instead of auto-applying
+            setPendingQRData(data);
+            setIsScannerOpen(false);
+
         } catch (e) {
             console.error("QR Error:", e);
             toast({ title: "Error en QR", description: "Formato no reconocido", variant: "destructive" });
@@ -180,6 +199,8 @@ export default function EscanerActasPage() {
                     className="w-full md:w-auto font-bold" 
                     onClick={() => setIsScannerOpen(!isScannerOpen)}
                     variant={isScannerOpen ? "destructive" : "default"}
+                    disabled={!selectedMesa}
+                    title={!selectedMesa ? "Selecciona una mesa primero" : "Abrir Escáner QR"}
                 >
                     {isScannerOpen ? <X className="mr-2" /> : <QrCode className="mr-2" />}
                     {isScannerOpen ? "Cerrar Escáner" : "Abrir Escáner QR"}
@@ -203,12 +224,27 @@ export default function EscanerActasPage() {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {isAdmin && (
+                                <div className="space-y-2">
+                                    <label className="text-xs font-semibold uppercase text-muted-foreground">Seccional</label>
+                                    <Select onValueChange={(v) => { setSelectedSeccional(v); setSelectedLocal(null); setSelectedMesa(null); }} value={selectedSeccional || ''}>
+                                        <SelectTrigger><SelectValue placeholder="Selecciona SECC" /></SelectTrigger>
+                                        <SelectContent>
+                                            {allSeccionalesList.map((s) => (
+                                                <SelectItem key={s} value={s}>SECC {s}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
                             <div className="space-y-2">
                                 <label className="text-xs font-semibold uppercase text-muted-foreground">Local de Votación</label>
-                                <Select onValueChange={setSelectedLocal} value={selectedLocal || ''}>
+                                <Select onValueChange={(v) => { setSelectedLocal(v); setSelectedMesa(null); }} value={selectedLocal || ''}>
                                     <SelectTrigger><SelectValue placeholder="Selecciona Local" /></SelectTrigger>
                                     <SelectContent>
-                                        {locales.map((l: string) => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                                        {locales.map((l: string) => (
+                                            <SelectItem key={l} value={l}>{l}</SelectItem>
+                                        ))}
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -332,6 +368,48 @@ export default function EscanerActasPage() {
                         </div>
                     )}
                 </div>
+
+                {/* Preview Dialog */}
+                <Dialog open={!!pendingQRData} onOpenChange={(open) => { if (!open) setPendingQRData(null) }}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Mesa Detectada en Código QR</DialogTitle>
+                            <DialogDescription>
+                                Revisa los datos de la mesa escaneada antes de aplicarlos.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="space-y-4">
+                            <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm border border-yellow-200">
+                                <p><strong>Aviso:</strong> Los datos se cargarán a la <strong>Mesa {selectedMesa}</strong> del local <strong>{selectedLocal}</strong>, según tu configuración manual.</p>
+                                <p className="mt-2 text-xs opacity-80">El código QR indica pertenecer a: <i>{pendingQRData?.raw.local} (Mesa {pendingQRData?.raw.mesa})</i></p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm bg-muted/30 p-3 rounded-lg border">
+                                <div className="font-bold text-muted-foreground">Módulo Escaneado:</div>
+                                <div className="uppercase font-semibold">{pendingQRData?.moduleType}</div>
+                                <div className="font-bold text-muted-foreground">Total General Votos:</div>
+                                <div>{pendingQRData?.extra.total_general}</div>
+                                <div className="font-bold text-muted-foreground">Votos en Blanco:</div>
+                                <div>{pendingQRData?.extra.blancos}</div>
+                                <div className="font-bold text-muted-foreground">Votos Nulos:</div>
+                                <div>{pendingQRData?.extra.nulos}</div>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setPendingQRData(null)}>
+                                Descartar
+                            </Button>
+                            <Button onClick={() => {
+                                if (pendingQRData) {
+                                    setQrInitialData(pendingQRData);
+                                    setActiveModule(pendingQRData.moduleType);
+                                    setPendingQRData(null);
+                                }
+                            }}>
+                                Confirmar Datos QR
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </div>
     );

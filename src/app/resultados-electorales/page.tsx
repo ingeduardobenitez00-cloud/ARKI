@@ -91,7 +91,7 @@ export default function ResultadosElectoralesPage() {
         return INTENDENTE_CANDIDATES.map(c => ({
             name: c.name,
             votos: intendenteTotals[c.id] || 0,
-            color: c.list.includes('2') ? '#ef4444' : c.list.includes('7') ? '#3b82f6' : '#10b981'
+            color: c.list.includes('2') ? '#ef4444' : c.list.includes('7') ? '#eab308' : '#10b981'
         })).sort((a, b) => b.votos - a.votos);
     }, [intendenteTotals]);
 
