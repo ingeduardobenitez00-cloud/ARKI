@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { collection, query, where, doc, getDoc, getDocs, onSnapshot, setDoc, serverTimestamp } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useFirestore, useStorage } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,6 +21,7 @@ import { updateElectoralTotals } from '@/services/electoral-service';
 export default function EscanerActasPage() {
     const { user } = useAuth();
     const db = useFirestore();
+    const storage = useStorage();
     const { toast } = useToast();
 
     // Selection State
@@ -218,16 +220,26 @@ export default function EscanerActasPage() {
 
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const handleSaveResult = async (data: any) => {
-        if (!db || !selectedLocal || !selectedMesa || !activeModule) return;
+    const handleSaveResult = async (data: any, imageFile?: File) => {
+        if (!db || !storage || !selectedLocal || !selectedMesa || !activeModule) return;
         setIsSaving(true);
         try {
             const docId = `${selectedLocal.replace(/\s+/g, '_')}_${selectedMesa}`;
+            
+            // Subir imagen a Firebase Storage si existe
+            let actaImageUrl = null;
+            if (imageFile) {
+                const imageRef = ref(storage, `actas_imagenes/${activeModule}/${docId}.jpg`);
+                await uploadBytes(imageRef, imageFile);
+                actaImageUrl = await getDownloadURL(imageRef);
+            }
+
             const resultRef = doc(db, `actas_${activeModule}`, docId);
             const statusRef = doc(db, 'seguimiento_resultados', docId);
 
             await setDoc(resultRef, {
                 ...data,
+                actaImageUrl, // Guardar la URL de la foto
                 mesa: selectedMesa,
                 local: selectedLocal,
                 cargadoPor: user?.name,

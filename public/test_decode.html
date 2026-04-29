@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+</head>
+<body>
+<script>
+window.onload = function() {
+    const h1 = "1CDC47C419004E000000005CB59A81789C6360606260BFE6C1D8D3C06016C2680000143C02F0E002080D87B9037C";
+    const h2 = "1C1C83551F005E000000005CB59A81789C63606062E08DCEB05FC2800498188802442A1BF48069C71200BC550318E002080D87B9037C";
+
+    function hexToUint8(hex) {
+        let bytes = new Uint8Array(hex.length / 2);
+        for (let i = 0; i < hex.length; i += 2) {
+            bytes[i/2] = parseInt(hex.substr(i, 2), 16);
+        }
+        return bytes;
+    }
+
+    try {
+        const u1 = hexToUint8(h1).slice(15);
+        // fflate.unzlibSync ignores trailing bytes automatically
+        const dec1 = fflate.unzlibSync(u1);
+        document.body.innerHTML += "<p><b>INT:</b> " + Array.from(dec1).join(",") + "</p>";
+
+        const u2 = hexToUint8(h2).slice(15);
+        const dec2 = fflate.unzlibSync(u2);
+        document.body.innerHTML += "<p><b>JUN:</b> " + Array.from(dec2).join(",") + "</p>";
+
+    } catch(e) {
+        document.body.innerHTML += "<p>ERROR: " + e.message + "</p>";
+    }
+}
+</script>
+</body>
+</html>

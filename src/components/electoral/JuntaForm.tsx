@@ -9,11 +9,12 @@ import { CandidateCard } from './CandidateCard';
 import { AlertCircle, Save, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { ActaImageCapture } from './ActaImageCapture';
 
 interface JuntaFormProps {
     mesa: number;
     local: string;
-    onSave: (data: any) => void;
+    onSave: (data: any, imageFile: File) => void;
     isSaving?: boolean;
     initialData?: any; // New prop for QR auto-fill
 }
@@ -21,6 +22,7 @@ interface JuntaFormProps {
 export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaFormProps) {
     const [votes, setVotes] = useState<Record<string, Record<number, number>>>(initialData?.votes || {});
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+    const [imageFile, setImageFile] = useState<File | null>(null);
 
     React.useEffect(() => {
         if (initialData) {
@@ -137,11 +139,14 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                     </div>
                 )}
             </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col w-full gap-4">
+                <div className="w-full">
+                    <ActaImageCapture onImageCaptured={setImageFile} />
+                </div>
                 <Button 
                     className="w-full h-12 text-lg font-bold bg-blue-700 hover:bg-blue-800" 
-                    disabled={!isTotalValid || isSaving}
-                    onClick={() => onSave({ votes, ...extra })}
+                    disabled={!isTotalValid || !imageFile || isSaving}
+                    onClick={() => onSave({ votes, ...extra }, imageFile!)}
                 >
                     <CheckCircle className="w-5 h-5 mr-2" />
                     {isSaving ? 'Guardando...' : 'Finalizar Carga Junta Municipal'}

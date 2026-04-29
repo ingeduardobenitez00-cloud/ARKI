@@ -7,11 +7,12 @@ import { INTENDENTE_CANDIDATES } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
 import { AlertCircle, Save } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { ActaImageCapture } from './ActaImageCapture';
 
 interface IntendenteFormProps {
     mesa: number;
     local: string;
-    onSave: (data: any) => void;
+    onSave: (data: any, imageFile: File) => void;
     isSaving?: boolean;
     initialData?: any; // New prop for QR auto-fill
 }
@@ -19,6 +20,7 @@ interface IntendenteFormProps {
 export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: IntendenteFormProps) {
     const [votes, setVotes] = useState<Record<string, number>>(initialData?.votes || {});
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+    const [imageFile, setImageFile] = useState<File | null>(null);
 
     // Handle incoming QR data asynchronously
     React.useEffect(() => {
@@ -100,12 +102,14 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         <span>La suma ({calculatedTotal}) no coincide con el Total General ({extra.total_general})</span>
                     </div>
                 )}
-            </CardContent>
-            <CardFooter>
+            <CardFooter className="flex-col w-full gap-4">
+                <div className="w-full">
+                    <ActaImageCapture onImageCaptured={setImageFile} />
+                </div>
                 <Button 
                     className="w-full h-12 text-lg font-bold" 
-                    disabled={!isTotalValid || isSaving}
-                    onClick={() => onSave({ votes, ...extra })}
+                    disabled={!isTotalValid || !imageFile || isSaving}
+                    onClick={() => onSave({ votes, ...extra }, imageFile!)}
                 >
                     <Save className="w-5 h-5 mr-2" />
                     {isSaving ? 'Guardando...' : 'Guardar Resultados Intendencia'}
