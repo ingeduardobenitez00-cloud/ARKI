@@ -250,22 +250,37 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {INTENDENTE_CANDIDATES.map(c => (
-                                        <tr key={c.id} className="border-b">
-                                            <td className="p-2 text-xs font-medium">{c.list} - {c.name}</td>
-                                            <td className="p-2 text-right font-bold text-blue-600">{ocrPreview?.votes[c.id] || 0}</td>
+                                    {/* Mapeo Oficial (Solo si coinciden los índices) */}
+                                    {INTENDENTE_CANDIDATES.map((c, idx) => (
+                                        <tr key={c.id} className="border-b bg-slate-50/30">
+                                            <td className="p-2 text-[10px] font-medium text-slate-500">Mapeo Sistema: {c.list}</td>
+                                            <td className="p-2 text-right font-mono">{ocrPreview?.votes[c.id] || 0}</td>
                                         </tr>
                                     ))}
-                                    <tr className="bg-slate-50">
-                                        <td className="p-2 text-xs font-bold italic">NULOS / BLANCOS / VAC</td>
-                                        <td className="p-2 text-right font-bold">
-                                            {ocrPreview?.extra.nulos} / {ocrPreview?.extra.blancos} / {ocrPreview?.extra.votos_computar}
+                                    
+                                    {/* SECCIÓN NUEVA: DATOS REALES DETECTADOS EN EL QR */}
+                                    <tr className="bg-purple-600 text-white">
+                                        <td colSpan={2} className="p-1 text-[9px] font-black text-center uppercase tracking-widest">
+                                            Distribución Real del QR (Auditoría)
                                         </td>
                                     </tr>
-                                    <tr className="bg-purple-100">
-                                        <td className="p-2 text-sm font-black">TOTAL CERTIFICADO</td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general || 0}</td>
-                                    </tr>
+                                    {ocrPreview?.rawData?.map((val, idx) => {
+                                        if (val === 0) return null; // Ocultar ceros para no saturar
+                                        return (
+                                            <tr key={idx} className="border-b hover:bg-purple-50">
+                                                <td className="p-2 text-xs font-bold">
+                                                    <span className="text-purple-400 mr-2">#{idx}</span>
+                                                    {idx === ocrPreview.rawData!.length - 1 ? "TOTAL DETECTADO" : 
+                                                     idx === ocrPreview.rawData!.length - 4 ? "NULOS DETECTADOS" :
+                                                     idx === ocrPreview.rawData!.length - 3 ? "BLANCOS DETECTADOS" :
+                                                     `Dato Digital ${idx}`}
+                                                </td>
+                                                <td className="p-2 text-right font-black text-purple-700 text-sm">
+                                                    {val}
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
                                 </tbody>
                             </table>
                         </div>
