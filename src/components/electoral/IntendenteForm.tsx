@@ -99,7 +99,9 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA: Segmentación Estricta (Buzón de Identidad - 7 bytes)
+        const L = data.length;
+        
+        // BLOQUE DE REFERENCIA (Identidad - Primeros 7 bytes)
         const identity = {
             eleccion: data[0] || 0,
             depto: data[1] || 0,
@@ -110,42 +112,40 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             mesa_bis: data[6] || 0
         };
 
-        // REGLA: Aislamiento de Votos Reales (A partir del byte 7)
-        const resultsBlock = data.slice(7, 18); // 11 bytes de resultados
+        // REGLA DE AJUSTE DINÁMICO: Mapeo de atrás hacia adelante (Bottom-Up)
+        // Esto asegura que los resultados electorales siempre caigan en sus campos
+        // sin importar cuánto cambie la longitud de la cabecera técnica.
         
-        // Mapeo Estricto de Resultados
+        // 1. Identificar el cierre (Los últimos 4 bytes del bloque de resultados)
+        const extraData = {
+            total_general: data[L - 1] || 0, // El Juez Supremo (TOT)
+            votos_computar: data[L - 2] || 0, // VAC
+            blancos: data[L - 3] || 0,        // BLC
+            nulos: data[L - 4] || 0           // NUL
+        };
+
+        // 2. Mapear votos de listas hacia atrás desde la posición del NUL
         const previewVotes: Record<string, number> = {};
-        // 1. Lista 510 (Primer valor)
-        previewVotes[INTENDENTE_CANDIDATES[0].id] = resultsBlock[0] || 0;
-        // 2. Listas 520 a 600 (Siguientes 6 valores)
-        for (let i = 1; i < 7; i++) {
-            if (INTENDENTE_CANDIDATES[i]) {
-                previewVotes[INTENDENTE_CANDIDATES[i].id] = resultsBlock[i] || 0;
+        // Empezamos desde L-5 y retrocedemos según el número de candidatos
+        for (let i = 0; i < INTENDENTE_CANDIDATES.length; i++) {
+            const candidateIdx = (L - 5) - i;
+            if (candidateIdx >= 7) { // No entrar en zona de identidad
+                const reverseIdx = INTENDENTE_CANDIDATES.length - 1 - i;
+                const candidate = INTENDENTE_CANDIDATES[reverseIdx];
+                previewVotes[candidate.id] = data[candidateIdx] || 0;
             }
         }
 
-        // 3. Nulos, Blancos, VAC y TOT (Los últimos 4 valores del bloque)
-        const extraData = {
-            nulos: resultsBlock[7] || 0,
-            blancos: resultsBlock[8] || 0,
-            votos_computar: resultsBlock[9] || 0,
-            total_general: resultsBlock[10] || 0 // Este es el TOT oficial
-        };
-
-        // REGLA DE ORO: Suma Detectada vs TOT oficial
-        const sumaResultados = (Object.values(previewVotes).reduce((a, b) => a + b, 0)) + 
+        // Validación: Solo sumar los 'cajones' de resultados
+        const sumaResultados = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
                               extraData.nulos + extraData.blancos + extraData.votos_computar;
         
-        const coincidesWithTOT = sumaResultados === extraData.total_general;
+        const esValido = sumaResultados === extraData.total_general;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { 
-                ...extraData, 
-                total_calculado: sumaResultados, 
-                es_valido: coincidesWithTOT 
-            },
+            extra: { ...extraData, total_calculado: sumaResultados, es_valido: esValido },
             identity,
             isQr: true,
             rawData: data,

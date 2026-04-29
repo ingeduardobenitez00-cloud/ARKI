@@ -119,7 +119,9 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA: Segmentación Estricta (Identidad - 7 bytes)
+        const L = data.length;
+        
+        // BLOQUE DE REFERENCIA (Identidad - 7 bytes)
         const identity = {
             eleccion: data[0] || 0,
             depto: data[1] || 0,
@@ -130,40 +132,49 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             mesa_bis: data[6] || 0
         };
 
-        // REGLA: Segmento de Resultados (Bloques de 24)
-        const DATA_OFFSET = 7;
-        const resultsPayload = data.slice(DATA_OFFSET);
+        // REGLA DE AJUSTE DINÁMICO: Mapeo de atrás hacia adelante (Bottom-Up)
         
-        const previewVotes: Record<string, Record<number, number>> = {};
-        JUNTA_LISTS.forEach((list, listIndex) => {
-            previewVotes[list.id] = {};
-            const offset = listIndex * 24;
-            for (let i = 0; i < 24; i++) {
-                previewVotes[list.id][i + 1] = resultsPayload[offset + i] || 0;
-            }
-        });
-
-        // Footer tras los bloques de candidatos (Nulos, Blancos, VAC, TOT)
-        const footerStart = JUNTA_LISTS.length * 24;
+        // 1. Identificar el cierre (Últimos 4 bytes)
         const extraData = {
-            nulos: resultsPayload[footerStart] || 0,
-            blancos: resultsPayload[footerStart + 1] || 0,
-            votos_computar: resultsPayload[footerStart + 2] || 0,
-            total_general: resultsPayload[footerStart + 3] || 0 // TOT Oficial
+            total_general: data[L - 1] || 0, // TOT Oficial
+            votos_computar: data[L - 2] || 0, // VAC
+            blancos: data[L - 3] || 0,        // BLC
+            nulos: data[L - 4] || 0           // NUL
         };
 
-        // Validación por Coincidencia
-        let sumaVotos = extraData.nulos + extraData.blancos + extraData.votos_computar;
+        // 2. Mapear bloques de 24 votos hacia atrás
+        const previewVotes: Record<string, Record<number, number>> = {};
+        // Recorremos las listas de atrás hacia adelante
+        for (let lIdx = JUNTA_LISTS.length - 1; lIdx >= 0; lIdx--) {
+            const list = JUNTA_LISTS[lIdx];
+            previewVotes[list.id] = {};
+            
+            // Cada lista tiene 24 candidatos, retrocedemos desde el offset del footer
+            // El offset base para la última lista es L-5
+            const footerOffset = 4;
+            const blockOffset = (JUNTA_LISTS.length - 1 - lIdx) * 24;
+            const listEndIdx = (L - 1 - footerOffset) - blockOffset;
+
+            for (let i = 23; i >= 0; i--) {
+                const byteIdx = listEndIdx - (23 - i);
+                if (byteIdx >= 7) {
+                    previewVotes[list.id][i + 1] = data[byteIdx] || 0;
+                }
+            }
+        }
+
+        // Validación de Integridad
+        let sumaTotal = extraData.nulos + extraData.blancos + extraData.votos_computar;
         Object.values(previewVotes).forEach(listVotes => {
-            sumaVotos += Object.values(listVotes).reduce((a, b) => a + b, 0);
+            sumaTotal += Object.values(listVotes).reduce((a, b) => a + b, 0);
         });
         
-        const coincidesWithTOT = sumaVotos === extraData.total_general;
+        const esValido = sumaTotal === extraData.total_general;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaVotos, es_valido: coincidesWithTOT },
+            extra: { ...extraData, total_calculado: sumaTotal, es_valido: esValido },
             identity,
             isQr: true,
             rawData: data,
