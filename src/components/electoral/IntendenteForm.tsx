@@ -145,7 +145,6 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
-    };Open(true);
     };
 
     const applyOcrData = () => {
