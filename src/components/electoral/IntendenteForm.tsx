@@ -27,6 +27,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     const [ocrPreview, setOcrPreview] = useState<{ 
         votes: Record<string, number>, 
         extra: any,
+        identity: { mesa: number, local: number, distrito: number },
         isQr?: boolean,
         rawData?: number[],
         rawHex?: string
@@ -98,30 +99,47 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
-        // Reseteado a 0 para búsqueda manual del patrón (1...2...3 = Suma 6)
-        const DATA_OFFSET = 0; 
-        const cleanPayload = data.slice(DATA_OFFSET);
+        // REGLA 1: Segmento de Identidad (Buzones Técnicos)
+        // Mapeamos los primeros bytes a la identidad del acta
+        const identity = {
+            distrito: data[0] || 0,
+            local: data[1] || 0,
+            mesa: data[2] || 0
+        };
+
+        // REGLA 1 y 2: Segmento de Resultados (votos-input)
+        // El offset ahora es dinámico tras la identidad
+        const DATA_OFFSET = 7;
+        const resultsPayload = data.slice(DATA_OFFSET);
         
-        // REGLA 3: Lógica de Validación de Suma (Bytes 1 al 10)
-        // Calculamos la suma de los primeros 10 bytes del payload limpio
-        const votosPayload = cleanPayload.slice(0, 10);
-        const sumaCalculada = votosPayload.reduce((a, b) => a + b, 0);
-        const byteTOT = cleanPayload[10] || 0; // Posición 11 (índice 10)
+        // Mapeo secuencial a candidatos
+        const previewVotes: Record<string, number> = {};
+        INTENDENTE_CANDIDATES.forEach((c, idx) => {
+            previewVotes[c.id] = resultsPayload[idx] || 0;
+        });
+
+        // Nulos, Blancos y VAC
+        const offsetExtra = INTENDENTE_CANDIDATES.length;
+        const extraData = {
+            nulos: resultsPayload[offsetExtra] || 0,
+            blancos: resultsPayload[offsetExtra + 1] || 0,
+            votos_computar: resultsPayload[offsetExtra + 2] || 0,
+            total_general_qr: resultsPayload[offsetExtra + 3] || 0
+        };
+
+        // REGLA 3: Validación por Coincidencia (Votos vs TOT)
+        const sumaVotos = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
+                         extraData.nulos + extraData.blancos + extraData.votos_computar;
         
-        const tieneDiscrepancia = sumaCalculada !== byteTOT && byteTOT !== 0;
+        const tieneDiscrepancia = sumaVotos !== extraData.total_general_qr && extraData.total_general_qr !== 0;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: {}, 
-            extra: {
-                total_calculado: sumaCalculada,
-                total_qr: byteTOT,
-                tiene_discrepancia: tieneDiscrepancia,
-                offset_actual: DATA_OFFSET
-            },
+            votes: previewVotes, 
+            extra: { ...extraData, total_calculado: sumaVotos, tiene_discrepancia: tieneDiscrepancia },
+            identity,
             isQr: true,
-            rawData: cleanPayload,
+            rawData: data,
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
@@ -226,15 +244,15 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-blue-700 font-bold">Total General (Autocalculado)</Label>
+                        <Label className="text-blue-700 font-bold">Total General (Resultados)</Label>
                         <Input 
                             type="number" 
                             value={calculatedTotal} 
                             readOnly
-                            className="font-black text-lg bg-slate-50 border-blue-500 text-blue-700"
+                            className="votos-total font-black text-lg bg-slate-50 border-blue-600 text-blue-700"
                         />
-                        <p className="text-[10px] text-muted-foreground italic">
-                            * Suma automática de votos + nulos + blancos.
+                        <p className="text-[9px] text-muted-foreground italic">
+                            * Solo suma campos marcados como resultados electorales.
                         </p>
                     </div>
                 </div>
@@ -288,36 +306,42 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
-                                        <td colSpan={2} className="p-1">
-                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ OFFSET NO CALIBRADO (Discrepancia)' : 'Analizador de Actas (Espejo Fiel)'}
+                                    <tr className="bg-slate-200 text-slate-700 font-black text-[9px] text-center uppercase tracking-widest">
+                                        <td colSpan={2} className="p-1">Buzón de Identidad (Referencia)</td>
+                                    </tr>
+                                    <tr className="border-b bg-slate-50">
+                                        <td className="p-2 text-xs">Mesa / Local / Distrito Detectado</td>
+                                        <td className="p-2 text-right font-mono text-xs">
+                                            {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local} / {ocrPreview?.identity.distrito}
                                         </td>
                                     </tr>
-                                    {[
-                                        "Lista 510", "Lista 520", "Lista 530", "Lista 540", 
-                                        "Lista 580", "Lista 590", "Lista 600",
-                                        "Votos Nulos (NUL)", "Votos en Blanco (BLC)", "Votos a Computar (VAC)",
-                                        "TOTAL DE CONTROL (TOT)"
-                                    ].map((label, idx) => {
-                                        const val = ocrPreview?.rawData?.[idx] || 0;
-                                        const isTOT = idx === 10;
+                                    <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
+                                        <td colSpan={2} className="p-1">
+                                            Buzón de Resultados Electorales
+                                        </td>
+                                    </tr>
+                                    {ocrPreview?.rawData?.slice(7).map((val, idx) => {
+                                        const isTOT = idx === ocrPreview.rawData!.length - 8; // Último byte del payload real
                                         return (
-                                            <tr key={idx} className={`border-b ${isTOT ? 'bg-blue-50' : ''}`}>
+                                            <tr key={idx} className="border-b">
                                                 <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx + 1}</span>
-                                                    <span>{label}</span>
+                                                    <span>Dato Electoral {idx + 1}</span>
                                                 </td>
-                                                <td className={`p-2 text-right font-black text-sm ${isTOT && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-slate-900'}`}>
+                                                <td className="p-2 text-right font-black text-sm text-slate-900">
                                                     {val}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-slate-100">
-                                        <td className="p-2 text-xs font-black">SUMA DETECTADA (Pos 1-10)</td>
+                                        <td className="p-2 text-xs font-black uppercase">Suma de Buzón Resultados</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
+                                    </tr>
+                                    <tr className="bg-blue-50">
+                                        <td className="p-2 text-xs font-bold">TOTAL CONTROL EN QR (TOT)</td>
+                                        <td className="p-2 text-right font-black text-blue-700">{ocrPreview?.extra.total_general_qr}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -349,8 +373,12 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
                             Cancelar
                         </Button>
-                        <Button onClick={applyOcrData} className="bg-purple-600 hover:bg-purple-800 flex-1">
-                            Inyectar al Formulario
+                        <Button 
+                            onClick={applyOcrData} 
+                            className="bg-purple-600 hover:bg-purple-800 flex-1"
+                            disabled={ocrPreview?.identity.mesa !== mesa}
+                        >
+                            {ocrPreview?.identity.mesa === mesa ? 'Inyectar al Formulario' : 'Mesa no Coincide'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

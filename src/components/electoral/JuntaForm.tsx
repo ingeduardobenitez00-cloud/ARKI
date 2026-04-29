@@ -29,6 +29,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const [ocrPreview, setOcrPreview] = useState<{ 
         votes: Record<string, Record<number, number>>, 
         extra: any,
+        identity: { mesa: number, local: number, distrito: number },
         isQr?: boolean,
         rawData?: number[],
         rawHex?: string
@@ -118,30 +119,50 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
-        // Reseteado a 0 para búsqueda manual del patrón en Junta
-        const DATA_OFFSET = 0;
-        const cleanPayload = data.slice(DATA_OFFSET);
+        // REGLA 1: Segmento de Identidad
+        const identity = {
+            distrito: data[0] || 0,
+            local: data[1] || 0,
+            mesa: data[2] || 0
+        };
+
+        // REGLA 1 y 2: Segmento de Resultados (Bloques de 24)
+        const DATA_OFFSET = 7;
+        const resultsPayload = data.slice(DATA_OFFSET);
         
-        // REGLA 3: Lógica de Validación (Para Junta es un bloque mayor, pero mantenemos el principio)
-        const sumaCalculada = cleanPayload.reduce((a, b, idx) => {
-            // Sumamos todos excepto el último byte que es el TOT
-            return idx < cleanPayload.length - 1 ? a + b : a;
-        }, 0);
-        const byteTOT = cleanPayload[cleanPayload.length - 1] || 0;
-        const tieneDiscrepancia = sumaCalculada !== byteTOT && byteTOT !== 0;
+        const previewVotes: Record<string, Record<number, number>> = {};
+        JUNTA_LISTS.forEach((list, listIndex) => {
+            previewVotes[list.id] = {};
+            const offset = listIndex * 24;
+            for (let i = 0; i < 24; i++) {
+                previewVotes[list.id][i + 1] = resultsPayload[offset + i] || 0;
+            }
+        });
+
+        // Footer tras los bloques de candidatos
+        const footerOffset = JUNTA_LISTS.length * 24;
+        const extraData = {
+            nulos: resultsPayload[footerOffset] || 0,
+            blancos: resultsPayload[footerOffset + 1] || 0,
+            votos_computar: resultsPayload[footerOffset + 2] || 0,
+            total_general_qr: resultsPayload[footerOffset + 3] || 0
+        };
+
+        // REGLA 3: Validación por Coincidencia
+        let sumaVotos = extraData.nulos + extraData.blancos + extraData.votos_computar;
+        Object.values(previewVotes).forEach(listVotes => {
+            sumaVotos += Object.values(listVotes).reduce((a, b) => a + b, 0);
+        });
+        
+        const tieneDiscrepancia = sumaVotos !== extraData.total_general_qr && extraData.total_general_qr !== 0;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: {}, 
-            extra: {
-                total_calculado: sumaCalculada,
-                total_qr: byteTOT,
-                tiene_discrepancia: tieneDiscrepancia,
-                offset_actual: DATA_OFFSET
-            },
+            votes: previewVotes, 
+            extra: { ...extraData, total_calculado: sumaVotos, tiene_discrepancia: tieneDiscrepancia },
+            identity,
             isQr: true,
-            rawData: cleanPayload,
+            rawData: data,
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
@@ -276,15 +297,15 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-blue-700 font-bold">Total General (Autocalculado)</Label>
+                        <Label className="text-blue-700 font-bold">Total General (Resultados)</Label>
                         <Input 
                             type="number" 
                             value={calculatedTotal} 
                             readOnly
-                            className="font-black text-lg bg-slate-50 border-blue-600 text-blue-700"
+                            className="votos-total font-black text-lg bg-slate-50 border-blue-600 text-blue-700"
                         />
-                        <p className="text-[10px] text-muted-foreground italic">
-                            * Suma de todos los votos preferenciales + nulos + blancos.
+                        <p className="text-[9px] text-muted-foreground italic">
+                            * Suma de buzones de resultados electorales.
                         </p>
                     </div>
                 </div>
@@ -338,35 +359,29 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
-                                        <td colSpan={2} className="p-1">
-                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA (Revisar Offset)' : 'Analizador de Junta (Espejo Fiel)'}
+                                    <tr className="bg-slate-200 text-slate-700 font-black text-[9px] text-center uppercase tracking-widest">
+                                        <td colSpan={2} className="p-1">Buzón de Identidad (Referencia)</td>
+                                    </tr>
+                                    <tr className="border-b bg-slate-50 text-xs">
+                                        <td className="p-2">Mesa / Local Detectado</td>
+                                        <td className="p-2 text-right font-mono">
+                                            {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local}
                                         </td>
                                     </tr>
-                                    {ocrPreview?.rawData?.slice(0, 24).map((val, idx) => {
-                                        return (
-                                            <tr key={idx} className="border-b hover:bg-slate-50">
-                                                <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx + 1}</span>
-                                                    <span>Opción/Lista {idx + 1}</span>
-                                                </td>
-                                                <td className="p-2 text-right font-black text-sm text-blue-900">
-                                                    {val}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    <tr className="bg-blue-50 border-t-2 border-blue-200">
-                                        <td className="p-2 text-xs font-black">TOTAL CONTROL (TOT)</td>
-                                        <td className="p-2 text-right font-black text-blue-900 text-sm">
-                                            {ocrPreview?.extra.total_qr}
+                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
+                                        <td colSpan={2} className="p-1">
+                                            Buzón de Resultados (Preferenciales)
                                         </td>
                                     </tr>
                                     <tr className="bg-slate-100">
-                                        <td className="p-2 text-xs font-black">SUMA DETECTADA</td>
+                                        <td className="p-2 text-xs font-black uppercase tracking-tighter">Suma de Resultados Detectados</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
+                                    </tr>
+                                    <tr className="bg-blue-50">
+                                        <td className="p-2 text-xs font-bold uppercase tracking-tighter">TOTAL CONTROL EN QR (TOT)</td>
+                                        <td className="p-2 text-right font-black text-blue-700">{ocrPreview?.extra.total_general_qr}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -380,8 +395,12 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
                             Descartar
                         </Button>
-                        <Button onClick={applyOcrData} className="bg-blue-700 hover:bg-blue-900 flex-1">
-                            Inyectar al Formulario
+                        <Button 
+                            onClick={applyOcrData} 
+                            className="bg-blue-700 hover:bg-blue-900 flex-1"
+                            disabled={ocrPreview?.identity.mesa !== mesa}
+                        >
+                            {ocrPreview?.identity.mesa === mesa ? 'Inyectar al Formulario' : 'Mesa no Coincide'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
