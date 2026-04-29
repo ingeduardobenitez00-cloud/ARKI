@@ -90,27 +90,48 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
     };
 
     const decodeAndProcessQr = (hex: string) => {
+        console.log("--- INICIANDO DECIFRADO QR ---");
+        console.log("Contenido crudo escaneado:", hex);
+        
         try {
-            const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
-            if (cleanHex.length < 30) throw new Error("Formato inválido");
+            // 1. Limpieza extrema del HEX
+            const cleanHex = hex.trim().replace(/\s/g, '').replace(/[^0-9A-Fa-f]/g, '');
+            console.log("HEX limpio para procesar:", cleanHex);
+
+            if (cleanHex.length < 32) {
+                throw new Error(`Contenido demasiado corto (${cleanHex.length} caracteres). ¿Es un acta MSA?`);
+            }
             
-            const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+            // 2. Convertir Hex a Array de Bytes
+            const hexMatch = cleanHex.match(/.{1,2}/g);
+            if (!hexMatch) throw new Error("No se pudo parsear el HEX a bytes.");
+            
+            const bytes = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
+            console.log("Total bytes extraídos:", bytes.length);
+
+            // 3. Extraer Data Comprimida (Saltando el Header de 15 bytes)
+            // El header de MSA suele empezar con 'MSA' (4d 53 41)
             const compressedData = bytes.slice(15);
+            console.log("Primeros bytes de data comprimida:", compressedData.slice(0, 5));
+
+            // 4. Descomprimir usando Zlib
             const decompressed = fflate.unzlibSync(compressedData);
             const dataArray = Array.from(decompressed);
+            console.log("¡DESCOMPRESIÓN EXITOSA! Bytes finales:", dataArray);
             
             if (onQrParsed) {
                 onQrParsed(dataArray);
                 toast({
-                    title: "QR Decifrado",
-                    description: "Datos digitales extraídos con éxito.",
-                    className: "bg-green-600 text-white",
+                    title: "¡QR Decifrado con Éxito!",
+                    description: `Se extrajeron ${dataArray.length} puntos de datos digitales.`,
+                    className: "bg-green-600 text-white border-none shadow-lg",
                 });
             }
-        } catch (e) {
+        } catch (e: any) {
+            console.error("ERROR CRÍTICO EN DECIFRADO QR:", e);
             toast({
-                title: "Error QR",
-                description: "No se pudo decifrar el código QR de MSA.",
+                title: "Error de Decifrado",
+                description: e.message || "El formato del QR no coincide con el protocolo MSA.",
                 variant: "destructive",
             });
         }
