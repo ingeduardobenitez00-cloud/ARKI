@@ -309,33 +309,36 @@ export default function EscanerActasPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-xs font-semibold uppercase text-muted-foreground">Mesa</label>
-                                <Select onValueChange={(v) => setSelectedMesa(parseInt(v))} value={selectedMesa ? String(selectedMesa) : ''}>
-                                    <SelectTrigger><SelectValue placeholder="Selecciona Mesa" /></SelectTrigger>
-                                    <SelectContent>
-                                        {currentLocalMesas.map((m: number) => <SelectItem key={m} value={String(m)}>Mesa {m}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 pt-2">
+
+                            {/* SCAN BUTTON PANEL */}
+                            <div className="pt-6 flex flex-col items-center justify-center border-t border-dashed space-y-4">
+                                <div className={`p-4 rounded-full ${selectedMesa && activeModule ? 'bg-blue-100 text-blue-600 animate-pulse' : 'bg-slate-100 text-slate-400'}`}>
+                                    <QrCode className="w-10 h-10" />
+                                </div>
                                 <Button 
-                                    variant={activeModule === 'intendencia' ? 'default' : 'outline'}
-                                    disabled={!selectedMesa}
-                                    onClick={() => setActiveModule('intendencia')}
-                                    className="text-xs"
+                                    size="lg"
+                                    disabled={!selectedMesa || !activeModule}
+                                    className={`w-full h-14 text-sm font-black shadow-xl transition-all ${selectedMesa && activeModule ? 'bg-blue-700 hover:bg-blue-800 scale-105' : 'bg-slate-200'}`}
+                                    onClick={() => setIsScannerOpen(true)}
                                 >
-                                    Intendente
-                                </Button>
-                                <Button 
-                                    variant={activeModule === 'junta' ? 'default' : 'outline'}
-                                    disabled={!selectedMesa}
-                                    onClick={() => setActiveModule('junta')}
-                                    className="text-xs"
-                                >
-                                    Concejales
+                                    {selectedMesa && activeModule ? 'ABRIR ESCÁNER QR' : 'SELECCIONA MESA/CARGO'}
                                 </Button>
                             </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Floating Scan Button for Mobile */}
+                    {selectedMesa && activeModule && !isScannerOpen && (
+                        <div className="fixed bottom-6 right-6 z-50 animate-in zoom-in duration-300">
+                            <Button 
+                                size="lg"
+                                className="h-16 w-16 rounded-full bg-blue-700 shadow-2xl hover:bg-blue-800 scale-110 flex items-center justify-center p-0"
+                                onClick={() => setIsScannerOpen(true)}
+                            >
+                                <QrCode className="w-8 h-8 text-white" />
+                            </Button>
+                        </div>
+                    )}
                         </CardContent>
                     </Card>
 
