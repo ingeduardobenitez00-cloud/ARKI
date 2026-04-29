@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { IntendenteForm } from '@/components/electoral/IntendenteForm';
 import { JuntaForm } from '@/components/electoral/JuntaForm';
+import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { updateElectoralTotals } from '@/services/electoral-service';
