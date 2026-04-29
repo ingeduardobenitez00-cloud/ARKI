@@ -290,6 +290,27 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
                     </div>
                 )}
             </CardContent>
+
+            {/* Modal de Escáner QR */}
+            <Dialog open={isQrScannerOpen} onOpenChange={setIsQrScannerOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <QrCode className="w-5 h-5" />
+                            Escáner de Acta (QR MSA)
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div id="qr-reader" className="overflow-hidden rounded-lg border bg-black min-h-[250px]"></div>
+                    <div className="flex flex-col gap-2">
+                        <p className="text-[10px] text-center text-muted-foreground italic">
+                            Apunta al código QR en la parte inferior del acta.
+                        </p>
+                        <Button variant="outline" onClick={stopQrScanner} className="w-full">
+                            Cancelar
+                        </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

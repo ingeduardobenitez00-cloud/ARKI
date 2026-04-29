@@ -11,11 +11,11 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { IntendenteForm } from '@/components/electoral/IntendenteForm';
 import { JuntaForm } from '@/components/electoral/JuntaForm';
-import { useToast } from '@/hooks/use-toast';
-import { Loader2, ClipboardCheck, History, CheckCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { updateElectoralTotals } from '@/services/electoral-service';
+import Link from 'next/link';
+import { Loader2, ClipboardCheck, History, CheckCircle, Database } from 'lucide-react';
 
 export default function EscanerActasPage() {
     const { user } = useAuth();
@@ -154,6 +154,12 @@ export default function EscanerActasPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Carga de Resultados Electorales</h1>
                 </div>
+                <Link href="/laboratorio-qr">
+                    <Button variant="outline" className="text-xs font-bold gap-2 border-purple-500 text-purple-600 hover:bg-purple-50">
+                        <Database className="w-4 h-4" />
+                        Laboratorio QR (Modo Ingeniero)
+                    </Button>
+                </Link>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
