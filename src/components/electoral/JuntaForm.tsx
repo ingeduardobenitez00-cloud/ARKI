@@ -258,20 +258,23 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-blue-700 font-bold">Total General Certificado</Label>
+                        <Label className="text-blue-700 font-bold">Total General (Autocalculado)</Label>
                         <Input 
                             type="number" 
-                            value={extra.total_general || ''} 
-                            onChange={(e) => setExtra((p: any) => ({...p, total_general: parseInt(e.target.value) || 0}))} 
-                            className={`font-black text-lg ${isTotalValid ? 'border-green-500 ring-green-500' : 'border-red-500'}`}
+                            value={calculatedTotal} 
+                            readOnly
+                            className="font-black text-lg bg-slate-50 border-blue-600 text-blue-700"
                         />
+                        <p className="text-[10px] text-muted-foreground italic">
+                            * Suma de todos los votos preferenciales + nulos + blancos.
+                        </p>
                     </div>
                 </div>
 
-                {!isTotalValid && extra.total_general > 0 && (
-                    <div className="flex items-center gap-2 text-red-500 text-sm font-semibold justify-center bg-red-50 p-2 rounded">
+                {calculatedTotal === 0 && (
+                    <div className="flex items-center gap-2 text-blue-500 text-sm font-semibold justify-center bg-blue-50 p-2 rounded mt-4">
                         <AlertCircle className="w-4 h-4" />
-                        <span>Suma Actual: {calculatedTotal} | Diferencia: {Math.abs(extra.total_general - calculatedTotal)}</span>
+                        <span>Esperando ingreso de datos o escaneo QR...</span>
                     </div>
                 )}
             </CardContent>
@@ -288,9 +291,14 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             <Dialog open={isOcrDialogOpen} onOpenChange={setIsOcrDialogOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <CardTitle className="text-blue-600 flex items-center gap-2">
-                            <Wand2 className="w-5 h-5" />
-                            Confirmar Datos de Junta
+                        <CardTitle className="text-blue-600 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                                <Wand2 className="w-5 h-5" />
+                                Confirmar Datos de Junta
+                            </div>
+                            <Badge className="bg-blue-600 text-white border-none">
+                                TOTAL QR: {ocrPreview?.rawData?.reduce((a, b) => a + b, 0) || 0}
+                            </Badge>
                         </CardTitle>
                         <DialogDescription>
                             Se han detectado datos para las siguientes listas.
