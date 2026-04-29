@@ -112,16 +112,14 @@ export default function EscanerActasPage() {
             let provisionalVotes: Record<string, number> = {};
 
             // 2. Determine Module Type from Byte 1
-            // 0xDC is the signature we found for Intendente in Capiata/Capital
             if (bytes[1] === 0xDC) {
                 moduleType = 'intendencia';
                 extra.nulos = bytes[11] || 0;
                 extra.blancos = bytes[29] || 0;
-                // Total heuristic: byte 22 is 11 in sample, acta says 12.
                 extra.total_general = bytes[22] ? bytes[22] + 1 : 0;
             } else {
-                // Default to Junta or other formats
                 moduleType = 'junta';
+                // For Junta Municipal REC format
                 extra.nulos = bytes[11] || 0;
                 extra.total_general = bytes[42] || 0;
             }
