@@ -64,7 +64,6 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
                 <input 
                     type="file" 
                     accept="image/*" 
-                    capture="environment"
                     ref={fileInputRef}
                     className="hidden"
                     onChange={handleFileChange}
@@ -73,21 +72,21 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
                 {!previewUrl ? (
                     <div className="flex flex-col items-center text-center space-y-3">
                         <div className="p-4 bg-blue-100 text-blue-600 rounded-full">
-                            <Camera className="w-8 h-8" />
+                            <ImageIcon className="w-8 h-8" />
                         </div>
                         <div>
                             <h4 className="font-bold text-slate-800">Fotografía Obligatoria del Acta</h4>
                             <p className="text-xs text-slate-500 max-w-[250px] mx-auto mt-1">
-                                Toma una foto clara y enfocada del acta para auditoría.
+                                Toma una foto o sube una imagen de la galería.
                             </p>
                         </div>
                         <Button 
                             type="button"
                             onClick={() => fileInputRef.current?.click()}
-                            className="bg-blue-700 hover:bg-blue-800 font-bold"
+                            className="bg-blue-700 hover:bg-blue-800 font-bold w-full max-w-sm"
                         >
                             <Camera className="w-4 h-4 mr-2" />
-                            Abrir Cámara
+                            Cámara / Galería
                         </Button>
                     </div>
                 ) : (
