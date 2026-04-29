@@ -30,8 +30,10 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
         votes: Record<string, Record<number, number>>, 
         extra: any,
         isQr?: boolean,
-        rawData?: number[]
+        rawData?: number[],
+        rawHex?: string
     } | null>(null);
+    const [rawQrHex, setRawQrHex] = useState<string | null>(null);
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
     const [activeListId, setActiveListId] = useState(JUNTA_LISTS[0].id);
 
@@ -115,30 +117,39 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
         setIsOcrDialogOpen(true);
     };
 
-    const handleQrParsed = (data: number[]) => {
+    const handleQrParsed = (data: number[], rawHex: string) => {
         const previewVotes: Record<string, Record<number, number>> = {};
-        // Bloques de 24 para cada lista
+        const MAX_VOTES_LIMIT = 400; // REGLA 3: Filtro de seguridad
+
+        // REGLA 2: Extracción Estricta (Bloques de 24)
         JUNTA_LISTS.forEach((list, listIndex) => {
             previewVotes[list.id] = {};
             const offset = listIndex * 24;
             for (let i = 0; i < 24; i++) {
-                previewVotes[list.id][i + 1] = data[offset + i] || 0;
+                let val = data[offset + i] || 0;
+                // Aplicar filtro de seguridad
+                if (val > MAX_VOTES_LIMIT) val = 0;
+                previewVotes[list.id][i + 1] = val;
             }
         });
 
-        // Footer (últimas 4 posiciones)
+        // Footer (Nulos, Blancos, VAC, Total)
+        // Se asume que están tras el bloque de candidatos de todas las listas
+        const footerOffset = JUNTA_LISTS.length * 24;
         const previewExtra = {
-            nulos: data[data.length - 4] || 0,
-            blancos: data[data.length - 3] || 0,
-            votos_computar: data[data.length - 2] || 0,
-            total_general: data[data.length - 1] || 0
+            nulos: data[footerOffset] > MAX_VOTES_LIMIT ? 0 : data[footerOffset] || 0,
+            blancos: data[footerOffset + 1] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 1] || 0,
+            votos_computar: data[footerOffset + 2] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 2] || 0,
+            total_general: data[footerOffset + 3] || 0
         };
 
+        setRawQrHex(rawHex); // Guardar para persistencia
         setOcrPreview({ 
             votes: previewVotes, 
             extra: previewExtra,
             isQr: true,
-            rawData: data 
+            rawData: data,
+            rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
     };
@@ -282,7 +293,12 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                 <Button 
                     className="w-full h-12 text-lg font-bold bg-blue-700 hover:bg-blue-800" 
                     disabled={!isTotalValid || !imageFile || isSaving}
-                    onClick={() => onSave({ votes, ...extra }, imageFile!)}
+                    onClick={() => onSave({ 
+                        votes, 
+                        ...extra, 
+                        metodo_carga: rawQrHex ? 'QR_SCAN' : 'MANUAL',
+                        raw_qr_data: rawQrHex 
+                    }, imageFile!)}
                 >
                     <CheckCircle className="w-5 h-5 mr-2" />
                     {isSaving ? 'Guardando...' : 'Finalizar Carga Junta Municipal'}

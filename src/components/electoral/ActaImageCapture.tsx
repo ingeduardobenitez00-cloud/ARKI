@@ -11,8 +11,8 @@ import { useToast } from '@/hooks/use-toast';
 
 interface ActaImageCaptureProps {
     onImageCaptured: (file: File | null) => void;
-    onOcrParsed?: (text: string) => void;
-    onQrParsed?: (data: number[]) => void;
+    onOcrParsed: (text: string) => void;
+    onQrParsed: (data: number[], rawHex: string) => void;
 }
 
 export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: ActaImageCaptureProps) {
@@ -134,25 +134,20 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
             // 4. Descomprimir usando Zlib
             const decompressed = fflate.unzlibSync(compressedData);
             const dataArray = Array.from(decompressed);
-            console.log("¡DESCOMPRESIÓN EXITOSA! Bytes finales:", dataArray);
+            console.log("BUFFER BRUTO DESCOMPRIMIDO:", dataArray);
 
-            // 5. INTENTAR TRADUCCIÓN A TEXTO (Por si es JSON o CSV)
-            let textData = "";
-            try {
-                textData = new TextDecoder().decode(decompressed);
-                if (textData.includes('{') || textData.includes(',') || textData.length > 5) {
-                    console.log("Detección de Texto:", textData);
-                } else {
-                    textData = "";
-                }
-            } catch (e) { /* No es texto */ }
-            
+            // REGLA DE PRECISIÓN 1: DATA_OFFSET (Salto de metadatos)
+            // Según pruebas, los votos reales suelen empezar tras los bytes de Local/Mesa
+            const DATA_OFFSET = 7; 
+            const payloadOnly = dataArray.slice(DATA_OFFSET);
+
             if (onQrParsed) {
-                // Pasamos un objeto más rico con el texto si existe
-                onQrParsed(dataArray);
+                // REGLA DE PRECISIÓN 5: Enviamos también el HEX original para auditoría
+                onQrParsed(payloadOnly, cleanHex); 
+                
                 toast({
                     title: "¡QR Decifrado con Éxito!",
-                    description: textData ? "Contiene datos de texto/JSON." : `Se extrajeron ${dataArray.length} puntos de datos digitales.`,
+                    description: `Bloque de votos extraído tras offset ${DATA_OFFSET}.`,
                     className: "bg-green-600 text-white border-none shadow-lg",
                 });
             }

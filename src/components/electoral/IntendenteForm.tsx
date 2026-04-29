@@ -28,8 +28,10 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         votes: Record<string, number>, 
         extra: any,
         isQr?: boolean,
-        rawData?: number[]
+        rawData?: number[],
+        rawHex?: string
     } | null>(null);
+    const [rawQrHex, setRawQrHex] = useState<string | null>(null);
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
 
     // Handle incoming QR data asynchronously
@@ -95,26 +97,36 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         setIsOcrDialogOpen(true);
     };
 
-    const handleQrParsed = (data: number[]) => {
+    const handleQrParsed = (data: number[], rawHex: string) => {
         const previewVotes: Record<string, number> = {};
-        // Mapeo directo por posición
+        const MAX_VOTES_LIMIT = 400; // REGLA 3: Filtro de seguridad
+
+        // REGLA 2: Extracción Estricta (Payload Only)
+        // Solo procesamos bytes para el número de candidatos configurados
         INTENDENTE_CANDIDATES.forEach((candidate, index) => {
-            previewVotes[candidate.id] = data[index] || 0;
+            let val = data[index] || 0;
+            // Aplicar filtro de seguridad
+            if (val > MAX_VOTES_LIMIT) val = 0;
+            previewVotes[candidate.id] = val;
         });
 
-        // Footer (últimas 4 posiciones)
+        // Footer (Nulos, Blancos, VAC, Total)
+        // Se asume que están al final del payload después de los candidatos
+        const footerOffset = INTENDENTE_CANDIDATES.length;
         const previewExtra = {
-            nulos: data[data.length - 4] || 0,
-            blancos: data[data.length - 3] || 0,
-            votos_computar: data[data.length - 2] || 0,
-            total_general: data[data.length - 1] || 0
+            nulos: data[footerOffset] > MAX_VOTES_LIMIT ? 0 : data[footerOffset] || 0,
+            blancos: data[footerOffset + 1] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 1] || 0,
+            votos_computar: data[footerOffset + 2] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 2] || 0,
+            total_general: data[footerOffset + 3] || 0
         };
 
+        setRawQrHex(rawHex); // Guardar para persistencia
         setOcrPreview({ 
             votes: previewVotes, 
             extra: previewExtra,
             isQr: true,
-            rawData: data 
+            rawData: data,
+            rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
     };
@@ -225,7 +237,12 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                 <Button 
                     className="w-full h-12 text-lg font-bold" 
                     disabled={!isTotalValid || !imageFile || isSaving}
-                    onClick={() => onSave({ votes, ...extra }, imageFile!)}
+                    onClick={() => onSave({ 
+                        votes, 
+                        ...extra, 
+                        metodo_carga: rawQrHex ? 'QR_SCAN' : 'MANUAL',
+                        raw_qr_data: rawQrHex 
+                    }, imageFile!)}
                 >
                     <Save className="w-5 h-5 mr-2" />
                     {isSaving ? 'Guardando...' : 'Guardar Resultados Intendencia'}
