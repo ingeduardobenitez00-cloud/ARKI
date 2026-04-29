@@ -197,7 +197,7 @@ export default function EscanerActasPage() {
                                 <Button 
                                     size="lg"
                                     disabled={!selectedMesa}
-                                    className={`w-full h-14 text-sm font-black shadow-md transition-all ${selectedMesa && activeModule !== 'intendencia' ? 'bg-blue-700 hover:bg-blue-800 scale-100' : 'bg-slate-200 text-slate-500'}`}
+                                    className={`w-full h-14 text-sm font-black shadow-md transition-all ${selectedMesa && activeModule === 'intendencia' ? 'bg-blue-700 text-white hover:bg-blue-800 scale-100' : 'bg-slate-200 text-slate-500'}`}
                                     onClick={() => setActiveModule('intendencia')}
                                 >
                                     CARGAR INTENDENCIA
@@ -205,7 +205,7 @@ export default function EscanerActasPage() {
                                 <Button 
                                     size="lg"
                                     disabled={!selectedMesa}
-                                    className={`w-full h-14 text-sm font-black shadow-md transition-all ${selectedMesa && activeModule !== 'junta' ? 'bg-blue-700 hover:bg-blue-800 scale-100' : 'bg-slate-200 text-slate-500'}`}
+                                    className={`w-full h-14 text-sm font-black shadow-md transition-all ${selectedMesa && activeModule === 'junta' ? 'bg-blue-700 text-white hover:bg-blue-800 scale-100' : 'bg-slate-200 text-slate-500'}`}
                                     onClick={() => setActiveModule('junta')}
                                 >
                                     CARGAR JUNTA

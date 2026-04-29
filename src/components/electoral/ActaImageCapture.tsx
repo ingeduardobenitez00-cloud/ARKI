@@ -10,7 +10,8 @@ interface ActaImageCaptureProps {
 }
 
 export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCaptureProps) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const galleryInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
@@ -30,9 +31,8 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
     const handleRetake = () => {
         setPreviewUrl(null);
         onImageCaptured(null);
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (galleryInputRef.current) galleryInputRef.current.value = '';
     };
 
     const handleRunOcr = async () => {
@@ -64,7 +64,15 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
                 <input 
                     type="file" 
                     accept="image/*" 
-                    ref={fileInputRef}
+                    capture="environment"
+                    ref={cameraInputRef}
+                    className="hidden"
+                    onChange={handleFileChange}
+                />
+                <input 
+                    type="file" 
+                    accept="image/*" 
+                    ref={galleryInputRef}
                     className="hidden"
                     onChange={handleFileChange}
                 />
@@ -80,14 +88,25 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
                                 Toma una foto o sube una imagen de la galería.
                             </p>
                         </div>
-                        <Button 
-                            type="button"
-                            onClick={() => fileInputRef.current?.click()}
-                            className="bg-blue-700 hover:bg-blue-800 font-bold w-full max-w-sm"
-                        >
-                            <Camera className="w-4 h-4 mr-2" />
-                            Cámara / Galería
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-3 w-full max-w-sm mt-2">
+                            <Button 
+                                type="button"
+                                onClick={() => cameraInputRef.current?.click()}
+                                className="bg-blue-700 hover:bg-blue-800 font-bold flex-1"
+                            >
+                                <Camera className="w-4 h-4 mr-2" />
+                                Cámara
+                            </Button>
+                            <Button 
+                                type="button"
+                                variant="outline"
+                                onClick={() => galleryInputRef.current?.click()}
+                                className="border-blue-700 text-blue-700 hover:bg-blue-50 font-bold flex-1"
+                            >
+                                <ImageIcon className="w-4 h-4 mr-2" />
+                                Galería
+                            </Button>
+                        </div>
                     </div>
                 ) : (
                     <div className="w-full flex flex-col items-center space-y-3">

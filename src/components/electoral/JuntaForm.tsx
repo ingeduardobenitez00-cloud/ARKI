@@ -21,7 +21,7 @@ interface JuntaFormProps {
 
 export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaFormProps) {
     const [votes, setVotes] = useState<Record<string, Record<number, number>>>(initialData?.votes || {});
-    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
 
     React.useEffect(() => {
@@ -45,6 +45,9 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
 
             const blancosMatch = trimmed.match(/^BLC.*?(\d+)\s*$/i);
             if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
+
+            const vacMatch = trimmed.match(/^VAC.*?(\d+)\s*$/i);
+            if (vacMatch && vacMatch[1]) newExtra.votos_computar = parseInt(vacMatch[1], 10);
 
             const totalMatch = trimmed.match(/^TOT.*?(\d+)\s*$/i);
             if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
@@ -93,7 +96,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const totalVotosListas = Object.keys(votes).reduce((acc, listId) => acc + getListTotal(listId), 0);
-    const calculatedTotal = totalVotosListas + extra.nulos + extra.blancos;
+    const calculatedTotal = totalVotosListas + extra.nulos + extra.blancos + (extra.votos_computar || 0);
     const isTotalValid = calculatedTotal === extra.total_general && extra.total_general > 0;
 
     return (
@@ -166,10 +169,13 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>Total Listas</Label>
-                        <div className="h-10 flex items-center px-3 bg-white rounded-md border font-bold text-blue-700">
-                            {totalVotosListas}
-                        </div>
+                        <Label>Votos a Computar</Label>
+                        <Input 
+                            type="number" 
+                            value={extra.votos_computar || ''} 
+                            onChange={(e) => setExtra((p: any) => ({...p, votos_computar: parseInt(e.target.value) || 0}))} 
+                            className="font-bold text-blue-700"
+                        />
                     </div>
                     <div className="space-y-2">
                         <Label className="text-blue-700 font-bold">Total General Certificado</Label>

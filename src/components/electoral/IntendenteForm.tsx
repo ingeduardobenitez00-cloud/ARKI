@@ -19,7 +19,7 @@ interface IntendenteFormProps {
 
 export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: IntendenteFormProps) {
     const [votes, setVotes] = useState<Record<string, number>>(initialData?.votes || {});
-    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, total_general: 0 });
+    const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
 
     // Handle incoming QR data asynchronously
@@ -49,6 +49,9 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         const blancosMatch = text.match(/BLC.*?(\d+)\s*$/im);
         if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
 
+        const vacMatch = text.match(/VAC.*?(\d+)\s*$/im);
+        if (vacMatch && vacMatch[1]) newExtra.votos_computar = parseInt(vacMatch[1], 10);
+
         const totalMatch = text.match(/TOT.*?(\d+)\s*$/im);
         if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
 
@@ -60,7 +63,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         setVotes(prev => ({ ...prev, [candidateId]: parseInt(value) || 0 }));
     };
 
-    const calculatedTotal = Object.values(votes).reduce((a, b) => a + b, 0) + extra.nulos + extra.blancos;
+    const calculatedTotal = Object.values(votes).reduce((a, b) => a + b, 0) + extra.nulos + extra.blancos + (extra.votos_computar || 0);
     const isTotalValid = calculatedTotal === extra.total_general && extra.total_general > 0;
 
     return (
@@ -113,6 +116,15 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                             value={extra.blancos || ''} 
                             onChange={(e) => setExtra((p: any) => ({...p, blancos: parseInt(e.target.value) || 0}))} 
                             className="font-bold"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Votos a Computar</Label>
+                        <Input 
+                            type="number" 
+                            value={extra.votos_computar || ''} 
+                            onChange={(e) => setExtra((p: any) => ({...p, votos_computar: parseInt(e.target.value) || 0}))} 
+                            className="font-bold text-blue-700"
                         />
                     </div>
                     <div className="space-y-2">
