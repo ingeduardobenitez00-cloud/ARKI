@@ -372,18 +372,57 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                         <td colSpan={2} className="p-1">Buzón de Identidad (Referencia)</td>
                                     </tr>
                                     <tr className="border-b bg-slate-50 text-xs">
-                                        <td className="p-2">Mesa / Local / Distrito Detectado</td>
+                                        <td className="p-2">Mesa / Local / Distrito</td>
                                         <td className="p-2 text-right font-mono">
                                             {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local} / {ocrPreview?.identity.distrito}
                                         </td>
                                     </tr>
-                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${!ocrPreview?.extra.es_valido ? 'bg-red-600' : 'bg-green-700'}`}>
+                                    <tr className={`font-black text-[9px] text-center uppercase tracking-widest ${!ocrPreview?.extra.es_valido ? 'bg-red-600 text-white' : 'bg-green-700 text-white'}`}>
                                         <td colSpan={2} className="p-1">
-                                            Buzón de Resultados (Preferenciales)
+                                            {!ocrPreview?.extra.es_valido ? '⚠️ Buzón de Resultados (Discrepancia)' : '✅ Buzón de Resultados (Preferenciales)'}
                                         </td>
                                     </tr>
-                                    <tr className="bg-slate-50 border-b">
-                                        <td className="p-2 text-xs font-bold uppercase">Suma de Votos Detectados</td>
+                                    {/* Filas por Lista con sus opciones preferenciales */}
+                                    {JUNTA_LISTS.map((list) => {
+                                        const listVotes = ocrPreview?.votes[list.id] || {};
+                                        const listTotal = Object.values(listVotes).reduce((a: number, b) => a + (b as number), 0);
+                                        return (
+                                            <>
+                                                <tr key={`${list.id}-header`} className="bg-slate-800 text-white text-[9px] uppercase">
+                                                    <td colSpan={2} className="p-1 pl-2 font-black tracking-wider">
+                                                        {list.name} — Total: {listTotal}
+                                                    </td>
+                                                </tr>
+                                                {Array.from({ length: 24 }, (_, i) => {
+                                                    const opNum = i + 1;
+                                                    const val = listVotes[opNum] || 0;
+                                                    return (
+                                                        <tr key={`${list.id}-op-${opNum}`} className={`border-b text-xs ${val > 0 ? 'bg-blue-50' : ''}`}>
+                                                            <td className="p-1 pl-3 text-slate-600">
+                                                                {list.name} – Op. {opNum}
+                                                            </td>
+                                                            <td className={`p-1 text-right font-black ${val > 0 ? 'text-blue-700' : 'text-slate-300'}`}>
+                                                                {val}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </>
+                                        );
+                                    })}
+                                    {/* Filas de Cierre */}
+                                    {[
+                                        { label: 'NULOS (NUL)', val: ocrPreview?.extra.nulos },
+                                        { label: 'BLANCOS (BLC)', val: ocrPreview?.extra.blancos },
+                                        { label: 'A COMPUTAR (VAC)', val: ocrPreview?.extra.votos_computar },
+                                    ].map(({ label, val }) => (
+                                        <tr key={label} className="border-b bg-amber-50">
+                                            <td className="p-2 text-xs font-semibold">{label}</td>
+                                            <td className="p-2 text-right font-black text-sm">{val || 0}</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-slate-100 border-t-2 border-slate-300">
+                                        <td className="p-2 text-xs font-black uppercase">SUMA TOTAL CALCULADA</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
@@ -391,11 +430,6 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                     <tr className="bg-blue-600 text-white">
                                         <td className="p-2 text-xs font-black uppercase">TOTAL OFICIAL JUNTA (TOT)</td>
                                         <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general}</td>
-                                    </tr>
-                                    <tr className="bg-slate-100 text-[8px] text-center text-slate-500 italic">
-                                        <td colSpan={2} className="p-1">
-                                            * Se han saltado los 7 bytes de cabecera técnica.
-                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
