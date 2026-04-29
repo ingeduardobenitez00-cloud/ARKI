@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { INTENDENTE_CANDIDATES } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
-import { AlertCircle, Save, Wand2 } from 'lucide-react';
+import { AlertCircle, Save, Wand2, Database } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ActaImageCapture } from './ActaImageCapture';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';

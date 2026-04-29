@@ -6,12 +6,11 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { JUNTA_LISTS, getJuntaOptions } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
-import { AlertCircle, Save, CheckCircle } from 'lucide-react';
+import { AlertCircle, Save, CheckCircle, Database, Wand2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { ActaImageCapture } from './ActaImageCapture';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';
-import { Wand2 } from 'lucide-react';
 
 interface JuntaFormProps {
     mesa: number;
