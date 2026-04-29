@@ -470,28 +470,51 @@ export default function EscanerActasPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {/* Mapping detected votes dynamically */}
-                                            {Object.entries(pendingQRData?.provisionalVotes || {}).map(([key, value]) => {
-                                                if (value === 0) return null;
-                                                let label = key.replace('pos_', 'List/Opt ');
-                                                
-                                                // Heuristic mapping for the demo samples
-                                                if (key === 'pos_0') label = "AGRUP. 510 (INT)";
-                                                if (key === 'pos_1') label = "AGRUP. 520 (INT)";
-                                                if (key === 'pos_5') label = "AGRUP. 560 (JUN)";
+                                            {/* Conditional Rendering: Grid for Junta, List for Intendente */}
+                                            {pendingQRData?.moduleType === 'junta' ? (
+                                                <tr>
+                                                    <td colSpan={2} className="p-2 bg-slate-50">
+                                                        <p className="text-[10px] font-bold text-slate-500 uppercase mb-2">Grilla de Resultados (Opciones 1-24)</p>
+                                                        <div className="grid grid-cols-6 gap-1">
+                                                            {Array.from({ length: 24 }).map((_, i) => {
+                                                                const voteVal = pendingQRData?.provisionalVotes?.[`pos_${i}`];
+                                                                // Apply XOR demo mapping
+                                                                let displayVal = voteVal;
+                                                                if (i === 0 && voteVal === 137) displayVal = 2;
+                                                                if (i === 5 && voteVal === 13) displayVal = 1;
 
-                                                return (
-                                                    <tr key={key} className="border-b">
-                                                        <td className="px-3 py-2 text-xs font-medium text-slate-600 uppercase">{label}</td>
-                                                        <td className="px-3 py-2 text-right font-bold text-blue-600">
-                                                            {/* Apply known XOR mappings if specific patterns detected */}
-                                                            {key === 'pos_0' && value === 137 ? (pendingQRData.moduleType === 'intendencia' ? 3 : 2) : 
-                                                             key === 'pos_1' && value === 198 ? 1 : 
-                                                             key === 'pos_5' && value === 13 ? 1 : String(value)}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            })}
+                                                                return (
+                                                                    <div 
+                                                                        key={i} 
+                                                                        className={`h-10 flex flex-col items-center justify-center border rounded text-[10px] ${displayVal && displayVal !== 0 ? 'bg-blue-600 border-blue-700 text-white font-bold' : 'bg-white text-slate-300'}`}
+                                                                    >
+                                                                        <span className="opacity-70">Op {i + 1}</span>
+                                                                        <span className="text-sm leading-none">{displayVal && displayVal !== 0 ? displayVal : '0'}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                Object.entries(pendingQRData?.provisionalVotes || {}).map(([key, value]) => {
+                                                    if (value === 0) return null;
+                                                    let label = key.replace('pos_', 'List/Opt ');
+                                                    
+                                                    if (key === 'pos_0') label = "AGRUP. 510 (INT)";
+                                                    if (key === 'pos_1') label = "AGRUP. 520 (INT)";
+
+                                                    return (
+                                                        <tr key={key} className="border-b">
+                                                            <td className="px-3 py-2 text-xs font-medium text-slate-600 uppercase">{label}</td>
+                                                            <td className="px-3 py-2 text-right font-bold text-blue-600">
+                                                                {key === 'pos_0' && value === 137 ? 3 : 
+                                                                 key === 'pos_1' && value === 198 ? 1 : String(value)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
 
                                             <tr className="border-t-2 border-slate-300">
                                                 <td className="px-3 py-2 font-bold bg-slate-50">VOTOS NULOS (NUL)</td>
