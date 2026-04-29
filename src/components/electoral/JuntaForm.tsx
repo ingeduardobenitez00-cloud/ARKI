@@ -119,14 +119,18 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 1: Segmento de Identidad
+        // REGLA: Segmentación Estricta (Identidad - 7 bytes)
         const identity = {
-            distrito: data[0] || 0,
-            local: data[1] || 0,
-            mesa: data[2] || 0
+            eleccion: data[0] || 0,
+            depto: data[1] || 0,
+            distrito: data[2] || 0,
+            zona: data[3] || 0,
+            local: data[4] || 0,
+            mesa: data[5] || 0,
+            mesa_bis: data[6] || 0
         };
 
-        // REGLA 1 y 2: Segmento de Resultados (Bloques de 24)
+        // REGLA: Segmento de Resultados (Bloques de 24)
         const DATA_OFFSET = 7;
         const resultsPayload = data.slice(DATA_OFFSET);
         
@@ -139,27 +143,27 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             }
         });
 
-        // Footer tras los bloques de candidatos
-        const footerOffset = JUNTA_LISTS.length * 24;
+        // Footer tras los bloques de candidatos (Nulos, Blancos, VAC, TOT)
+        const footerStart = JUNTA_LISTS.length * 24;
         const extraData = {
-            nulos: resultsPayload[footerOffset] || 0,
-            blancos: resultsPayload[footerOffset + 1] || 0,
-            votos_computar: resultsPayload[footerOffset + 2] || 0,
-            total_general_qr: resultsPayload[footerOffset + 3] || 0
+            nulos: resultsPayload[footerStart] || 0,
+            blancos: resultsPayload[footerStart + 1] || 0,
+            votos_computar: resultsPayload[footerStart + 2] || 0,
+            total_general: resultsPayload[footerStart + 3] || 0 // TOT Oficial
         };
 
-        // REGLA 3: Validación por Coincidencia
+        // Validación por Coincidencia
         let sumaVotos = extraData.nulos + extraData.blancos + extraData.votos_computar;
         Object.values(previewVotes).forEach(listVotes => {
             sumaVotos += Object.values(listVotes).reduce((a, b) => a + b, 0);
         });
         
-        const tieneDiscrepancia = sumaVotos !== extraData.total_general_qr && extraData.total_general_qr !== 0;
+        const coincidesWithTOT = sumaVotos === extraData.total_general;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaVotos, tiene_discrepancia: tieneDiscrepancia },
+            extra: { ...extraData, total_calculado: sumaVotos, es_valido: coincidesWithTOT },
             identity,
             isQr: true,
             rawData: data,
@@ -338,10 +342,10 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         <CardTitle className="text-blue-600 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <Wand2 className="w-5 h-5" />
-                                Analizador Independiente (Junta)
+                                Analizador de Concejales
                             </div>
-                            <Badge className={`border-none ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : 'bg-blue-600'} text-white`}>
-                                SUMA: {ocrPreview?.extra.total_calculado}
+                            <Badge className={`border-none ${ocrPreview?.extra.es_valido ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                                {ocrPreview?.extra.es_valido ? 'VALIDACIÓN EXITOSA' : 'DISCREPANCIA EN SUMA'}
                             </Badge>
                         </CardTitle>
                         <DialogDescription>
@@ -363,25 +367,30 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                         <td colSpan={2} className="p-1">Buzón de Identidad (Referencia)</td>
                                     </tr>
                                     <tr className="border-b bg-slate-50 text-xs">
-                                        <td className="p-2">Mesa / Local Detectado</td>
+                                        <td className="p-2">Mesa / Local / Distrito Detectado</td>
                                         <td className="p-2 text-right font-mono">
-                                            {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local}
+                                            {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local} / {ocrPreview?.identity.distrito}
                                         </td>
                                     </tr>
-                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
+                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${!ocrPreview?.extra.es_valido ? 'bg-red-600' : 'bg-green-700'}`}>
                                         <td colSpan={2} className="p-1">
                                             Buzón de Resultados (Preferenciales)
                                         </td>
                                     </tr>
-                                    <tr className="bg-slate-100">
-                                        <td className="p-2 text-xs font-black uppercase tracking-tighter">Suma de Resultados Detectados</td>
-                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
+                                    <tr className="bg-slate-50 border-b">
+                                        <td className="p-2 text-xs font-bold uppercase">Suma de Votos Detectados</td>
+                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
                                     </tr>
-                                    <tr className="bg-blue-50">
-                                        <td className="p-2 text-xs font-bold uppercase tracking-tighter">TOTAL CONTROL EN QR (TOT)</td>
-                                        <td className="p-2 text-right font-black text-blue-700">{ocrPreview?.extra.total_general_qr}</td>
+                                    <tr className="bg-blue-600 text-white">
+                                        <td className="p-2 text-xs font-black uppercase">TOTAL OFICIAL JUNTA (TOT)</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general}</td>
+                                    </tr>
+                                    <tr className="bg-slate-100 text-[8px] text-center text-slate-500 italic">
+                                        <td colSpan={2} className="p-1">
+                                            * Se han saltado los 7 bytes de cabecera técnica.
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>

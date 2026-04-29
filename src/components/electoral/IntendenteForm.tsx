@@ -99,44 +99,53 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 1: Segmento de Identidad (Buzones Técnicos)
-        // Mapeamos los primeros bytes a la identidad del acta
+        // REGLA: Segmentación Estricta (Buzón de Identidad - 7 bytes)
         const identity = {
-            distrito: data[0] || 0,
-            local: data[1] || 0,
-            mesa: data[2] || 0
+            eleccion: data[0] || 0,
+            depto: data[1] || 0,
+            distrito: data[2] || 0,
+            zona: data[3] || 0,
+            local: data[4] || 0,
+            mesa: data[5] || 0,
+            mesa_bis: data[6] || 0
         };
 
-        // REGLA 1 y 2: Segmento de Resultados (votos-input)
-        // El offset ahora es dinámico tras la identidad
-        const DATA_OFFSET = 7;
-        const resultsPayload = data.slice(DATA_OFFSET);
+        // REGLA: Aislamiento de Votos Reales (A partir del byte 7)
+        const resultsBlock = data.slice(7, 18); // 11 bytes de resultados
         
-        // Mapeo secuencial a candidatos
+        // Mapeo Estricto de Resultados
         const previewVotes: Record<string, number> = {};
-        INTENDENTE_CANDIDATES.forEach((c, idx) => {
-            previewVotes[c.id] = resultsPayload[idx] || 0;
-        });
+        // 1. Lista 510 (Primer valor)
+        previewVotes[INTENDENTE_CANDIDATES[0].id] = resultsBlock[0] || 0;
+        // 2. Listas 520 a 600 (Siguientes 6 valores)
+        for (let i = 1; i < 7; i++) {
+            if (INTENDENTE_CANDIDATES[i]) {
+                previewVotes[INTENDENTE_CANDIDATES[i].id] = resultsBlock[i] || 0;
+            }
+        }
 
-        // Nulos, Blancos y VAC
-        const offsetExtra = INTENDENTE_CANDIDATES.length;
+        // 3. Nulos, Blancos, VAC y TOT (Los últimos 4 valores del bloque)
         const extraData = {
-            nulos: resultsPayload[offsetExtra] || 0,
-            blancos: resultsPayload[offsetExtra + 1] || 0,
-            votos_computar: resultsPayload[offsetExtra + 2] || 0,
-            total_general_qr: resultsPayload[offsetExtra + 3] || 0
+            nulos: resultsBlock[7] || 0,
+            blancos: resultsBlock[8] || 0,
+            votos_computar: resultsBlock[9] || 0,
+            total_general: resultsBlock[10] || 0 // Este es el TOT oficial
         };
 
-        // REGLA 3: Validación por Coincidencia (Votos vs TOT)
-        const sumaVotos = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
-                         extraData.nulos + extraData.blancos + extraData.votos_computar;
+        // REGLA DE ORO: Suma Detectada vs TOT oficial
+        const sumaResultados = (Object.values(previewVotes).reduce((a, b) => a + b, 0)) + 
+                              extraData.nulos + extraData.blancos + extraData.votos_computar;
         
-        const tieneDiscrepancia = sumaVotos !== extraData.total_general_qr && extraData.total_general_qr !== 0;
+        const coincidesWithTOT = sumaResultados === extraData.total_general;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaVotos, tiene_discrepancia: tieneDiscrepancia },
+            extra: { 
+                ...extraData, 
+                total_calculado: sumaResultados, 
+                es_valido: coincidesWithTOT 
+            },
             identity,
             isQr: true,
             rawData: data,
@@ -287,9 +296,9 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                 <Wand2 className="w-5 h-5" />
                                 Espejo de Datos (Analizador)
                             </div>
-                            <Badge className={`border-none ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : 'bg-green-600'} text-white`}>
-                                SUMA: {ocrPreview?.extra.total_calculado}
-                            </Badge>
+                        <Badge className={`border-none ${ocrPreview?.extra.es_valido ? 'bg-green-600' : 'bg-red-600'} text-white`}>
+                            {ocrPreview?.extra.es_valido ? 'VALIDACIÓN EXITOSA' : 'DISCREPANCIA EN SUMA'}
+                        </Badge>
                         </CardTitle>
                         <DialogDescription>
                             Revisa si los números coinciden con el acta física antes de aplicarlos al formulario.
@@ -315,33 +324,25 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             {ocrPreview?.identity.mesa} / {ocrPreview?.identity.local} / {ocrPreview?.identity.distrito}
                                         </td>
                                     </tr>
-                                    <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
+                                    <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${!ocrPreview?.extra.es_valido ? 'bg-red-600' : 'bg-green-700'}`}>
                                         <td colSpan={2} className="p-1">
                                             Buzón de Resultados Electorales
                                         </td>
                                     </tr>
-                                    {ocrPreview?.rawData?.slice(7).map((val, idx) => {
-                                        const isTOT = idx === ocrPreview.rawData!.length - 8; // Último byte del payload real
-                                        return (
-                                            <tr key={idx} className="border-b">
-                                                <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span>Dato Electoral {idx + 1}</span>
-                                                </td>
-                                                <td className="p-2 text-right font-black text-sm text-slate-900">
-                                                    {val}
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                    <tr className="bg-slate-100">
-                                        <td className="p-2 text-xs font-black uppercase">Suma de Buzón Resultados</td>
-                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
+                                    <tr className="bg-slate-50 border-b">
+                                        <td className="p-2 text-xs font-bold">SUMA DE RESULTADOS (Listas+Aux)</td>
+                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
                                     </tr>
-                                    <tr className="bg-blue-50">
-                                        <td className="p-2 text-xs font-bold">TOTAL CONTROL EN QR (TOT)</td>
-                                        <td className="p-2 text-right font-black text-blue-700">{ocrPreview?.extra.total_general_qr}</td>
+                                    <tr className="bg-blue-600 text-white">
+                                        <td className="p-2 text-xs font-black">TOTAL OFICIAL DEL ACTA (TOT)</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general}</td>
+                                    </tr>
+                                    <tr className="bg-slate-100 text-[8px] text-center text-slate-500 italic">
+                                        <td colSpan={2} className="p-1">
+                                            * Los primeros 7 bytes de identidad han sido procesados como referencia.
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>
