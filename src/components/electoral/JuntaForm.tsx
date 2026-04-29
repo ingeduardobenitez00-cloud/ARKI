@@ -31,6 +31,53 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
         }
     }, [initialData]);
 
+    const handleOcrParsed = (text: string) => {
+        const newVotes = { ...votes };
+        const newExtra = { ...extra };
+        const lines = text.split('\n');
+
+        lines.forEach(line => {
+            const trimmed = line.trim();
+            if (!trimmed) return;
+
+            const nulosMatch = trimmed.match(/^NUL.*?(\d+)\s*$/i);
+            if (nulosMatch && nulosMatch[1]) newExtra.nulos = parseInt(nulosMatch[1], 10);
+
+            const blancosMatch = trimmed.match(/^BLC.*?(\d+)\s*$/i);
+            if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
+
+            const totalMatch = trimmed.match(/^TOT.*?(\d+)\s*$/i);
+            if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
+
+            JUNTA_LISTS.forEach(list => {
+                const listRegex = new RegExp(`^${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
+                const match = trimmed.match(listRegex);
+                if (match && match[1]) {
+                    const numbers = match[1].trim().split(/\s+/).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
+                    if (numbers.length > 0) {
+                        if (!newVotes[list.id]) newVotes[list.id] = {};
+                        
+                        // Bloque 1: Opciones 1 a 16 (la línea suele tener más de 10 números)
+                        if (numbers.length > 10) {
+                            for (let i = 0; i < Math.min(16, numbers.length); i++) {
+                                newVotes[list.id][i + 1] = numbers[i];
+                            }
+                        } 
+                        // Bloque 2: Opciones 17 a 24 + TOT (suele tener 9 o menos números)
+                        else {
+                            for (let i = 0; i < Math.min(8, numbers.length); i++) {
+                                newVotes[list.id][17 + i] = numbers[i];
+                            }
+                        }
+                    }
+                }
+            });
+        });
+
+        setVotes(newVotes);
+        setExtra(newExtra);
+    };
+
     const handleVoteChange = (listId: string, option: number, value: string) => {
         setVotes(prev => ({
             ...prev,
@@ -141,7 +188,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             </CardContent>
             <CardFooter className="flex-col w-full gap-4">
                 <div className="w-full">
-                    <ActaImageCapture onImageCaptured={setImageFile} />
+                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
                 </div>
                 <Button 
                     className="w-full h-12 text-lg font-bold bg-blue-700 hover:bg-blue-800" 

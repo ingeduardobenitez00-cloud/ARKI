@@ -30,6 +30,32 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         }
     }, [initialData]);
 
+    const handleOcrParsed = (text: string) => {
+        const newVotes = { ...votes };
+        const newExtra = { ...extra };
+
+        INTENDENTE_CANDIDATES.forEach(candidate => {
+            // Regex to match "510 ... 3"
+            const regex = new RegExp(`(?:^|\\s)${candidate.list}\\b.*?(\\d+)\\s*$`, 'im');
+            const match = text.match(regex);
+            if (match && match[1]) {
+                newVotes[candidate.id] = parseInt(match[1], 10);
+            }
+        });
+
+        const nulosMatch = text.match(/NUL.*?(\d+)\s*$/im);
+        if (nulosMatch && nulosMatch[1]) newExtra.nulos = parseInt(nulosMatch[1], 10);
+
+        const blancosMatch = text.match(/BLC.*?(\d+)\s*$/im);
+        if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
+
+        const totalMatch = text.match(/TOT.*?(\d+)\s*$/im);
+        if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
+
+        setVotes(newVotes);
+        setExtra(newExtra);
+    };
+
     const handleVoteChange = (candidateId: string, value: string) => {
         setVotes(prev => ({ ...prev, [candidateId]: parseInt(value) || 0 }));
     };
@@ -105,7 +131,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             </CardContent>
             <CardFooter className="flex-col w-full gap-4">
                 <div className="w-full">
-                    <ActaImageCapture onImageCaptured={setImageFile} />
+                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
                 </div>
                 <Button 
                     className="w-full h-12 text-lg font-bold" 

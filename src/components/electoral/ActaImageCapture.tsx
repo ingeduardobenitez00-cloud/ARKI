@@ -1,15 +1,19 @@
 import React, { useRef, useState } from 'react';
-import { Camera, Image as ImageIcon, Trash2, CheckCircle2 } from 'lucide-react';
+import Tesseract from 'tesseract.js';
+import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 
 interface ActaImageCaptureProps {
     onImageCaptured: (file: File | null) => void;
+    onOcrParsed?: (text: string) => void;
 }
 
-export function ActaImageCapture({ onImageCaptured }: ActaImageCaptureProps) {
+export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCaptureProps) {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+    const [ocrProgress, setOcrProgress] = useState(0);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -28,6 +32,29 @@ export function ActaImageCapture({ onImageCaptured }: ActaImageCaptureProps) {
         onImageCaptured(null);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
+        }
+    };
+
+    const handleRunOcr = async () => {
+        if (!previewUrl || !onOcrParsed) return;
+        setIsOcrProcessing(true);
+        setOcrProgress(0);
+        try {
+            const { data: { text } } = await Tesseract.recognize(
+                previewUrl,
+                'spa',
+                { logger: m => {
+                    if (m.status === 'recognizing text') {
+                        setOcrProgress(Math.round(m.progress * 100));
+                    }
+                }}
+            );
+            console.log("Resultados Crudos OCR:\n", text);
+            onOcrParsed(text);
+        } catch (error) {
+            console.error("Error ejecutando OCR", error);
+        } finally {
+            setIsOcrProcessing(false);
         }
     };
 
@@ -76,11 +103,30 @@ export function ActaImageCapture({ onImageCaptured }: ActaImageCaptureProps) {
                                 alt="Vista previa del acta" 
                                 className="w-full h-full object-cover"
                             />
+                            {isOcrProcessing && (
+                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white p-4">
+                                    <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                                    <span className="font-bold">Analizando Imagen...</span>
+                                    <span className="text-sm">{ocrProgress}% completado</span>
+                                </div>
+                            )}
                         </div>
+                        {onOcrParsed && (
+                            <Button 
+                                type="button"
+                                onClick={handleRunOcr}
+                                disabled={isOcrProcessing}
+                                className="bg-purple-600 hover:bg-purple-700 font-bold w-full max-w-sm"
+                            >
+                                <Wand2 className="w-4 h-4 mr-2" />
+                                Extraer Datos Automáticamente
+                            </Button>
+                        )}
                         <Button 
                             type="button"
                             variant="outline"
                             onClick={handleRetake}
+                            disabled={isOcrProcessing}
                             className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold w-full max-w-sm"
                         >
                             <Trash2 className="w-4 h-4 mr-2" />
