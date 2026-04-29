@@ -121,49 +121,43 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const handleQrParsed = (data: number[], rawHex: string) => {
         const L = data.length;
         
-        // BLOQUE DE REFERENCIA (Identidad - 7 bytes)
+        // CONTRATO DE CAMPOS JUNTA: (Nº Listas * 25) + 4 campos de cierre
+        const RESULT_FIELDS_COUNT = (JUNTA_LISTS.length * 25) + 4;
+        const resultsBlock = data.slice(L - RESULT_FIELDS_COUNT);
+        
+        // Identidad residual
+        const identityBlock = data.slice(0, L - RESULT_FIELDS_COUNT);
         const identity = {
-            eleccion: data[0] || 0,
-            depto: data[1] || 0,
-            distrito: data[2] || 0,
-            zona: data[3] || 0,
-            local: data[4] || 0,
-            mesa: data[5] || 0,
-            mesa_bis: data[6] || 0
+            eleccion: identityBlock[0] || 0,
+            depto: identityBlock[1] || 0,
+            distrito: identityBlock[2] || 0,
+            zona: identityBlock[3] || 0,
+            local: identityBlock[4] || 0,
+            mesa: identityBlock[5] || 0,
+            mesa_bis: identityBlock[6] || 0
         };
 
-        // REGLA DE AJUSTE DINÁMICO: Mapeo de atrás hacia adelante (Bottom-Up)
-        
         // 1. Identificar el cierre (Últimos 4 bytes)
         const extraData = {
-            total_general: data[L - 1] || 0, // TOT Oficial
-            votos_computar: data[L - 2] || 0, // VAC
-            blancos: data[L - 3] || 0,        // BLC
-            nulos: data[L - 4] || 0           // NUL
+            total_general: resultsBlock[resultsBlock.length - 1] || 0, // TOT
+            votos_computar: resultsBlock[resultsBlock.length - 2] || 0, // VAC
+            blancos: resultsBlock[resultsBlock.length - 3] || 0,        // BLC
+            nulos: resultsBlock[resultsBlock.length - 4] || 0           // NUL
         };
 
-        // 2. Mapear bloques de 24 votos hacia atrás
+        // 2. Mapear bloques de 25 votos
         const previewVotes: Record<string, Record<number, number>> = {};
-        // Recorremos las listas de atrás hacia adelante
-        for (let lIdx = JUNTA_LISTS.length - 1; lIdx >= 0; lIdx--) {
-            const list = JUNTA_LISTS[lIdx];
+        JUNTA_LISTS.forEach((list, listIndex) => {
             previewVotes[list.id] = {};
-            
-            // Cada lista tiene 24 candidatos, retrocedemos desde el offset del footer
-            // El offset base para la última lista es L-5
-            const footerOffset = 4;
-            const blockOffset = (JUNTA_LISTS.length - 1 - lIdx) * 24;
-            const listEndIdx = (L - 1 - footerOffset) - blockOffset;
-
-            for (let i = 23; i >= 0; i--) {
-                const byteIdx = listEndIdx - (23 - i);
-                if (byteIdx >= 7) {
-                    previewVotes[list.id][i + 1] = data[byteIdx] || 0;
-                }
+            const blockStart = listIndex * 25;
+            // Solo tomamos los primeros 24 bytes (Preferenciales)
+            for (let i = 0; i < 24; i++) {
+                previewVotes[list.id][i + 1] = resultsBlock[blockStart + i] || 0;
             }
-        }
+            // El byte 25 es el Control de Lista (se ignora para la suma de preferenciales)
+        });
 
-        // Validación de Integridad
+        // VALIDACIÓN DE INTEGRIDAD
         let sumaTotal = extraData.nulos + extraData.blancos + extraData.votos_computar;
         Object.values(previewVotes).forEach(listVotes => {
             sumaTotal += Object.values(listVotes).reduce((a, b) => a + b, 0);

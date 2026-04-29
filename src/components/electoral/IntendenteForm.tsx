@@ -96,62 +96,56 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
 
         setOcrPreview({ votes: previewVotes, extra: previewExtra });
         setIsOcrDialogOpen(true);
-    };
-
     const handleQrParsed = (data: number[], rawHex: string) => {
         const L = data.length;
         
-        // BLOQUE DE REFERENCIA (Identidad - Primeros 7 bytes)
+        // CONTRATO DE CAMPOS (Intendente = 11 campos fijos al final)
+        const RESULT_FIELDS_COUNT = 11;
+        const resultsBlock = data.slice(L - RESULT_FIELDS_COUNT);
+        
+        // BLOQUE DE REFERENCIA (Identidad = Todo lo que está antes de los 11 resultados)
+        const identityBlock = data.slice(0, L - RESULT_FIELDS_COUNT);
         const identity = {
-            eleccion: data[0] || 0,
-            depto: data[1] || 0,
-            distrito: data[2] || 0,
-            zona: data[3] || 0,
-            local: data[4] || 0,
-            mesa: data[5] || 0,
-            mesa_bis: data[6] || 0
+            eleccion: identityBlock[0] || 0,
+            depto: identityBlock[1] || 0,
+            distrito: identityBlock[2] || 0,
+            zona: identityBlock[3] || 0,
+            local: identityBlock[4] || 0,
+            mesa: identityBlock[5] || 0,
+            mesa_bis: identityBlock[6] || 0
         };
 
-        // REGLA DE AJUSTE DINÁMICO: Mapeo de atrás hacia adelante (Bottom-Up)
-        // Esto asegura que los resultados electorales siempre caigan en sus campos
-        // sin importar cuánto cambie la longitud de la cabecera técnica.
-        
-        // 1. Identificar el cierre (Los últimos 4 bytes del bloque de resultados)
+        // MAPEO DE LOS 11 CAMPOS (De derecha a izquierda según el Contrato)
         const extraData = {
-            total_general: data[L - 1] || 0, // El Juez Supremo (TOT)
-            votos_computar: data[L - 2] || 0, // VAC
-            blancos: data[L - 3] || 0,        // BLC
-            nulos: data[L - 4] || 0           // NUL
+            total_general: resultsBlock[10] || 0, // Campo [11]: TOT (Último)
+            votos_computar: resultsBlock[9] || 0,  // Campo [10]: VAC
+            blancos: resultsBlock[8] || 0,         // Campo [9]: BLC
+            nulos: resultsBlock[7] || 0            // Campo [8]: NUL
         };
 
-        // 2. Mapear votos de listas hacia atrás desde la posición del NUL
         const previewVotes: Record<string, number> = {};
-        // Empezamos desde L-5 y retrocedemos según el número de candidatos
-        for (let i = 0; i < INTENDENTE_CANDIDATES.length; i++) {
-            const candidateIdx = (L - 5) - i;
-            if (candidateIdx >= 7) { // No entrar en zona de identidad
-                const reverseIdx = INTENDENTE_CANDIDATES.length - 1 - i;
-                const candidate = INTENDENTE_CANDIDATES[reverseIdx];
-                previewVotes[candidate.id] = data[candidateIdx] || 0;
-            }
-        }
+        // Campos [1 al 7]: Votos de las Listas
+        INTENDENTE_CANDIDATES.forEach((candidate, idx) => {
+            previewVotes[candidate.id] = resultsBlock[idx] || 0;
+        });
 
-        // Validación: Solo sumar los 'cajones' de resultados
-        const sumaResultados = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
-                              extraData.nulos + extraData.blancos + extraData.votos_computar;
+        // VALIDACIÓN DE INTEGRIDAD: Suma de campos 1 al 10 == Campo 11 (TOT)
+        const sumaCampos1al10 = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
+                               extraData.nulos + extraData.blancos + extraData.votos_computar;
         
-        const esValido = sumaResultados === extraData.total_general;
+        const esValido = sumaCampos1al10 === extraData.total_general;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaResultados, es_valido: esValido },
+            extra: { ...extraData, total_calculado: sumaCampos1al10, es_valido: esValido },
             identity,
             isQr: true,
             rawData: data,
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
+    };Open(true);
     };
 
     const applyOcrData = () => {
