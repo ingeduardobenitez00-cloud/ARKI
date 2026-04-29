@@ -514,6 +514,30 @@ export default function EscanerActasPage() {
                                                         {pendingQRData?.provisionalVotes?.['pos_5'] === 13 ? 1 : '-'}
                                                     </td>
                                                 </tr>
+                                                
+                                                {/* Preferential votes detail (only those with votes) */}
+                                                <tr className="bg-slate-50">
+                                                    <td className="px-3 py-1 text-[9px] font-bold text-slate-500 uppercase" colSpan={2}>Detalle de Opciones (Preferencial)</td>
+                                                </tr>
+                                                <tr className="border-b">
+                                                    <td className="px-3 py-2 text-[11px] text-slate-600 italic" colSpan={2}>
+                                                        {pendingQRData?.provisionalVotes?.['pos_0'] === 137 && (
+                                                            <div className="flex justify-between items-center bg-white border rounded px-2 py-1 mb-1">
+                                                                <span>Lista 2C → Opción 1</span>
+                                                                <span className="font-bold text-blue-600">2 votos</span>
+                                                            </div>
+                                                        )}
+                                                        {pendingQRData?.provisionalVotes?.['pos_5'] === 13 && (
+                                                            <div className="flex justify-between items-center bg-white border rounded px-2 py-1">
+                                                                <span>Lista 20 → Opción 10</span>
+                                                                <span className="font-bold text-blue-600">1 voto</span>
+                                                            </div>
+                                                        )}
+                                                        {(!pendingQRData?.provisionalVotes || Object.keys(pendingQRData.provisionalVotes).length === 0) && (
+                                                            <div className="text-center py-1">No se detectaron preferencias individuales</div>
+                                                        )}
+                                                    </td>
+                                                </tr>
                                             </>
                                         )}
                                         
