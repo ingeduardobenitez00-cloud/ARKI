@@ -5,9 +5,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { INTENDENTE_CANDIDATES } from '@/data/electoral-metadata';
 import { CandidateCard } from './CandidateCard';
-import { AlertCircle, Save } from 'lucide-react';
+import { AlertCircle, Save, Wand2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ActaImageCapture } from './ActaImageCapture';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 
 interface IntendenteFormProps {
     mesa: number;
@@ -21,6 +22,10 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     const [votes, setVotes] = useState<Record<string, number>>(initialData?.votes || {});
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
+    
+    // Preview OCR state
+    const [ocrPreview, setOcrPreview] = useState<{ votes: Record<string, number>, extra: any } | null>(null);
+    const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
 
     // Handle incoming QR data asynchronously
     React.useEffect(() => {
@@ -31,34 +36,43 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     }, [initialData]);
 
     const handleOcrParsed = (text: string) => {
-        const newVotes = { ...votes };
-        const newExtra = { ...extra };
+        const previewVotes: Record<string, number> = {};
+        const previewExtra = { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 };
 
         INTENDENTE_CANDIDATES.forEach(candidate => {
-            // Extraer solo el número de lista (ej: "2 MHC" -> "2")
             const listNumber = candidate.list.split(' ')[0];
-            // Regex: Busca el número de lista, seguido de cualquier cosa (puntos, espacios), y captura el número al final de la línea
             const regex = new RegExp(`(?:^|\\s)${listNumber}\\b.*?(\\d+)\\s*$`, 'im');
             const match = text.match(regex);
             if (match && match[1]) {
-                newVotes[candidate.id] = parseInt(match[1], 10);
+                previewVotes[candidate.id] = parseInt(match[1], 10);
+            } else {
+                previewVotes[candidate.id] = 0;
             }
         });
 
         const nulosMatch = text.match(/NUL.*?(\d+)\s*$/im);
-        if (nulosMatch && nulosMatch[1]) newExtra.nulos = parseInt(nulosMatch[1], 10);
+        if (nulosMatch && nulosMatch[1]) previewExtra.nulos = parseInt(nulosMatch[1], 10);
 
         const blancosMatch = text.match(/BLC.*?(\d+)\s*$/im);
-        if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
+        if (blancosMatch && blancosMatch[1]) previewExtra.blancos = parseInt(blancosMatch[1], 10);
 
         const vacMatch = text.match(/VAC.*?(\d+)\s*$/im);
-        if (vacMatch && vacMatch[1]) newExtra.votos_computar = parseInt(vacMatch[1], 10);
+        if (vacMatch && vacMatch[1]) previewExtra.votos_computar = parseInt(vacMatch[1], 10);
 
         const totalMatch = text.match(/TOT.*?(\d+)\s*$/im);
-        if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
+        if (totalMatch && totalMatch[1]) previewExtra.total_general = parseInt(totalMatch[1], 10);
 
-        setVotes(newVotes);
-        setExtra(newExtra);
+        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setIsOcrDialogOpen(true);
+    };
+
+    const applyOcrData = () => {
+        if (ocrPreview) {
+            setVotes(prev => ({ ...prev, ...ocrPreview.votes }));
+            setExtra(prev => ({ ...prev, ...ocrPreview.extra }));
+            setOcrPreview(null);
+            setIsOcrDialogOpen(false);
+        }
     };
 
     const handleVoteChange = (candidateId: string, value: string) => {
@@ -157,6 +171,59 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                     {isSaving ? 'Guardando...' : 'Guardar Resultados Intendencia'}
                 </Button>
             </CardFooter>
+            <Dialog open={isOcrDialogOpen} onOpenChange={setIsOcrDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <CardTitle className="text-purple-600 flex items-center gap-2">
+                            <Wand2 className="w-5 h-5" />
+                            Confirmar Datos Extraídos
+                        </CardTitle>
+                        <DialogDescription>
+                            Revisa si los números coinciden con el acta física antes de aplicarlos al formulario.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 py-4">
+                        <div className="border rounded-lg overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="text-left p-2 border-b">Lista / Campo</th>
+                                        <th className="text-right p-2 border-b">Votos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {INTENDENTE_CANDIDATES.map(c => (
+                                        <tr key={c.id} className="border-b">
+                                            <td className="p-2 text-xs font-medium">{c.list} - {c.name}</td>
+                                            <td className="p-2 text-right font-bold text-blue-600">{ocrPreview?.votes[c.id] || 0}</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-slate-50">
+                                        <td className="p-2 text-xs font-bold italic">NULOS / BLANCOS / VAC</td>
+                                        <td className="p-2 text-right font-bold">
+                                            {ocrPreview?.extra.nulos} / {ocrPreview?.extra.blancos} / {ocrPreview?.extra.votos_computar}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-purple-100">
+                                        <td className="p-2 text-sm font-black">TOTAL CERTIFICADO</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general || 0}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
+                            Cancelar
+                        </Button>
+                        <Button onClick={applyOcrData} className="bg-purple-600 hover:bg-purple-700 flex-1">
+                            Aplicar al Formulario
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

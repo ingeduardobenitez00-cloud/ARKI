@@ -10,6 +10,8 @@ import { AlertCircle, Save, CheckCircle } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { ActaImageCapture } from './ActaImageCapture';
+import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Wand2 } from 'lucide-react';
 
 interface JuntaFormProps {
     mesa: number;
@@ -24,6 +26,10 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
 
+    // Preview OCR state
+    const [ocrPreview, setOcrPreview] = useState<{ votes: Record<string, Record<number, number>>, extra: any } | null>(null);
+    const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
+
     React.useEffect(() => {
         if (initialData) {
             if (initialData.votes) setVotes(initialData.votes);
@@ -32,8 +38,8 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     }, [initialData]);
 
     const handleOcrParsed = (text: string) => {
-        const newVotes = { ...votes };
-        const newExtra = { ...extra };
+        const previewVotes: Record<string, Record<number, number>> = {};
+        const previewExtra = { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 };
         const lines = text.split('\n');
 
         lines.forEach(line => {
@@ -41,16 +47,16 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             if (!trimmed) return;
 
             const nulosMatch = trimmed.match(/^NUL.*?(\d+)\s*$/i);
-            if (nulosMatch && nulosMatch[1]) newExtra.nulos = parseInt(nulosMatch[1], 10);
+            if (nulosMatch && nulosMatch[1]) previewExtra.nulos = parseInt(nulosMatch[1], 10);
 
             const blancosMatch = trimmed.match(/^BLC.*?(\d+)\s*$/i);
-            if (blancosMatch && blancosMatch[1]) newExtra.blancos = parseInt(blancosMatch[1], 10);
+            if (blancosMatch && blancosMatch[1]) previewExtra.blancos = parseInt(blancosMatch[1], 10);
 
             const vacMatch = trimmed.match(/^VAC.*?(\d+)\s*$/i);
-            if (vacMatch && vacMatch[1]) newExtra.votos_computar = parseInt(vacMatch[1], 10);
+            if (vacMatch && vacMatch[1]) previewExtra.votos_computar = parseInt(vacMatch[1], 10);
 
             const totalMatch = trimmed.match(/^TOT.*?(\d+)\s*$/i);
-            if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
+            if (totalMatch && totalMatch[1]) previewExtra.total_general = parseInt(totalMatch[1], 10);
 
             JUNTA_LISTS.forEach(list => {
                 const listRegex = new RegExp(`(?:^|\\s)${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
@@ -58,18 +64,14 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                 if (match && match[1]) {
                     const numbers = match[1].trim().split(/\s+/).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
                     if (numbers.length > 0) {
-                        if (!newVotes[list.id]) newVotes[list.id] = {};
-                        
-                        // Bloque 1: Opciones 1 a 16 (la línea suele tener más de 10 números)
+                        if (!previewVotes[list.id]) previewVotes[list.id] = {};
                         if (numbers.length > 10) {
                             for (let i = 0; i < Math.min(16, numbers.length); i++) {
-                                newVotes[list.id][i + 1] = numbers[i];
+                                previewVotes[list.id][i + 1] = numbers[i];
                             }
-                        } 
-                        // Bloque 2: Opciones 17 a 24 + TOT (suele tener 9 o menos números)
-                        else {
+                        } else {
                             for (let i = 0; i < Math.min(8, numbers.length); i++) {
-                                newVotes[list.id][17 + i] = numbers[i];
+                                previewVotes[list.id][17 + i] = numbers[i];
                             }
                         }
                     }
@@ -77,9 +79,23 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             });
         });
 
-        console.log("Datos Procesados de Junta:", { newVotes, newExtra });
-        setVotes(newVotes);
-        setExtra(newExtra);
+        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setIsOcrDialogOpen(true);
+    };
+
+    const applyOcrData = () => {
+        if (ocrPreview) {
+            setVotes(prev => {
+                const merged = { ...prev };
+                Object.keys(ocrPreview.votes).forEach(listId => {
+                    merged[listId] = { ...(merged[listId] || {}), ...ocrPreview.votes[listId] };
+                });
+                return merged;
+            });
+            setExtra(prev => ({ ...prev, ...ocrPreview.extra }));
+            setOcrPreview(null);
+            setIsOcrDialogOpen(false);
+        }
     };
 
     const handleVoteChange = (listId: string, option: number, value: string) => {
@@ -206,6 +222,67 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                     {isSaving ? 'Guardando...' : 'Finalizar Carga Junta Municipal'}
                 </Button>
             </CardFooter>
+            <Dialog open={isOcrDialogOpen} onOpenChange={setIsOcrDialogOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <CardTitle className="text-blue-600 flex items-center gap-2">
+                            <Wand2 className="w-5 h-5" />
+                            Confirmar Datos de Junta
+                        </CardTitle>
+                        <DialogDescription>
+                            Se han detectado datos para las siguientes listas.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-3 py-4">
+                        <div className="border rounded-lg overflow-hidden">
+                            <table className="w-full text-sm">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="text-left p-2 border-b">Lista</th>
+                                        <th className="text-right p-2 border-b">Total Votos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {JUNTA_LISTS.map(list => {
+                                        const votesObj = ocrPreview?.votes[list.id] || {};
+                                        const total = Object.values(votesObj).reduce((a, b) => a + b, 0);
+                                        if (total === 0) return null;
+                                        return (
+                                            <tr key={list.id} className="border-b">
+                                                <td className="p-2 text-xs font-medium">L{list.listNumber} - {list.name}</td>
+                                                <td className="p-2 text-right font-bold text-blue-600">{total}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    <tr className="bg-slate-50">
+                                        <td className="p-2 text-xs font-bold italic">NUL / BLC / VAC</td>
+                                        <td className="p-2 text-right font-bold">
+                                            {ocrPreview?.extra.nulos} / {ocrPreview?.extra.blancos} / {ocrPreview?.extra.votos_computar}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-blue-100">
+                                        <td className="p-2 text-sm font-black">TOTAL CERTIFICADO</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general || 0}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground italic text-center">
+                            * Los votos preferenciales individuales se aplicarán automáticamente a cada opción.
+                        </p>
+                    </div>
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
+                            Descartar
+                        </Button>
+                        <Button onClick={applyOcrData} className="bg-blue-600 hover:bg-blue-800 flex-1">
+                            Aplicar al Formulario
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     );
 }

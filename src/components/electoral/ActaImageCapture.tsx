@@ -66,8 +66,8 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
             
             toast({
                 title: "OCR Completado",
-                description: "Datos extraídos y aplicados al formulario.",
-                className: "bg-green-600 text-white border-none",
+                description: "Datos extraídos. Revisa el resumen en pantalla para confirmar.",
+                className: "bg-purple-600 text-white border-none",
             });
 
             await worker.terminate();
