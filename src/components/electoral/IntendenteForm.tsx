@@ -96,6 +96,8 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
 
         setOcrPreview({ votes: previewVotes, extra: previewExtra });
         setIsOcrDialogOpen(true);
+    };
+
     const handleQrParsed = (data: number[], rawHex: string) => {
         const L = data.length;
         
