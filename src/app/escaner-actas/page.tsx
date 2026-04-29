@@ -339,8 +339,6 @@ export default function EscanerActasPage() {
                             </Button>
                         </div>
                     )}
-                        </CardContent>
-                    </Card>
 
                     <Card className="h-[500px] flex flex-col">
                         <CardHeader className="bg-muted/50 border-b">
