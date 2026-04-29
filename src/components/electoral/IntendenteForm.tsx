@@ -39,28 +39,52 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         const previewVotes: Record<string, number> = {};
         const previewExtra = { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 };
 
+        // 1. Intentar por identificador exacto (Regex)
         INTENDENTE_CANDIDATES.forEach(candidate => {
             const listNumber = candidate.list.split(' ')[0];
             const regex = new RegExp(`(?:^|\\s)${listNumber}\\b.*?(\\d+)\\s*$`, 'im');
             const match = text.match(regex);
             if (match && match[1]) {
                 previewVotes[candidate.id] = parseInt(match[1], 10);
-            } else {
-                previewVotes[candidate.id] = 0;
             }
         });
 
-        const nulosMatch = text.match(/NUL.*?(\d+)\s*$/im);
+        // 2. Extraer campos fijos por palabra clave (más agresivo al final de línea)
+        const nulosMatch = text.match(/NUL.*?\D(\d+)\s*$/im) || text.match(/NUL.*?(\d+)/im);
         if (nulosMatch && nulosMatch[1]) previewExtra.nulos = parseInt(nulosMatch[1], 10);
-
-        const blancosMatch = text.match(/BLC.*?(\d+)\s*$/im);
+        
+        const blancosMatch = text.match(/BLC.*?\D(\d+)\s*$/im) || text.match(/BLC.*?(\d+)/im);
         if (blancosMatch && blancosMatch[1]) previewExtra.blancos = parseInt(blancosMatch[1], 10);
-
-        const vacMatch = text.match(/VAC.*?(\d+)\s*$/im);
+        
+        const vacMatch = text.match(/VAC.*?\D(\d+)\s*$/im) || text.match(/VAC.*?(\d+)/im);
         if (vacMatch && vacMatch[1]) previewExtra.votos_computar = parseInt(vacMatch[1], 10);
-
-        const totalMatch = text.match(/TOT.*?(\d+)\s*$/im);
+        
+        const totalMatch = text.match(/TOT.*?\D(\d+)\s*$/im) || text.match(/TOT.*?(\d+)/im);
         if (totalMatch && totalMatch[1]) previewExtra.total_general = parseInt(totalMatch[1], 10);
+
+        // 3. FALLBACK POR ORDEN (Heurística Posicional)
+        // Si no captó nada o hay muchos ceros, intentamos por orden de filas
+        const lines = text.split('\n').map(l => l.trim()).filter(l => /\d+/.test(l));
+        
+        // Si tenemos al menos 7 líneas con números, mapeamos por posición
+        if (lines.length >= 7) {
+            // Fila 0 -> Lista 2
+            if (!previewVotes[INTENDENTE_CANDIDATES[0].id]) 
+                previewVotes[INTENDENTE_CANDIDATES[0].id] = parseInt(lines[0].match(/(\d+)\s*$/)?.[1] || "0");
+            // Fila 1 -> Lista 7
+            if (!previewVotes[INTENDENTE_CANDIDATES[1].id]) 
+                previewVotes[INTENDENTE_CANDIDATES[1].id] = parseInt(lines[1].match(/(\d+)\s*$/)?.[1] || "0");
+            // Fila 2 -> Lista 300
+            if (!previewVotes[INTENDENTE_CANDIDATES[2].id]) 
+                previewVotes[INTENDENTE_CANDIDATES[2].id] = parseInt(lines[2].match(/(\d+)\s*$/)?.[1] || "0");
+
+            // Mapear pie de acta por posición inversa
+            const offset = lines.length - 4;
+            if (previewExtra.nulos === 0) previewExtra.nulos = parseInt(lines[offset].match(/(\d+)\s*$/)?.[1] || "0");
+            if (previewExtra.blancos === 0) previewExtra.blancos = parseInt(lines[offset+1].match(/(\d+)\s*$/)?.[1] || "0");
+            if (previewExtra.votos_computar === 0) previewExtra.votos_computar = parseInt(lines[offset+2].match(/(\d+)\s*$/)?.[1] || "0");
+            if (previewExtra.total_general === 0) previewExtra.total_general = parseInt(lines[offset+3].match(/(\d+)\s*$/)?.[1] || "0");
+        }
 
         setOcrPreview({ votes: previewVotes, extra: previewExtra });
         setIsOcrDialogOpen(true);

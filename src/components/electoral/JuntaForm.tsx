@@ -46,18 +46,17 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             const trimmed = line.trim();
             if (!trimmed) return;
 
-            const nulosMatch = trimmed.match(/^NUL.*?(\d+)\s*$/i);
+            // 1. Identificar campos fijos (NUL, BLC, VAC, TOT) - Más agresivo
+            const nulosMatch = trimmed.match(/NUL.*?\D(\d+)/i);
             if (nulosMatch && nulosMatch[1]) previewExtra.nulos = parseInt(nulosMatch[1], 10);
-
-            const blancosMatch = trimmed.match(/^BLC.*?(\d+)\s*$/i);
+            const blancosMatch = trimmed.match(/BLC.*?\D(\d+)/i);
             if (blancosMatch && blancosMatch[1]) previewExtra.blancos = parseInt(blancosMatch[1], 10);
-
-            const vacMatch = trimmed.match(/^VAC.*?(\d+)\s*$/i);
+            const vacMatch = trimmed.match(/VAC.*?\D(\d+)/i);
             if (vacMatch && vacMatch[1]) previewExtra.votos_computar = parseInt(vacMatch[1], 10);
-
-            const totalMatch = trimmed.match(/^TOT.*?(\d+)\s*$/i);
+            const totalMatch = trimmed.match(/TOT.*?\D(\d+)/i);
             if (totalMatch && totalMatch[1]) previewExtra.total_general = parseInt(totalMatch[1], 10);
 
+            // 2. Identificar por número de lista explícito (ej: "2C ...")
             JUNTA_LISTS.forEach(list => {
                 const listRegex = new RegExp(`(?:^|\\s)${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
                 const match = trimmed.match(listRegex);
@@ -78,6 +77,34 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                 }
             });
         });
+
+        // 3. FALLBACK POR ORDEN (Si las listas no fueron identificadas por nombre)
+        const candidateLines = lines.filter(l => (l.match(/\d+/g) || []).length > 5);
+        if (candidateLines.length >= 5) {
+            JUNTA_LISTS.forEach((list, index) => {
+                // Si la lista aún no tiene votos, tomamos la línea correspondiente por índice
+                if (!previewVotes[list.id] && candidateLines[index]) {
+                    const numbers = candidateLines[index].match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
+                    if (numbers.length > 0) {
+                        previewVotes[list.id] = {};
+                        // Distribuir números correlativamente (1 al 24)
+                        for (let i = 0; i < Math.min(24, numbers.length); i++) {
+                            previewVotes[list.id][i + 1] = numbers[i];
+                        }
+                    }
+                }
+            });
+        }
+
+        // 4. Fallback para campos fijos por posición (últimas 4 líneas con 1 solo número)
+        const footerLines = lines.filter(l => (l.match(/\d+/g) || []).length === 1);
+        if (footerLines.length >= 4) {
+            const offset = footerLines.length - 4;
+            if (previewExtra.nulos === 0) previewExtra.nulos = parseInt(footerLines[offset].match(/\d+/)?.[0] || "0");
+            if (previewExtra.blancos === 0) previewExtra.blancos = parseInt(footerLines[offset+1].match(/\d+/)?.[0] || "0");
+            if (previewExtra.votos_computar === 0) previewExtra.votos_computar = parseInt(footerLines[offset+2].match(/\d+/)?.[0] || "0");
+            if (previewExtra.total_general === 0) previewExtra.total_general = parseInt(footerLines[offset+3].match(/\d+/)?.[0] || "0");
+        }
 
         setOcrPreview({ votes: previewVotes, extra: previewExtra });
         setIsOcrDialogOpen(true);
