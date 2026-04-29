@@ -112,6 +112,9 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+                <div className="w-full pb-6 border-b-2 border-dashed">
+                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
+                </div>
                 <Tabs defaultValue={JUNTA_LISTS[0].id} className="w-full">
                     <TabsList className="grid grid-cols-5 w-full h-auto p-1 bg-muted">
                         {JUNTA_LISTS.map(list => {
@@ -186,10 +189,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                     </div>
                 )}
             </CardContent>
-            <CardFooter className="flex-col w-full gap-4">
-                <div className="w-full">
-                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
-                </div>
+            <CardFooter className="flex-col w-full gap-4 pt-6">
                 <Button 
                     className="w-full h-12 text-lg font-bold bg-blue-700 hover:bg-blue-800" 
                     disabled={!isTotalValid || !imageFile || isSaving}

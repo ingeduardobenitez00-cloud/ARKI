@@ -79,6 +79,10 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
+                <div className="w-full pb-6 border-b-2 border-dashed">
+                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     {INTENDENTE_CANDIDATES.map(candidate => (
                         <CandidateCard 
@@ -129,10 +133,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                     </div>
                 )}
             </CardContent>
-            <CardFooter className="flex-col w-full gap-4">
-                <div className="w-full">
-                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
-                </div>
+            <CardFooter className="flex-col w-full gap-4 pt-6">
                 <Button 
                     className="w-full h-12 text-lg font-bold" 
                     disabled={!isTotalValid || !imageFile || isSaving}
