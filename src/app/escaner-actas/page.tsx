@@ -101,7 +101,9 @@ export default function EscanerActasPage() {
     // MSA Binary QR Parser (provisional - updated with REC heuristic)
     const parseMSABinaryQR = (hexStr: string): any | null => {
         try {
-            const bytes = new Uint8Array(hexStr.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+            // Clean prefix "REC " if present
+            const cleanHex = hexStr.startsWith('REC ') ? hexStr.slice(4) : hexStr;
+            const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
             
             // Find zlib magic bytes 0x78 0x9C
             let zlibPos = -1;
