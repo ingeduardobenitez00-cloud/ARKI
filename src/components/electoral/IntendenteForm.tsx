@@ -102,6 +102,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         <span>La suma ({calculatedTotal}) no coincide con el Total General ({extra.total_general})</span>
                     </div>
                 )}
+            </CardContent>
             <CardFooter className="flex-col w-full gap-4">
                 <div className="w-full">
                     <ActaImageCapture onImageCaptured={setImageFile} />
