@@ -53,7 +53,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             if (totalMatch && totalMatch[1]) newExtra.total_general = parseInt(totalMatch[1], 10);
 
             JUNTA_LISTS.forEach(list => {
-                const listRegex = new RegExp(`^${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
+                const listRegex = new RegExp(`(?:^|\\s)${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
                 const match = trimmed.match(listRegex);
                 if (match && match[1]) {
                     const numbers = match[1].trim().split(/\s+/).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
@@ -77,6 +77,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             });
         });
 
+        console.log("Datos Procesados de Junta:", { newVotes, newExtra });
         setVotes(newVotes);
         setExtra(newExtra);
     };

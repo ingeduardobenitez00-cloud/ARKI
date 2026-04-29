@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import Tesseract from 'tesseract.js';
-import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2 } from 'lucide-react';
+import Tesseract, { createWorker } from 'tesseract.js';
+import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/hooks/use-toast';
 
 interface ActaImageCaptureProps {
     onImageCaptured: (file: File | null) => void;
@@ -10,6 +11,7 @@ interface ActaImageCaptureProps {
 }
 
 export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCaptureProps) {
+    const { toast } = useToast();
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -39,20 +41,46 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
         if (!previewUrl || !onOcrParsed) return;
         setIsOcrProcessing(true);
         setOcrProgress(0);
+        
+        let worker: any = null;
         try {
-            const { data: { text } } = await Tesseract.recognize(
-                previewUrl,
-                'spa',
-                { logger: m => {
+            console.log("Iniciando Worker de Tesseract...");
+            worker = await createWorker('spa', 1, {
+                logger: m => {
+                    console.log("Tesseract Progress:", m);
                     if (m.status === 'recognizing text') {
                         setOcrProgress(Math.round(m.progress * 100));
                     }
-                }}
-            );
+                }
+            });
+
+            console.log("Iniciando Reconocimiento...");
+            const { data: { text } } = await worker.recognize(previewUrl);
+            
+            if (!text || text.trim().length === 0) {
+                throw new Error("No se pudo extraer texto de la imagen");
+            }
+
             console.log("Resultados Crudos OCR:\n", text);
             onOcrParsed(text);
-        } catch (error) {
-            console.error("Error ejecutando OCR", error);
+            
+            toast({
+                title: "OCR Completado",
+                description: "Datos extraídos y aplicados al formulario.",
+                className: "bg-green-600 text-white border-none",
+            });
+
+            await worker.terminate();
+        } catch (error: any) {
+            console.error("Error detallado OCR:", error);
+            toast({
+                title: "Error en OCR",
+                description: `Error: ${error.message || "Desconocido"}. Revisa la conexión o intenta de nuevo.`,
+                variant: "destructive",
+            });
+            if (worker) {
+                try { await worker.terminate(); } catch(e) {}
+            }
         } finally {
             setIsOcrProcessing(false);
         }
