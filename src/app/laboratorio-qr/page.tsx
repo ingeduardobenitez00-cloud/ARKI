@@ -5,7 +5,6 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import * as fflate from 'fflate';
 import { Wand2, Database, Camera, Code, AlertCircle } from 'lucide-react';
 import { INTENDENTE_CANDIDATES } from '@/data/electoral-metadata';
@@ -18,21 +17,30 @@ export default function QRLaboratoryPage() {
     const [mode, setMode] = useState<'INT' | 'JUN'>('INT');
     
     useEffect(() => {
-        const scanner = new Html5QrcodeScanner('reader', { 
-            fps: 10, 
-            qrbox: { width: 250, height: 250 } 
-        }, false);
+        let scanner: any = null;
+        
+        const initScanner = async () => {
+            const { Html5QrcodeScanner } = await import('html5-qrcode');
+            scanner = new Html5QrcodeScanner('reader', { 
+                fps: 10, 
+                qrbox: { width: 250, height: 250 } 
+            }, false);
 
-        scanner.render(
-            (result) => {
-                setScanResult(result);
-                processHex(result);
-            },
-            (err) => { /* Silenciar errores */ }
-        );
+            scanner.render(
+                (result: string) => {
+                    setScanResult(result);
+                    processHex(result);
+                },
+                (err: any) => { /* ignore */ }
+            );
+        };
+
+        initScanner();
 
         return () => {
-            scanner.clear().catch(console.error);
+            if (scanner) {
+                scanner.clear().catch(console.error);
+            }
         };
     }, []);
 

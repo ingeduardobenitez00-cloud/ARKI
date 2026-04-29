@@ -3,7 +3,8 @@ import Tesseract, { createWorker } from 'tesseract.js';
 import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2, AlertTriangle, QrCode, X } from 'lucide-react';
 import * as fflate from 'fflate';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Html5QrcodeScanner } from 'html5-qrcode';
+// Eliminamos el import estático para evitar error de SSR
+// import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -43,8 +44,12 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
         if (galleryInputRef.current) galleryInputRef.current.value = '';
     };
 
-    const handleStartQrScanner = () => {
+    const handleStartQrScanner = async () => {
         setIsQrScannerOpen(true);
+        
+        // Importación dinámica para evitar errores de SSR
+        const { Html5QrcodeScanner } = await import('html5-qrcode');
+        
         setTimeout(() => {
             if (!scannerRef.current) {
                 const scanner = new Html5QrcodeScanner('qr-reader', { 
