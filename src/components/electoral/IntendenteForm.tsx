@@ -24,7 +24,12 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     const [imageFile, setImageFile] = useState<File | null>(null);
     
     // Preview OCR state
-    const [ocrPreview, setOcrPreview] = useState<{ votes: Record<string, number>, extra: any } | null>(null);
+    const [ocrPreview, setOcrPreview] = useState<{ 
+        votes: Record<string, number>, 
+        extra: any,
+        isQr?: boolean,
+        rawData?: number[]
+    } | null>(null);
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
 
     // Handle incoming QR data asynchronously
@@ -105,7 +110,12 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             total_general: data[data.length - 1] || 0
         };
 
-        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setOcrPreview({ 
+            votes: previewVotes, 
+            extra: previewExtra,
+            isQr: true,
+            rawData: data 
+        });
         setIsOcrDialogOpen(true);
     };
 
@@ -259,6 +269,27 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                 </tbody>
                             </table>
                         </div>
+
+                        {/* NUEVO: Visualización de Bytes Crudos del QR */}
+                        {ocrPreview?.isQr && ocrPreview?.rawData && (
+                            <div className="mt-4 border-t pt-4">
+                                <h4 className="text-[10px] font-black uppercase text-purple-600 mb-2 flex items-center gap-2">
+                                    <Database className="w-3 h-3" />
+                                    Estructura de Bytes Digitales (QR)
+                                </h4>
+                                <div className="bg-slate-950 p-2 rounded text-[9px] font-mono text-green-400 grid grid-cols-6 gap-x-2 gap-y-1 max-h-32 overflow-y-auto border border-green-900/30">
+                                    {ocrPreview.rawData.map((val, idx) => (
+                                        <div key={idx} className={`flex justify-between border-b border-green-900/10 ${val > 0 ? 'bg-green-900/20 text-white px-1' : 'opacity-40'}`}>
+                                            <span className="text-slate-500">[{idx}]</span>
+                                            <span>{val}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[9px] text-slate-500 mt-2 italic">
+                                    * Se muestran todos los bytes decifrados. Los valores resaltados tienen votos.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0">

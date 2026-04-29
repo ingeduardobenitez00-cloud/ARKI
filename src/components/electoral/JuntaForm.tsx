@@ -27,7 +27,12 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const [imageFile, setImageFile] = useState<File | null>(null);
 
     // Preview OCR state
-    const [ocrPreview, setOcrPreview] = useState<{ votes: Record<string, Record<number, number>>, extra: any } | null>(null);
+    const [ocrPreview, setOcrPreview] = useState<{ 
+        votes: Record<string, Record<number, number>>, 
+        extra: any,
+        isQr?: boolean,
+        rawData?: number[]
+    } | null>(null);
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
     const [activeListId, setActiveListId] = useState(JUNTA_LISTS[0].id);
 
@@ -130,7 +135,12 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
             total_general: data[data.length - 1] || 0
         };
 
-        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setOcrPreview({ 
+            votes: previewVotes, 
+            extra: previewExtra,
+            isQr: true,
+            rawData: data 
+        });
         setIsOcrDialogOpen(true);
     };
 
@@ -325,6 +335,27 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         <p className="text-[10px] text-muted-foreground italic text-center">
                             * Los votos preferenciales individuales se aplicarán automáticamente a cada opción.
                         </p>
+
+                        {/* NUEVO: Visualización de Bytes Crudos del QR */}
+                        {ocrPreview?.isQr && ocrPreview?.rawData && (
+                            <div className="mt-4 border-t pt-4">
+                                <h4 className="text-[10px] font-black uppercase text-blue-600 mb-2 flex items-center gap-2">
+                                    <Database className="w-3 h-3" />
+                                    Estructura de Bytes Digitales (QR)
+                                </h4>
+                                <div className="bg-slate-950 p-2 rounded text-[9px] font-mono text-green-400 grid grid-cols-6 gap-x-2 gap-y-1 max-h-48 overflow-y-auto border border-green-900/30">
+                                    {ocrPreview.rawData.map((val, idx) => (
+                                        <div key={idx} className={`flex justify-between border-b border-green-900/10 ${val > 0 ? 'bg-green-900/20 text-white px-1 font-bold' : 'opacity-30'}`}>
+                                            <span className="text-slate-500">[{idx}]</span>
+                                            <span>{val}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                                <p className="text-[9px] text-slate-500 mt-2 italic">
+                                    * Se muestran los 500+ bytes decifrados. Los valores en blanco son votos.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0">
