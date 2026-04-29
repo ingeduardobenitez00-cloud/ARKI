@@ -1,6 +1,9 @@
 import React, { useRef, useState } from 'react';
 import Tesseract, { createWorker } from 'tesseract.js';
-import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2, AlertTriangle } from 'lucide-react';
+import { Camera, Image as ImageIcon, Trash2, CheckCircle2, Wand2, Loader2, AlertTriangle, QrCode, X } from 'lucide-react';
+import * as fflate from 'fflate';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Html5QrcodeScanner } from 'html5-qrcode';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -8,15 +11,18 @@ import { useToast } from '@/hooks/use-toast';
 interface ActaImageCaptureProps {
     onImageCaptured: (file: File | null) => void;
     onOcrParsed?: (text: string) => void;
+    onQrParsed?: (data: number[]) => void;
 }
 
-export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCaptureProps) {
+export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: ActaImageCaptureProps) {
     const { toast } = useToast();
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
+    const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
+    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -37,6 +43,63 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
         if (galleryInputRef.current) galleryInputRef.current.value = '';
     };
 
+    const handleStartQrScanner = () => {
+        setIsQrScannerOpen(true);
+        setTimeout(() => {
+            if (!scannerRef.current) {
+                const scanner = new Html5QrcodeScanner('qr-reader', { 
+                    fps: 10, 
+                    qrbox: { width: 250, height: 250 } 
+                }, false);
+                scannerRef.current = scanner;
+
+                scanner.render(
+                    (result) => {
+                        console.log("QR Scanned:", result);
+                        decodeAndProcessQr(result);
+                        stopQrScanner();
+                    },
+                    (err) => { /* ignore */ }
+                );
+            }
+        }, 300);
+    };
+
+    const stopQrScanner = () => {
+        if (scannerRef.current) {
+            scannerRef.current.clear().catch(console.error);
+            scannerRef.current = null;
+        }
+        setIsQrScannerOpen(false);
+    };
+
+    const decodeAndProcessQr = (hex: string) => {
+        try {
+            const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
+            if (cleanHex.length < 30) throw new Error("Formato inválido");
+            
+            const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+            const compressedData = bytes.slice(15);
+            const decompressed = fflate.unzlibSync(compressedData);
+            const dataArray = Array.from(decompressed);
+            
+            if (onQrParsed) {
+                onQrParsed(dataArray);
+                toast({
+                    title: "QR Decifrado",
+                    description: "Datos digitales extraídos con éxito.",
+                    className: "bg-green-600 text-white",
+                });
+            }
+        } catch (e) {
+            toast({
+                title: "Error QR",
+                description: "No se pudo decifrar el código QR de MSA.",
+                variant: "destructive",
+            });
+        }
+    };
+
     const handleRunOcr = async () => {
         if (!previewUrl || !onOcrParsed) return;
         setIsOcrProcessing(true);
@@ -44,18 +107,42 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
         
         let worker: any = null;
         try {
-            console.log("Iniciando Worker de Tesseract...");
+            // --- PRE-PROCESAMIENTO DE IMAGEN ---
+            // Creamos un canvas para mejorar el contraste y convertir a escala de grises
+            const img = new Image();
+            img.src = previewUrl;
+            await new Promise((resolve) => (img.onload = resolve));
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            canvas.width = img.width;
+            canvas.height = img.height;
+
+            if (ctx) {
+                // Aplicar filtros de imagen para OCR
+                ctx.filter = 'grayscale(1) contrast(2) brightness(1.1)';
+                ctx.drawImage(img, 0, 0);
+            }
+            const processedImageData = canvas.toDataURL('image/jpeg', 0.9);
+
+            console.log("Iniciando Worker de Tesseract (Optimizado)...");
             worker = await createWorker('spa', 1, {
                 logger: m => {
-                    console.log("Tesseract Progress:", m);
                     if (m.status === 'recognizing text') {
                         setOcrProgress(Math.round(m.progress * 100));
                     }
                 }
             });
 
-            console.log("Iniciando Reconocimiento...");
-            const { data: { text } } = await worker.recognize(previewUrl);
+            // Configurar parámetros para mejorar precisión numérica
+            await worker.setParameters({
+                tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ. ', // Solo números y letras mayúsculas
+                tessjs_create_hocr: '0',
+                tessjs_create_tsv: '0',
+            });
+
+            console.log("Iniciando Reconocimiento con Filtros...");
+            const { data: { text } } = await worker.recognize(processedImageData);
             
             if (!text || text.trim().length === 0) {
                 throw new Error("No se pudo extraer texto de la imagen");
@@ -132,8 +219,30 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed }: ActaImageCapt
                                 className="border-blue-700 text-blue-700 hover:bg-blue-50 font-bold flex-1"
                             >
                                 <ImageIcon className="w-4 h-4 mr-2" />
-                                Galería
+                                Galerías
                             </Button>
+                            <Button 
+                                type="button"
+                                onClick={handleStartQrScanner}
+                                className="bg-purple-600 hover:bg-purple-700 text-white font-bold flex-1"
+                            >
+                                <QrCode className="w-4 h-4 mr-2" />
+                                Escáner QR
+                            </Button>
+                        </div>
+
+                        {/* Recomendaciones para el usuario */}
+                        <div className="w-full max-w-sm mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-left">
+                            <h5 className="text-[10px] font-black uppercase text-amber-800 flex items-center gap-1 mb-1">
+                                <AlertTriangle className="w-3 h-3" />
+                                Tips para el "Botón Mágico"
+                            </h5>
+                            <ul className="text-[10px] text-amber-700 space-y-1 list-disc pl-3 leading-tight">
+                                <li><b>Evita sombras:</b> Asegúrate que tu cuerpo o celular no tapen la luz.</li>
+                                <li><b>Foto Plana:</b> Toma la foto totalmente desde arriba (no inclinada).</li>
+                                <li><b>Sin Arrugas:</b> Estira bien el acta sobre la mesa.</li>
+                                <li><b>Foco:</b> Si los números se ven borrosos, la IA no podrá leerlos.</li>
+                            </ul>
                         </div>
                     </div>
                 ) : (

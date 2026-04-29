@@ -110,6 +110,29 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
         setIsOcrDialogOpen(true);
     };
 
+    const handleQrParsed = (data: number[]) => {
+        const previewVotes: Record<string, Record<number, number>> = {};
+        // Bloques de 24 para cada lista
+        JUNTA_LISTS.forEach((list, listIndex) => {
+            previewVotes[list.id] = {};
+            const offset = listIndex * 24;
+            for (let i = 0; i < 24; i++) {
+                previewVotes[list.id][i + 1] = data[offset + i] || 0;
+            }
+        });
+
+        // Footer (últimas 4 posiciones)
+        const previewExtra = {
+            nulos: data[data.length - 4] || 0,
+            blancos: data[data.length - 3] || 0,
+            votos_computar: data[data.length - 2] || 0,
+            total_general: data[data.length - 1] || 0
+        };
+
+        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setIsOcrDialogOpen(true);
+    };
+
     const applyOcrData = () => {
         if (ocrPreview) {
             setVotes(prev => {
@@ -159,10 +182,13 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="w-full pb-6 border-b-2 border-dashed">
-                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
-                </div>
-                <Tabs defaultValue={JUNTA_LISTS[0].id} className="w-full">
+                <ActaImageCapture 
+                    onImageCaptured={setImageFile} 
+                    onOcrParsed={handleOcrParsed}
+                    onQrParsed={handleQrParsed}
+                />
+                
+                <Tabs defaultValue={activeListId} onValueChange={setActiveListId} className="w-full">
                     <TabsList className="grid grid-cols-5 w-full h-auto p-1 bg-muted">
                         {JUNTA_LISTS.map(list => {
                             const listTotal = getListTotal(list.id);

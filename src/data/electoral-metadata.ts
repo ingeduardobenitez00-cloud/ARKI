@@ -8,17 +8,17 @@ export interface Candidate {
 }
 
 export const INTENDENTE_CANDIDATES: Candidate[] = [
-  { id: 'camilo-perez', name: 'Camilo Perez', list: '2 MHC', photo: '/candidates/intendente/camilo-perez.jpg', type: 'Intendente' },
-  { id: 'arnaldo-samaniego', name: 'Arnaldo Samaniego', list: '7 MFCRA', photo: '/candidates/intendente/arnaldo-samaniego.jpg', type: 'Intendente' },
-  { id: 'danilo-gomez', name: 'Danilo Gomez', list: '300 MUE', photo: '/candidates/intendente/danilo-gomez.jpg', type: 'Intendente' },
+  { id: 'lista-2', name: '2', list: '2', photo: '/candidates/intendente/camilo-perez.jpg', type: 'Intendente' },
+  { id: 'lista-7', name: '7', list: '7', photo: '/candidates/intendente/arnaldo-samaniego.jpg', type: 'Intendente' },
+  { id: 'lista-300', name: '300', list: '300', photo: '/candidates/intendente/danilo-gomez.jpg', type: 'Intendente' },
 ];
 
 export const JUNTA_LISTS = [
-    { id: 'lista-2c', name: 'HONOR COLORADO C', listNumber: '2C' },
-    { id: 'lista-2p', name: 'HONOR COLORADO P', listNumber: '2P' },
-    { id: 'lista-6', name: 'COLORADO AÑETETE', listNumber: '6' },
-    { id: 'lista-7', name: 'FUERZA Y CAUSA', listNumber: '7' },
-    { id: 'lista-20', name: 'ORDEN REPUBLICANO', listNumber: '20' },
+    { id: 'lista-2c', name: '2C', listNumber: '2C' },
+    { id: 'lista-2p', name: '2P', listNumber: '2P' },
+    { id: 'lista-6', name: '6', listNumber: '6' },
+    { id: 'lista-7', name: '7', listNumber: '7' },
+    { id: 'lista-20', name: '20', listNumber: '20' },
 ];
 
 // Real names mapping for Junta Municipal

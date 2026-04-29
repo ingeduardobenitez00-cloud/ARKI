@@ -90,6 +90,25 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         setIsOcrDialogOpen(true);
     };
 
+    const handleQrParsed = (data: number[]) => {
+        const previewVotes: Record<string, number> = {};
+        // Mapeo directo por posición
+        INTENDENTE_CANDIDATES.forEach((candidate, index) => {
+            previewVotes[candidate.id] = data[index] || 0;
+        });
+
+        // Footer (últimas 4 posiciones)
+        const previewExtra = {
+            nulos: data[data.length - 4] || 0,
+            blancos: data[data.length - 3] || 0,
+            votos_computar: data[data.length - 2] || 0,
+            total_general: data[data.length - 1] || 0
+        };
+
+        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setIsOcrDialogOpen(true);
+    };
+
     const applyOcrData = () => {
         if (ocrPreview) {
             setVotes(prev => ({ ...prev, ...ocrPreview.votes }));
@@ -122,11 +141,15 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                 </CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-                <div className="w-full pb-6 border-b-2 border-dashed">
-                    <ActaImageCapture onImageCaptured={setImageFile} onOcrParsed={handleOcrParsed} />
+                <div className="space-y-4">
+                    <ActaImageCapture 
+                        onImageCaptured={setImageFile} 
+                        onOcrParsed={handleOcrParsed}
+                        onQrParsed={handleQrParsed}
+                    />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {INTENDENTE_CANDIDATES.map(candidate => (
                         <CandidateCard 
                             key={candidate.id}
