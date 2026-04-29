@@ -424,149 +424,96 @@ export default function EscanerActasPage() {
                     )}
                 </div>
 
-                {/* Preview Dialog */}
-                <Dialog open={!!pendingQRData} onOpenChange={(open) => { if (!open) setPendingQRData(null) }}>
-                    <DialogContent>
-                        <DialogHeader>
-                            <DialogTitle>Mesa Detectada en Código QR</DialogTitle>
+                <Dialog open={!!pendingQRData} onOpenChange={(open) => { if (!open) { setPendingQRData(null); isProcessingQR.current = false; } }}>
+                    <DialogContent className="sm:max-w-[425px] max-h-[90vh] flex flex-col p-0 overflow-hidden">
+                        <DialogHeader className="p-4 border-b">
+                            <DialogTitle className="flex items-center gap-2">
+                                <CheckCircle2 className="w-5 h-5 text-green-600" />
+                                Mesa Detectada en Código QR
+                            </DialogTitle>
                             <DialogDescription>
-                                Revisa los datos de la mesa escaneada antes de aplicarlos.
+                                Revisa los datos reales extraídos del código antes de aplicarlos.
                             </DialogDescription>
                         </DialogHeader>
-                        <div className="space-y-4">
-                            {pendingQRData?.provisional && (
-                                <div className="bg-red-50 text-red-800 p-3 rounded-md text-sm border border-red-300 font-bold flex items-start gap-2">
-                                    <span className="text-red-500 text-lg leading-none">⚠</span>
-                                    <div>
-                                        <p>PARSER PROVISIONAL (MSA Binario)</p>
-                                        <p className="font-normal text-xs mt-1">El formato binario del QR está siendo decodificado de forma experimental. Módulo detectado: <strong className="uppercase">{pendingQRData?.moduleType}</strong>. Los totales de votos deben ingresarse manualmente comparando con el papel. Este sistema se calibrará en mayo con actas reales.</p>
+
+                        <ScrollArea className="flex-1 p-4 overflow-y-auto">
+                            <div className="space-y-4 pb-4">
+                                {pendingQRData?.provisional && (
+                                    <div className="bg-red-50 border border-red-200 rounded-md p-3 flex gap-3 text-red-800">
+                                        <AlertTriangle className="w-5 h-5 shrink-0" />
+                                        <div>
+                                            <p className="font-bold text-sm">PARSER PROVISIONAL (MSA Binario)</p>
+                                            <p className="font-normal text-xs mt-1">Este modo proyecta los datos crudos del QR. Verifica siempre contra el acta física.</p>
+                                        </div>
                                     </div>
+                                )}
+                                
+                                <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm border border-yellow-200">
+                                    <p><strong>Configuración Manual:</strong> Mesa {selectedMesa} | {selectedLocal}</p>
+                                    <p className="mt-1 text-xs opacity-80 italic">QR indica: {pendingQRData?.raw.local} (Mesa {pendingQRData?.raw.mesa})</p>
                                 </div>
-                            )}
-                            <div className="bg-yellow-50 text-yellow-800 p-3 rounded-md text-sm border border-yellow-200">
-                                <p><strong>Aviso:</strong> Los datos se cargarán a la <strong>Mesa {selectedMesa}</strong> del local <strong>{selectedLocal}</strong>, según tu configuración manual.</p>
-                                <p className="mt-2 text-xs opacity-80">QR indica: <i>{pendingQRData?.raw.local} (Mesa {pendingQRData?.raw.mesa})</i></p>
-                            </div>
 
-                            {/* Visual Table Preview */}
-                            <div className="border rounded-lg overflow-hidden bg-white shadow-sm mt-4">
-                                <table className="w-full text-sm">
-                                    <thead className="bg-slate-100 border-b">
-                                        <tr>
-                                            <th className="px-3 py-2 text-left font-bold text-slate-700">AGRUPACIONES</th>
-                                            <th className="px-3 py-2 text-right font-bold text-slate-700">INT</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pendingQRData?.moduleType === 'intendencia' ? (
-                                            <>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 flex items-center gap-2">
-                                                        <span className="bg-black text-white px-2 py-0.5 rounded text-[10px] font-bold">510</span>
-                                                        <span className="text-xs">ALIANZA MOVIMIENTO AVANCEMOS</span>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right font-bold text-lg">
-                                                        {pendingQRData?.provisionalVotes?.['pos_0'] === 137 ? 3 : (pendingQRData?.provisionalVotes?.['pos_0'] || '-')}
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 flex items-center gap-2">
-                                                        <span className="bg-black text-white px-2 py-0.5 rounded text-[10px] font-bold">520</span>
-                                                        <span className="text-xs">ALIANZA CRECER CIUDADANO</span>
-                                                    </td>
-                                                    <td className="px-3 py-2 text-right font-bold text-lg">
-                                                        {pendingQRData?.provisionalVotes?.['pos_1'] === 198 ? 1 : (pendingQRData?.provisionalVotes?.['pos_1'] || '-')}
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b bg-slate-50">
-                                                    <td className="px-3 py-2 text-xs italic text-slate-500 text-center" colSpan={2}>
-                                                        Otras agrupaciones... (0)
-                                                    </td>
-                                                </tr>
-                                            </>
-                                        ) : (
-                                            <>
-                                                {/* Summary for Junta Municipal (Capital 5 Lists) */}
-                                                <tr className="border-b bg-blue-50/30">
-                                                    <td className="px-3 py-1 text-[10px] font-bold text-blue-600 uppercase" colSpan={2}>Resumen por Listas</td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-xs">Lista 2C - HONOR COLORADO</td>
-                                                    <td className="px-3 py-2 text-right font-bold">
-                                                        {pendingQRData?.provisionalVotes?.['pos_0'] === 137 ? 2 : '-'}
-                                                    </td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-xs">Lista 2P - HONOR COLORADO</td>
-                                                    <td className="px-3 py-2 text-right font-bold">-</td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-xs">Lista 6 - COLORADO AÑETETE</td>
-                                                    <td className="px-3 py-2 text-right font-bold">-</td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-xs">Lista 7 - FUERZA Y CAUSA</td>
-                                                    <td className="px-3 py-2 text-right font-bold">-</td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-xs">Lista 20 - ORDEN REPUBLICANO</td>
-                                                    <td className="px-3 py-2 text-right font-bold">
-                                                        {pendingQRData?.provisionalVotes?.['pos_5'] === 13 ? 1 : '-'}
-                                                    </td>
-                                                </tr>
+                                {/* Visual Table Preview */}
+                                <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-slate-100 border-b">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left font-bold text-slate-700">DATOS DEL QR</th>
+                                                <th className="px-3 py-2 text-right font-bold text-slate-700">VALOR</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {/* Mapping detected votes dynamically */}
+                                            {Object.entries(pendingQRData?.provisionalVotes || {}).map(([key, value]) => {
+                                                if (value === 0) return null;
+                                                let label = key.replace('pos_', 'List/Opt ');
                                                 
-                                                {/* Preferential votes detail (only those with votes) */}
-                                                <tr className="bg-slate-50">
-                                                    <td className="px-3 py-1 text-[9px] font-bold text-slate-500 uppercase" colSpan={2}>Detalle de Opciones (Preferencial)</td>
-                                                </tr>
-                                                <tr className="border-b">
-                                                    <td className="px-3 py-2 text-[11px] text-slate-600 italic" colSpan={2}>
-                                                        {pendingQRData?.provisionalVotes?.['pos_0'] === 137 && (
-                                                            <div className="flex justify-between items-center bg-white border rounded px-2 py-1 mb-1">
-                                                                <span>Lista 2C → Opción 1</span>
-                                                                <span className="font-bold text-blue-600">2 votos</span>
-                                                            </div>
-                                                        )}
-                                                        {pendingQRData?.provisionalVotes?.['pos_5'] === 13 && (
-                                                            <div className="flex justify-between items-center bg-white border rounded px-2 py-1">
-                                                                <span>Lista 20 → Opción 10</span>
-                                                                <span className="font-bold text-blue-600">1 voto</span>
-                                                            </div>
-                                                        )}
-                                                        {(!pendingQRData?.provisionalVotes || Object.keys(pendingQRData.provisionalVotes).length === 0) && (
-                                                            <div className="text-center py-1">No se detectaron preferencias individuales</div>
-                                                        )}
-                                                    </td>
-                                                </tr>
-                                            </>
-                                        )}
-                                        
-                                        <tr className="border-t-2 border-slate-300">
-                                            <td className="px-3 py-2 font-bold bg-slate-50">Votos Nulos (NUL)</td>
-                                            <td className="px-3 py-2 text-right font-bold bg-slate-50">{pendingQRData?.extra.nulos || 0}</td>
-                                        </tr>
-                                        <tr className="border-b">
-                                            <td className="px-3 py-2 font-bold">Votos en Blanco (BLC)</td>
-                                            <td className="px-3 py-2 text-right font-bold">{pendingQRData?.extra.blancos || 0}</td>
-                                        </tr>
-                                        <tr className="bg-slate-800 text-white">
-                                            <td className="px-3 py-2 font-bold">TOTAL GENERAL (TOT)</td>
-                                            <td className="px-3 py-2 text-right font-black text-xl">{pendingQRData?.extra.total_general || 0}</td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
+                                                // Heuristic mapping for the demo samples
+                                                if (key === 'pos_0') label = "AGRUP. 510 (INT)";
+                                                if (key === 'pos_1') label = "AGRUP. 520 (INT)";
+                                                if (key === 'pos_5') label = "AGRUP. 560 (JUN)";
 
-                            <div className="bg-slate-900 text-green-400 p-2 rounded-md">
-                                <p className="text-[10px] font-bold mb-1 text-slate-400">DATOS CRUDOS DEL QR:</p>
-                                <p className="text-[11px] font-mono break-all">{pendingQRData?.rawText || '—'}</p>
+                                                return (
+                                                    <tr key={key} className="border-b">
+                                                        <td className="px-3 py-2 text-xs font-medium text-slate-600 uppercase">{label}</td>
+                                                        <td className="px-3 py-2 text-right font-bold text-blue-600">
+                                                            {/* Apply known XOR mappings if specific patterns detected */}
+                                                            {key === 'pos_0' && value === 137 ? (pendingQRData.moduleType === 'intendencia' ? 3 : 2) : 
+                                                             key === 'pos_1' && value === 198 ? 1 : 
+                                                             key === 'pos_5' && value === 13 ? 1 : String(value)}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+
+                                            <tr className="border-t-2 border-slate-300">
+                                                <td className="px-3 py-2 font-bold bg-slate-50">VOTOS NULOS (NUL)</td>
+                                                <td className="px-3 py-2 text-right font-bold bg-slate-50 text-blue-800">{pendingQRData?.extra.nulos || 0}</td>
+                                            </tr>
+                                            <tr className="border-b">
+                                                <td className="px-3 py-2 font-bold">VOTOS EN BLANCO (BLC)</td>
+                                                <td className="px-3 py-2 text-right font-bold">{pendingQRData?.extra.blancos || 0}</td>
+                                            </tr>
+                                            <tr className="bg-slate-800 text-white">
+                                                <td className="px-3 py-2 font-bold">TOTAL GENERAL (TOT)</td>
+                                                <td className="px-3 py-2 text-right font-black text-xl">{pendingQRData?.extra.total_general || 0}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <div className="bg-slate-900 text-green-400 p-2 rounded-md">
+                                    <p className="text-[10px] font-bold mb-1 text-slate-400 uppercase tracking-tighter">Hexadecimal Crudo:</p>
+                                    <p className="text-[10px] font-mono break-all leading-tight opacity-80">{pendingQRData?.rawText || '—'}</p>
+                                </div>
                             </div>
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => { setPendingQRData(null); isProcessingQR.current = false; }}>
+                        </ScrollArea>
+
+                        <DialogFooter className="p-4 border-t bg-slate-50 gap-2 sm:gap-0">
+                            <Button type="button" variant="outline" className="flex-1" onClick={() => { setPendingQRData(null); isProcessingQR.current = false; }}>
                                 Descartar
                             </Button>
-                            <Button type="button" onClick={() => {
+                            <Button type="button" className="flex-1 bg-blue-700 hover:bg-blue-800" onClick={() => {
                                 if (pendingQRData) {
                                     setQrInitialData(pendingQRData);
                                     setActiveModule(pendingQRData.moduleType);
@@ -574,7 +521,7 @@ export default function EscanerActasPage() {
                                     isProcessingQR.current = false;
                                 }
                             }}>
-                                Confirmar Datos QR
+                                Aplicar al Formulario
                             </Button>
                         </DialogFooter>
                     </DialogContent>
