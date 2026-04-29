@@ -99,8 +99,8 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
 
     const handleQrParsed = (data: number[], rawHex: string) => {
         // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
-        // Calibración inicial sugerida: 12 bytes para saltar cabeceras de MSA
-        const DATA_OFFSET = 7; // Mantengo 7 por ahora, pero lo haremos visible para ajustar
+        // Reseteado a 0 para búsqueda manual del patrón (1...2...3 = Suma 6)
+        const DATA_OFFSET = 0; 
         const cleanPayload = data.slice(DATA_OFFSET);
         
         // REGLA 3: Lógica de Validación de Suma (Bytes 1 al 10)

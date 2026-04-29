@@ -118,8 +118,9 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 1: Sincronización de Inicio
-        const DATA_OFFSET = 7;
+        // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
+        // Reseteado a 0 para búsqueda manual del patrón en Junta
+        const DATA_OFFSET = 0;
         const cleanPayload = data.slice(DATA_OFFSET);
         
         // REGLA 3: Lógica de Validación (Para Junta es un bloque mayor, pero mantenemos el principio)

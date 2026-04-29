@@ -136,9 +136,9 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
             const dataArray = Array.from(decompressed);
             console.log("BUFFER BRUTO DESCOMPRIMIDO:", dataArray);
 
-            // REGLA DE PRECISIÓN 1: DATA_OFFSET (Salto de metadatos)
-            // Según pruebas, los votos reales suelen empezar tras los bytes de Local/Mesa
-            const DATA_OFFSET = 7; 
+            // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
+            // Reseteado a 0 para recalibración manual
+            const DATA_OFFSET = 0; 
             const payloadOnly = dataArray.slice(DATA_OFFSET);
 
             if (onQrParsed) {
