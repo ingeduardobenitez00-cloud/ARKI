@@ -344,7 +344,7 @@ export default function EscanerActasPage() {
                             <CardTitle className="text-sm flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                     <History className="w-4 h-4" />
-                                    Listado de Mesas
+                                    TABLA DE CONTROL DE MESAS
                                 </div>
                                 <Badge variant="outline">{currentLocalMesas.length} Mesas</Badge>
                             </CardTitle>
@@ -359,15 +359,33 @@ export default function EscanerActasPage() {
                                     currentLocalMesas.map((m: number) => {
                                         const status = mesasStatus[m];
                                         return (
-                                            <div key={m} className={`p-4 flex items-center justify-between hover:bg-muted/30 transition-colors ${selectedMesa === m ? 'bg-primary/5 border-l-4 border-primary' : ''}`} onClick={() => setSelectedMesa(m)}>
+                                            <div key={m} className={`p-4 flex items-center justify-between hover:bg-muted/30 transition-colors ${selectedMesa === m ? 'bg-primary/5 border-l-4 border-primary' : ''}`}>
                                                 <div className="font-bold">Mesa {m}</div>
                                                 <div className="flex gap-2">
-                                                    <Badge variant={status?.intendencia_cargada ? "default" : "secondary"} className={status?.intendencia_cargada ? "bg-green-600" : "bg-gray-100 text-gray-400"}>
-                                                        INT
-                                                    </Badge>
-                                                    <Badge variant={status?.junta_cargada ? "default" : "secondary"} className={status?.junta_cargada ? "bg-blue-600" : "bg-gray-100 text-gray-400"}>
-                                                        JUN
-                                                    </Badge>
+                                                    <Button 
+                                                        size="sm"
+                                                        variant={(selectedMesa === m && activeModule === 'intendencia') ? 'default' : 'outline'}
+                                                        className={`h-8 px-4 text-[10px] font-black transition-all ${(selectedMesa === m && activeModule === 'intendencia') ? 'bg-blue-700 shadow-md' : 'text-slate-400'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedMesa(m);
+                                                            setActiveModule('intendencia');
+                                                        }}
+                                                    >
+                                                        INT {status?.intendencia_cargada && "✓"}
+                                                    </Button>
+                                                    <Button 
+                                                        size="sm"
+                                                        variant={(selectedMesa === m && activeModule === 'junta') ? 'default' : 'outline'}
+                                                        className={`h-8 px-4 text-[10px] font-black transition-all ${(selectedMesa === m && activeModule === 'junta') ? 'bg-blue-700 shadow-md' : 'text-slate-400'}`}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedMesa(m);
+                                                            setActiveModule('junta');
+                                                        }}
+                                                    >
+                                                        JUN {status?.junta_cargada && "✓"}
+                                                    </Button>
                                                 </div>
                                             </div>
                                         );
