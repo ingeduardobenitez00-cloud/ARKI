@@ -35,8 +35,10 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         const newExtra = { ...extra };
 
         INTENDENTE_CANDIDATES.forEach(candidate => {
-            // Regex to match "510 ... 3"
-            const regex = new RegExp(`(?:^|\\s)${candidate.list}\\b.*?(\\d+)\\s*$`, 'im');
+            // Extraer solo el número de lista (ej: "2 MHC" -> "2")
+            const listNumber = candidate.list.split(' ')[0];
+            // Regex: Busca el número de lista, seguido de cualquier cosa (puntos, espacios), y captura el número al final de la línea
+            const regex = new RegExp(`(?:^|\\s)${listNumber}\\b.*?(\\d+)\\s*$`, 'im');
             const match = text.match(regex);
             if (match && match[1]) {
                 newVotes[candidate.id] = parseInt(match[1], 10);
