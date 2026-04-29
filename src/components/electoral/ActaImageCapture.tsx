@@ -109,10 +109,27 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
             const bytes = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
             console.log("Total bytes extraídos:", bytes.length);
 
-            // 3. Extraer Data Comprimida (Saltando el Header de 15 bytes)
-            // El header de MSA suele empezar con 'MSA' (4d 53 41)
-            const compressedData = bytes.slice(15);
-            console.log("Primeros bytes de data comprimida:", compressedData.slice(0, 5));
+            // 3. Búsqueda Inteligente del inicio de Zlib (0x78 0x9C)
+            let startIndex = -1;
+            for (let i = 0; i < bytes.length - 1; i++) {
+                if (bytes[i] === 0x78 && (bytes[i + 1] === 0x9C || bytes[i + 1] === 0x01 || bytes[i + 1] === 0xDA)) {
+                    startIndex = i;
+                    break;
+                }
+            }
+
+            if (startIndex === -1) {
+                // Fallback al offset de 15 si no se encuentra el marcador
+                startIndex = 15;
+                console.warn("No se encontró marcador Zlib, usando offset por defecto 15");
+            } else {
+                console.log(`Marcador Zlib encontrado en posición: ${startIndex}`);
+            }
+
+            const compressedData = bytes.slice(startIndex);
+            console.log("Primeros bytes de data a descomprimir:", 
+                Array.from(compressedData.slice(0, 5)).map(b => b.toString(16)).join(' ')
+            );
 
             // 4. Descomprimir usando Zlib
             const decompressed = fflate.unzlibSync(compressedData);
