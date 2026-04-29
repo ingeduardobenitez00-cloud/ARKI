@@ -118,21 +118,26 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 3: Analizador Independiente
-        const cleanPayload = data; // Offset 7 ya aplicado en ActaImageCapture
+        // REGLA 1: Sincronización de Inicio
+        const DATA_OFFSET = 7;
+        const cleanPayload = data.slice(DATA_OFFSET);
         
-        // Calcular suma de integridad
-        const totalCalculado = cleanPayload.reduce((a, b) => a + b, 0);
-        const totalEnQR = cleanPayload[cleanPayload.length - 1];
-        const tieneDiscrepancia = totalCalculado !== totalEnQR && totalEnQR !== 0;
+        // REGLA 3: Lógica de Validación (Para Junta es un bloque mayor, pero mantenemos el principio)
+        const sumaCalculada = cleanPayload.reduce((a, b, idx) => {
+            // Sumamos todos excepto el último byte que es el TOT
+            return idx < cleanPayload.length - 1 ? a + b : a;
+        }, 0);
+        const byteTOT = cleanPayload[cleanPayload.length - 1] || 0;
+        const tieneDiscrepancia = sumaCalculada !== byteTOT && byteTOT !== 0;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: {}, // No usamos mapeo por ID para el preview
+            votes: {}, 
             extra: {
-                total_calculado: totalCalculado,
-                total_qr: totalEnQR,
-                tiene_discrepancia: tieneDiscrepancia
+                total_calculado: sumaCalculada,
+                total_qr: byteTOT,
+                tiene_discrepancia: tieneDiscrepancia,
+                offset_actual: DATA_OFFSET
             },
             isQr: true,
             rawData: cleanPayload,
@@ -334,26 +339,31 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                 <tbody>
                                     <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
                                         <td colSpan={2} className="p-1">
-                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA EN INTEGRIDAD DE DATOS' : 'Analizador Independiente (Espejo Junta)'}
+                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA (Revisar Offset)' : 'Analizador de Junta (Espejo Fiel)'}
                                         </td>
                                     </tr>
-                                    {ocrPreview?.rawData?.slice(0, 100).map((val, idx) => { // Limitado para no saturar preview de junta
-                                        const isLast = idx === ocrPreview.rawData!.length - 1;
+                                    {ocrPreview?.rawData?.slice(0, 24).map((val, idx) => {
                                         return (
-                                            <tr key={idx} className={`border-b ${isLast ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                                            <tr key={idx} className="border-b hover:bg-slate-50">
                                                 <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx}</span>
-                                                    <span>{isLast ? 'TOTAL CONTROL' : `Votos Celda ${idx}`}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx + 1}</span>
+                                                    <span>Opción/Lista {idx + 1}</span>
                                                 </td>
-                                                <td className={`p-2 text-right font-black text-sm ${isLast && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-blue-900'}`}>
+                                                <td className="p-2 text-right font-black text-sm text-blue-900">
                                                     {val}
                                                 </td>
                                             </tr>
                                         );
                                     })}
-                                    <tr className="bg-blue-100">
-                                        <td className="p-2 text-xs font-black">SUMA INTEGRAL DETECTADA</td>
-                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-blue-700'}`}>
+                                    <tr className="bg-blue-50 border-t-2 border-blue-200">
+                                        <td className="p-2 text-xs font-black">TOTAL CONTROL (TOT)</td>
+                                        <td className="p-2 text-right font-black text-blue-900 text-sm">
+                                            {ocrPreview?.extra.total_qr}
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-slate-100">
+                                        <td className="p-2 text-xs font-black">SUMA DETECTADA</td>
+                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
                                     </tr>

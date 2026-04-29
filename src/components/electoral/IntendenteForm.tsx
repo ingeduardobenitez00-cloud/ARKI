@@ -98,23 +98,27 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        // REGLA 3: El preview debe mostrar exactamente la secuencia de bytes
-        // El DATA_OFFSET ya viene aplicado desde ActaImageCapture (7 bytes)
-        // Pero para asegurar que el primer valor sea el voto 1, podemos ajustar aquí:
-        const cleanPayload = data; // Ya viene con el offset aplicado
+        // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
+        // Calibración inicial sugerida: 12 bytes para saltar cabeceras de MSA
+        const DATA_OFFSET = 7; // Mantengo 7 por ahora, pero lo haremos visible para ajustar
+        const cleanPayload = data.slice(DATA_OFFSET);
         
-        // Calcular suma de integridad (todos los bytes excepto el último si es el total)
-        const totalCalculado = cleanPayload.reduce((a, b) => a + b, 0);
-        const totalEnQR = cleanPayload[cleanPayload.length - 1]; // El último suele ser el total de control
-        const tieneDiscrepancia = totalCalculado !== totalEnQR && totalEnQR !== 0;
+        // REGLA 3: Lógica de Validación de Suma (Bytes 1 al 10)
+        // Calculamos la suma de los primeros 10 bytes del payload limpio
+        const votosPayload = cleanPayload.slice(0, 10);
+        const sumaCalculada = votosPayload.reduce((a, b) => a + b, 0);
+        const byteTOT = cleanPayload[10] || 0; // Posición 11 (índice 10)
+        
+        const tieneDiscrepancia = sumaCalculada !== byteTOT && byteTOT !== 0;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: {}, // No usamos mapeo por ID aquí para el preview
+            votes: {}, 
             extra: {
-                total_calculado: totalCalculado,
-                total_qr: totalEnQR,
-                tiene_discrepancia: tieneDiscrepancia
+                total_calculado: sumaCalculada,
+                total_qr: byteTOT,
+                tiene_discrepancia: tieneDiscrepancia,
+                offset_actual: DATA_OFFSET
             },
             isQr: true,
             rawData: cleanPayload,
@@ -286,27 +290,31 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                 <tbody>
                                     <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
                                         <td colSpan={2} className="p-1">
-                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA EN INTEGRIDAD DE DATOS' : 'Informe de Auditoría Digital (Espejo)'}
+                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ OFFSET NO CALIBRADO (Discrepancia)' : 'Analizador de Actas (Espejo Fiel)'}
                                         </td>
                                     </tr>
-                                    {ocrPreview?.rawData?.map((val, idx) => {
-                                        // No ocultamos ceros en este modo para ver la secuencia completa
-                                        const isLast = idx === ocrPreview.rawData!.length - 1;
-                                        
+                                    {[
+                                        "Lista 510", "Lista 520", "Lista 530", "Lista 540", 
+                                        "Lista 580", "Lista 590", "Lista 600",
+                                        "Votos Nulos (NUL)", "Votos en Blanco (BLC)", "Votos a Computar (VAC)",
+                                        "TOTAL DE CONTROL (TOT)"
+                                    ].map((label, idx) => {
+                                        const val = ocrPreview?.rawData?.[idx] || 0;
+                                        const isTOT = idx === 10;
                                         return (
-                                            <tr key={idx} className={`border-b ${isLast ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                                            <tr key={idx} className={`border-b ${isTOT ? 'bg-blue-50' : ''}`}>
                                                 <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">Byte {idx}</span>
-                                                    <span>{isLast ? 'TOTAL DE CONTROL (QR)' : `Votos Posición ${idx}`}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx + 1}</span>
+                                                    <span>{label}</span>
                                                 </td>
-                                                <td className={`p-2 text-right font-black text-sm ${isLast && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-slate-900'}`}>
+                                                <td className={`p-2 text-right font-black text-sm ${isTOT && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-slate-900'}`}>
                                                     {val}
                                                 </td>
                                             </tr>
                                         );
                                     })}
                                     <tr className="bg-slate-100">
-                                        <td className="p-2 text-xs font-black">SUMA CALCULADA POR ARKI</td>
+                                        <td className="p-2 text-xs font-black">SUMA DETECTADA (Pos 1-10)</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
