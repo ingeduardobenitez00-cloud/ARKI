@@ -98,43 +98,52 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        const previewVotes: Record<string, number> = {};
-        const MAX_VOTES_LIMIT = 400; // REGLA 3: Filtro de seguridad
+        // REGLA 3: El preview debe mostrar exactamente la secuencia de bytes
+        // El DATA_OFFSET ya viene aplicado desde ActaImageCapture (7 bytes)
+        // Pero para asegurar que el primer valor sea el voto 1, podemos ajustar aquí:
+        const cleanPayload = data; // Ya viene con el offset aplicado
+        
+        // Calcular suma de integridad (todos los bytes excepto el último si es el total)
+        const totalCalculado = cleanPayload.reduce((a, b) => a + b, 0);
+        const totalEnQR = cleanPayload[cleanPayload.length - 1]; // El último suele ser el total de control
+        const tieneDiscrepancia = totalCalculado !== totalEnQR && totalEnQR !== 0;
 
-        // REGLA 2: Extracción Estricta (Payload Only)
-        // Solo procesamos bytes para el número de candidatos configurados
-        INTENDENTE_CANDIDATES.forEach((candidate, index) => {
-            let val = data[index] || 0;
-            // Aplicar filtro de seguridad
-            if (val > MAX_VOTES_LIMIT) val = 0;
-            previewVotes[candidate.id] = val;
-        });
-
-        // Footer (Nulos, Blancos, VAC, Total)
-        // Se asume que están al final del payload después de los candidatos
-        const footerOffset = INTENDENTE_CANDIDATES.length;
-        const previewExtra = {
-            nulos: data[footerOffset] > MAX_VOTES_LIMIT ? 0 : data[footerOffset] || 0,
-            blancos: data[footerOffset + 1] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 1] || 0,
-            votos_computar: data[footerOffset + 2] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 2] || 0,
-            total_general: data[footerOffset + 3] || 0
-        };
-
-        setRawQrHex(rawHex); // Guardar para persistencia
+        setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: previewVotes, 
-            extra: previewExtra,
+            votes: {}, // No usamos mapeo por ID aquí para el preview
+            extra: {
+                total_calculado: totalCalculado,
+                total_qr: totalEnQR,
+                tiene_discrepancia: tieneDiscrepancia
+            },
             isQr: true,
-            rawData: data,
+            rawData: cleanPayload,
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
     };
 
     const applyOcrData = () => {
-        if (ocrPreview) {
-            setVotes(prev => ({ ...prev, ...ocrPreview.votes }));
-            setExtra(prev => ({ ...prev, ...ocrPreview.extra }));
+        if (ocrPreview && ocrPreview.rawData) {
+            const newVotes: Record<string, number> = {};
+            // REGLA 4: Inyección por Posición
+            // Mapeamos el primer valor detectado al primer input, y así sucesivamente
+            INTENDENTE_CANDIDATES.forEach((candidate, index) => {
+                newVotes[candidate.id] = ocrPreview.rawData![index] || 0;
+            });
+
+            // Mapear los últimos campos (Nulos, Blancos, VAC)
+            // Asumimos que están después de los candidatos
+            const offset = INTENDENTE_CANDIDATES.length;
+            const newExtra = {
+                nulos: ocrPreview.rawData[offset] || 0,
+                blancos: ocrPreview.rawData[offset + 1] || 0,
+                votos_computar: ocrPreview.rawData[offset + 2] || 0,
+                total_general: ocrPreview.rawData[offset + 3] || 0
+            };
+
+            setVotes(newVotes);
+            setExtra(prev => ({ ...prev, ...newExtra }));
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
         }
@@ -254,10 +263,10 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         <CardTitle className="text-purple-600 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <Wand2 className="w-5 h-5" />
-                                Confirmar Datos Extraídos
+                                Espejo de Datos (Analizador)
                             </div>
-                            <Badge className="bg-purple-600 text-white border-none">
-                                TOTAL QR: {ocrPreview?.rawData?.reduce((a, b) => a + b, 0) || 0}
+                            <Badge className={`border-none ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : 'bg-green-600'} text-white`}>
+                                SUMA: {ocrPreview?.extra.total_calculado}
                             </Badge>
                         </CardTitle>
                         <DialogDescription>
@@ -275,38 +284,33 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className="bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest">
+                                    <tr className={`bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
                                         <td colSpan={2} className="p-1">
-                                            Informe de Auditoría Digital (QR)
+                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA EN INTEGRIDAD DE DATOS' : 'Informe de Auditoría Digital (Espejo)'}
                                         </td>
                                     </tr>
                                     {ocrPreview?.rawData?.map((val, idx) => {
-                                        if (val === 0) return null;
+                                        // No ocultamos ceros en este modo para ver la secuencia completa
+                                        const isLast = idx === ocrPreview.rawData!.length - 1;
                                         
-                                        // Intentar ver si este índice corresponde a un candidato del sistema
-                                        // o si el número de byte coincide con el ID de la lista
-                                        const systemCandidate = INTENDENTE_CANDIDATES.find(c => parseInt(c.list) === idx) ||
-                                                              INTENDENTE_CANDIDATES[idx - 1]; // Fallback por posición
-                                        
-                                        const isFooter = idx >= ocrPreview.rawData!.length - 4;
-                                        const label = isFooter ? 
-                                            (idx === ocrPreview.rawData!.length - 1 ? "TOTAL CERTIFICADO" : 
-                                             idx === ocrPreview.rawData!.length - 4 ? "VOTOS NULOS" :
-                                             idx === ocrPreview.rawData!.length - 3 ? "VOTOS EN BLANCO" : "VOTOS A COMPUTAR") :
-                                            (systemCandidate ? `LISTA ${systemCandidate.list} (Detectada)` : `Dato/Lista en Posición ${idx}`);
-
                                         return (
-                                            <tr key={idx} className={`border-b ${systemCandidate ? 'bg-green-50' : 'hover:bg-slate-50'}`}>
+                                            <tr key={idx} className={`border-b ${isLast ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                                                 <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">[{idx}]</span>
-                                                    <span className={systemCandidate ? 'text-green-700' : 'text-slate-700'}>{label}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">Byte {idx}</span>
+                                                    <span>{isLast ? 'TOTAL DE CONTROL (QR)' : `Votos Posición ${idx}`}</span>
                                                 </td>
-                                                <td className={`p-2 text-right font-black text-sm ${systemCandidate ? 'text-green-600' : 'text-slate-900'}`}>
+                                                <td className={`p-2 text-right font-black text-sm ${isLast && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-slate-900'}`}>
                                                     {val}
                                                 </td>
                                             </tr>
                                         );
                                     })}
+                                    <tr className="bg-slate-100">
+                                        <td className="p-2 text-xs font-black">SUMA CALCULADA POR ARKI</td>
+                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-green-600'}`}>
+                                            {ocrPreview?.extra.total_calculado}
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -337,8 +341,8 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
                             Cancelar
                         </Button>
-                        <Button onClick={applyOcrData} className="bg-purple-600 hover:bg-purple-700 flex-1">
-                            Aplicar al Formulario
+                        <Button onClick={applyOcrData} className="bg-purple-600 hover:bg-purple-800 flex-1">
+                            Inyectar al Formulario
                         </Button>
                     </DialogFooter>
                 </DialogContent>

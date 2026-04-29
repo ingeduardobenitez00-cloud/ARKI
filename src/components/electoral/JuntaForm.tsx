@@ -118,52 +118,53 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        const previewVotes: Record<string, Record<number, number>> = {};
-        const MAX_VOTES_LIMIT = 400; // REGLA 3: Filtro de seguridad
+        // REGLA 3: Analizador Independiente
+        const cleanPayload = data; // Offset 7 ya aplicado en ActaImageCapture
+        
+        // Calcular suma de integridad
+        const totalCalculado = cleanPayload.reduce((a, b) => a + b, 0);
+        const totalEnQR = cleanPayload[cleanPayload.length - 1];
+        const tieneDiscrepancia = totalCalculado !== totalEnQR && totalEnQR !== 0;
 
-        // REGLA 2: Extracción Estricta (Bloques de 24)
-        JUNTA_LISTS.forEach((list, listIndex) => {
-            previewVotes[list.id] = {};
-            const offset = listIndex * 24;
-            for (let i = 0; i < 24; i++) {
-                let val = data[offset + i] || 0;
-                // Aplicar filtro de seguridad
-                if (val > MAX_VOTES_LIMIT) val = 0;
-                previewVotes[list.id][i + 1] = val;
-            }
-        });
-
-        // Footer (Nulos, Blancos, VAC, Total)
-        // Se asume que están tras el bloque de candidatos de todas las listas
-        const footerOffset = JUNTA_LISTS.length * 24;
-        const previewExtra = {
-            nulos: data[footerOffset] > MAX_VOTES_LIMIT ? 0 : data[footerOffset] || 0,
-            blancos: data[footerOffset + 1] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 1] || 0,
-            votos_computar: data[footerOffset + 2] > MAX_VOTES_LIMIT ? 0 : data[footerOffset + 2] || 0,
-            total_general: data[footerOffset + 3] || 0
-        };
-
-        setRawQrHex(rawHex); // Guardar para persistencia
+        setRawQrHex(rawHex);
         setOcrPreview({ 
-            votes: previewVotes, 
-            extra: previewExtra,
+            votes: {}, // No usamos mapeo por ID para el preview
+            extra: {
+                total_calculado: totalCalculado,
+                total_qr: totalEnQR,
+                tiene_discrepancia: tieneDiscrepancia
+            },
             isQr: true,
-            rawData: data,
+            rawData: cleanPayload,
             rawHex: rawHex
         });
         setIsOcrDialogOpen(true);
     };
 
     const applyOcrData = () => {
-        if (ocrPreview) {
-            setVotes(prev => {
-                const merged = { ...prev };
-                Object.keys(ocrPreview.votes).forEach(listId => {
-                    merged[listId] = { ...(merged[listId] || {}), ...ocrPreview.votes[listId] };
-                });
-                return merged;
+        if (ocrPreview && ocrPreview.rawData) {
+            const newVotes: Record<string, Record<number, number>> = {};
+            
+            // REGLA 4: Inyección por Posición para Junta (Bloques de 24)
+            JUNTA_LISTS.forEach((list, listIndex) => {
+                newVotes[list.id] = {};
+                const offset = listIndex * 24;
+                for (let i = 0; i < 24; i++) {
+                    newVotes[list.id][i + 1] = ocrPreview.rawData![offset + i] || 0;
+                }
             });
-            setExtra(prev => ({ ...prev, ...ocrPreview.extra }));
+
+            // Mapear los últimos campos tras las listas
+            const footerOffset = JUNTA_LISTS.length * 24;
+            const newExtra = {
+                nulos: ocrPreview.rawData[footerOffset] || 0,
+                blancos: ocrPreview.rawData[footerOffset + 1] || 0,
+                votos_computar: ocrPreview.rawData[footerOffset + 2] || 0,
+                total_general: ocrPreview.rawData[footerOffset + 3] || 0
+            };
+
+            setVotes(newVotes);
+            setExtra(prev => ({ ...prev, ...newExtra }));
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
         }
@@ -310,10 +311,10 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         <CardTitle className="text-blue-600 flex items-center justify-between gap-2">
                             <div className="flex items-center gap-2">
                                 <Wand2 className="w-5 h-5" />
-                                Confirmar Datos de Junta
+                                Analizador Independiente (Junta)
                             </div>
-                            <Badge className="bg-blue-600 text-white border-none">
-                                TOTAL QR: {ocrPreview?.rawData?.reduce((a, b) => a + b, 0) || 0}
+                            <Badge className={`border-none ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : 'bg-blue-600'} text-white`}>
+                                SUMA: {ocrPreview?.extra.total_calculado}
                             </Badge>
                         </CardTitle>
                         <DialogDescription>
@@ -331,38 +332,31 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr className="bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest">
+                                    <tr className={`bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest ${ocrPreview?.extra.tiene_discrepancia ? 'bg-red-600' : ''}`}>
                                         <td colSpan={2} className="p-1">
-                                            Informe de Auditoría Digital (QR - Junta)
+                                            {ocrPreview?.extra.tiene_discrepancia ? '⚠️ DISCREPANCIA EN INTEGRIDAD DE DATOS' : 'Analizador Independiente (Espejo Junta)'}
                                         </td>
                                     </tr>
-                                    {ocrPreview?.rawData?.map((val, idx) => {
-                                        if (val === 0) return null;
-                                        
-                                        // Mapeo dinámico para Junta (bloques de 24)
-                                        const listIndex = Math.floor(idx / 24);
-                                        const optionInList = (idx % 24) + 1;
-                                        const list = JUNTA_LISTS[listIndex];
-                                        
-                                        const isFooter = idx >= ocrPreview.rawData!.length - 4;
-                                        const label = isFooter ? 
-                                            (idx === ocrPreview.rawData!.length - 1 ? "TOTAL GENERAL" : 
-                                             idx === ocrPreview.rawData!.length - 4 ? "NULOS" :
-                                             idx === ocrPreview.rawData!.length - 3 ? "BLANCOS" : "VOTOS A COMPUTAR") :
-                                            (list ? `LISTA ${list.listNumber} - Opción ${optionInList}` : `Dato/Lista Posición ${idx}`);
-
+                                    {ocrPreview?.rawData?.slice(0, 100).map((val, idx) => { // Limitado para no saturar preview de junta
+                                        const isLast = idx === ocrPreview.rawData!.length - 1;
                                         return (
-                                            <tr key={idx} className={`border-b ${list ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                                            <tr key={idx} className={`border-b ${isLast ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
                                                 <td className="p-2 text-xs font-bold flex items-center gap-2">
-                                                    <span className="text-[9px] text-slate-400 font-mono">[{idx}]</span>
-                                                    <span className={list ? 'text-blue-700' : 'text-slate-700'}>{label}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">Pos {idx}</span>
+                                                    <span>{isLast ? 'TOTAL CONTROL' : `Votos Celda ${idx}`}</span>
                                                 </td>
-                                                <td className={`p-2 text-right font-black text-sm ${list ? 'text-blue-600' : 'text-slate-900'}`}>
+                                                <td className={`p-2 text-right font-black text-sm ${isLast && ocrPreview?.extra.tiene_discrepancia ? 'text-red-600' : 'text-blue-900'}`}>
                                                     {val}
                                                 </td>
                                             </tr>
                                         );
                                     })}
+                                    <tr className="bg-blue-100">
+                                        <td className="p-2 text-xs font-black">SUMA INTEGRAL DETECTADA</td>
+                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.tiene_discrepancia ? 'text-red-600 underline' : 'text-blue-700'}`}>
+                                            {ocrPreview?.extra.total_calculado}
+                                        </td>
+                                    </tr>
                                 </tbody>
                             </table>
                         </div>
@@ -375,8 +369,8 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                         <Button variant="outline" onClick={() => setIsOcrDialogOpen(false)} className="flex-1">
                             Descartar
                         </Button>
-                        <Button onClick={applyOcrData} className="bg-blue-600 hover:bg-blue-800 flex-1">
-                            Aplicar al Formulario
+                        <Button onClick={applyOcrData} className="bg-blue-700 hover:bg-blue-900 flex-1">
+                            Inyectar al Formulario
                         </Button>
                     </DialogFooter>
                 </DialogContent>
