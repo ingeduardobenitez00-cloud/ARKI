@@ -101,11 +101,11 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     const handleQrParsed = (data: number[], rawHex: string) => {
         const L = data.length;
         
-        // CONTRATO DE CAMPOS (Intendente = 11 campos fijos al final)
+        // CONTRATO DE CAMPOS ESTRICTO (Intendente = 11 campos finales)
         const RESULT_FIELDS_COUNT = 11;
         const resultsBlock = data.slice(L - RESULT_FIELDS_COUNT);
         
-        // BLOQUE DE REFERENCIA (Identidad = Todo lo que está antes de los 11 resultados)
+        // IDENTIDAD (Todo lo que está a la izquierda de los 11 resultados)
         const identityBlock = data.slice(0, L - RESULT_FIELDS_COUNT);
         const identity = {
             eleccion: identityBlock[0] || 0,
@@ -117,30 +117,33 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             mesa_bis: identityBlock[6] || 0
         };
 
-        // MAPEO DE LOS 11 CAMPOS (De derecha a izquierda según el Contrato)
+        // EXTRACCIÓN DE RESULTADOS (Cajones de Votos)
         const extraData = {
-            total_general: resultsBlock[10] || 0, // Campo [11]: TOT (Último)
-            votos_computar: resultsBlock[9] || 0,  // Campo [10]: VAC
-            blancos: resultsBlock[8] || 0,         // Campo [9]: BLC
-            nulos: resultsBlock[7] || 0            // Campo [8]: NUL
+            total_general: resultsBlock[10] || 0, // El último (TOT)
+            votos_computar: resultsBlock[9] || 0,  // VAC
+            blancos: resultsBlock[8] || 0,         // BLC
+            nulos: resultsBlock[7] || 0            // NUL
         };
 
         const previewVotes: Record<string, number> = {};
-        // Campos [1 al 7]: Votos de las Listas
-        INTENDENTE_CANDIDATES.forEach((candidate, idx) => {
-            previewVotes[candidate.id] = resultsBlock[idx] || 0;
-        });
+        // Solo tomamos los primeros 7 del bloque de resultados para las listas
+        for (let i = 0; i < 7; i++) {
+            if (INTENDENTE_CANDIDATES[i]) {
+                previewVotes[INTENDENTE_CANDIDATES[i].id] = resultsBlock[i] || 0;
+            }
+        }
 
-        // VALIDACIÓN DE INTEGRIDAD: Suma de campos 1 al 10 == Campo 11 (TOT)
-        const sumaCampos1al10 = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
-                               extraData.nulos + extraData.blancos + extraData.votos_computar;
+        // RESETEO DE CONTADOR: Suma Pura de Resultados
+        const sumaResultados = Object.values(previewVotes).reduce((a, b) => a + b, 0) + 
+                              extraData.nulos + extraData.blancos + extraData.votos_computar;
         
-        const esValido = sumaCampos1al10 === extraData.total_general;
+        // REGLA DE SEGURIDAD: Solo verde si hay coincidencia exacta con el Juez (TOT)
+        const esValido = sumaResultados === extraData.total_general && extraData.total_general !== 0;
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaCampos1al10, es_valido: esValido },
+            extra: { ...extraData, total_calculado: sumaResultados, es_valido: esValido },
             identity,
             isQr: true,
             rawData: data,
@@ -371,10 +374,12 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         </Button>
                         <Button 
                             onClick={applyOcrData} 
-                            className="bg-purple-600 hover:bg-purple-800 flex-1"
-                            disabled={ocrPreview?.identity.mesa !== mesa}
+                            className={`${ocrPreview?.extra.es_valido ? 'bg-purple-600 hover:bg-purple-800' : 'bg-slate-400 cursor-not-allowed'} flex-1`}
+                            disabled={!ocrPreview?.extra.es_valido || ocrPreview?.identity.mesa !== mesa}
                         >
-                            {ocrPreview?.identity.mesa === mesa ? 'Inyectar al Formulario' : 'Mesa no Coincide'}
+                            {ocrPreview?.extra.es_valido 
+                                ? (ocrPreview?.identity.mesa === mesa ? 'Inyectar al Formulario' : 'Mesa no Coincide')
+                                : 'Discrepancia en Suma'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
