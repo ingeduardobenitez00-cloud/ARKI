@@ -23,7 +23,7 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
     const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
-    const scannerRef = useRef<Html5QrcodeScanner | null>(null);
+    const qrScannerRef = useRef<any>(null);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -47,33 +47,44 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
     const handleStartQrScanner = async () => {
         setIsQrScannerOpen(true);
         
-        // Importación dinámica para evitar errores de SSR
-        const { Html5QrcodeScanner } = await import('html5-qrcode');
+        // Importación dinámica de la clase base Html5Qrcode
+        const { Html5Qrcode } = await import('html5-qrcode');
         
         setTimeout(() => {
-            if (!scannerRef.current) {
-                const scanner = new Html5QrcodeScanner('qr-reader', { 
-                    fps: 10, 
-                    qrbox: { width: 250, height: 250 } 
-                }, false);
-                scannerRef.current = scanner;
+            const qrElement = document.getElementById('qr-reader');
+            if (qrElement && !qrScannerRef.current) {
+                const scanner = new Html5Qrcode('qr-reader');
+                qrScannerRef.current = scanner;
 
-                scanner.render(
+                scanner.start(
+                    { facingMode: "environment" }, 
+                    { fps: 10, qrbox: { width: 250, height: 250 } },
                     (result) => {
                         console.log("QR Scanned:", result);
                         decodeAndProcessQr(result);
                         stopQrScanner();
                     },
-                    (err) => { /* ignore */ }
-                );
+                    (err) => { /* Silenciar errores de escaneo */ }
+                ).catch(err => {
+                    console.error("Error al iniciar cámara:", err);
+                    toast({
+                        title: "Error de Cámara",
+                        description: "No se pudo acceder a la cámara trasera. Asegúrate de dar permisos.",
+                        variant: "destructive"
+                    });
+                });
             }
-        }, 300);
+        }, 500);
     };
 
-    const stopQrScanner = () => {
-        if (scannerRef.current) {
-            scannerRef.current.clear().catch(console.error);
-            scannerRef.current = null;
+    const stopQrScanner = async () => {
+        if (qrScannerRef.current) {
+            try {
+                await qrScannerRef.current.stop();
+            } catch (e) {
+                console.error("Error al detener cámara:", e);
+            }
+            qrScannerRef.current = null;
         }
         setIsQrScannerOpen(false);
     };

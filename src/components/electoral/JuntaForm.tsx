@@ -29,6 +29,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     // Preview OCR state
     const [ocrPreview, setOcrPreview] = useState<{ votes: Record<string, Record<number, number>>, extra: any } | null>(null);
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
+    const [activeListId, setActiveListId] = useState(JUNTA_LISTS[0].id);
 
     React.useEffect(() => {
         if (initialData) {

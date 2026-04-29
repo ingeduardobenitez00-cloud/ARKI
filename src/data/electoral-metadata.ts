@@ -8,9 +8,9 @@ export interface Candidate {
 }
 
 export const INTENDENTE_CANDIDATES: Candidate[] = [
-  { id: 'lista-2', name: '2', list: '2', photo: '/candidates/intendente/camilo-perez.jpg', type: 'Intendente' },
-  { id: 'lista-7', name: '7', list: '7', photo: '/candidates/intendente/arnaldo-samaniego.jpg', type: 'Intendente' },
-  { id: 'lista-300', name: '300', list: '300', photo: '/candidates/intendente/danilo-gomez.jpg', type: 'Intendente' },
+  { id: 'lista-2', name: '2 - CAMILO PEREZ', list: '2', photo: '/candidates/intendente/camilo-perez.jpg', type: 'Intendente' },
+  { id: 'lista-7', name: '7 - ARNALDO SAMANIEGO', list: '7', photo: '/candidates/intendente/arnaldo-samaniego.jpg', type: 'Intendente' },
+  { id: 'lista-300', name: '300 - DANILO GOMEZ', list: '300', photo: '/candidates/intendente/danilo-gomez.jpg', type: 'Intendente' },
 ];
 
 export const JUNTA_LISTS = [
