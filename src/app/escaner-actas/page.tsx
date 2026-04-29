@@ -12,7 +12,7 @@ import { QRScanner } from '@/components/electoral/QRScanner';
 import { IntendenteForm } from '@/components/electoral/IntendenteForm';
 import { JuntaForm } from '@/components/electoral/JuntaForm';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, QrCode, ClipboardCheck, History, X, CheckCircle } from 'lucide-react';
+import { Loader2, QrCode, ClipboardCheck, History, X, CheckCircle, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { updateElectoralTotals } from '@/services/electoral-service';
