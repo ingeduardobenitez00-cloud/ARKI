@@ -250,32 +250,33 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {/* Mapeo Oficial (Solo si coinciden los índices) */}
-                                    {INTENDENTE_CANDIDATES.map((c, idx) => (
-                                        <tr key={c.id} className="border-b bg-slate-50/30">
-                                            <td className="p-2 text-[10px] font-medium text-slate-500">Mapeo Sistema: {c.list}</td>
-                                            <td className="p-2 text-right font-mono">{ocrPreview?.votes[c.id] || 0}</td>
-                                        </tr>
-                                    ))}
-                                    
-                                    {/* SECCIÓN NUEVA: DATOS REALES DETECTADOS EN EL QR */}
-                                    <tr className="bg-purple-600 text-white">
-                                        <td colSpan={2} className="p-1 text-[9px] font-black text-center uppercase tracking-widest">
-                                            Distribución Real del QR (Auditoría)
+                                    <tr className="bg-slate-900 text-white font-black text-[9px] text-center uppercase tracking-widest">
+                                        <td colSpan={2} className="p-1">
+                                            Informe de Auditoría Digital (QR)
                                         </td>
                                     </tr>
                                     {ocrPreview?.rawData?.map((val, idx) => {
-                                        if (val === 0) return null; // Ocultar ceros para no saturar
+                                        if (val === 0) return null;
+                                        
+                                        // Intentar ver si este índice corresponde a un candidato del sistema
+                                        // o si el número de byte coincide con el ID de la lista
+                                        const systemCandidate = INTENDENTE_CANDIDATES.find(c => parseInt(c.list) === idx) ||
+                                                              INTENDENTE_CANDIDATES[idx - 1]; // Fallback por posición
+                                        
+                                        const isFooter = idx >= ocrPreview.rawData!.length - 4;
+                                        const label = isFooter ? 
+                                            (idx === ocrPreview.rawData!.length - 1 ? "TOTAL CERTIFICADO" : 
+                                             idx === ocrPreview.rawData!.length - 4 ? "VOTOS NULOS" :
+                                             idx === ocrPreview.rawData!.length - 3 ? "VOTOS EN BLANCO" : "VOTOS A COMPUTAR") :
+                                            (systemCandidate ? `LISTA ${systemCandidate.list} (Detectada)` : `Dato/Lista en Posición ${idx}`);
+
                                         return (
-                                            <tr key={idx} className="border-b hover:bg-purple-50">
-                                                <td className="p-2 text-xs font-bold">
-                                                    <span className="text-purple-400 mr-2">#{idx}</span>
-                                                    {idx === ocrPreview.rawData!.length - 1 ? "TOTAL DETECTADO" : 
-                                                     idx === ocrPreview.rawData!.length - 4 ? "NULOS DETECTADOS" :
-                                                     idx === ocrPreview.rawData!.length - 3 ? "BLANCOS DETECTADOS" :
-                                                     `Dato Digital ${idx}`}
+                                            <tr key={idx} className={`border-b ${systemCandidate ? 'bg-green-50' : 'hover:bg-slate-50'}`}>
+                                                <td className="p-2 text-xs font-bold flex items-center gap-2">
+                                                    <span className="text-[9px] text-slate-400 font-mono">[{idx}]</span>
+                                                    <span className={systemCandidate ? 'text-green-700' : 'text-slate-700'}>{label}</span>
                                                 </td>
-                                                <td className="p-2 text-right font-black text-purple-700 text-sm">
+                                                <td className={`p-2 text-right font-black text-sm ${systemCandidate ? 'text-green-600' : 'text-slate-900'}`}>
                                                     {val}
                                                 </td>
                                             </tr>

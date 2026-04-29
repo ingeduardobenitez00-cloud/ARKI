@@ -135,12 +135,24 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
             const decompressed = fflate.unzlibSync(compressedData);
             const dataArray = Array.from(decompressed);
             console.log("¡DESCOMPRESIÓN EXITOSA! Bytes finales:", dataArray);
+
+            // 5. INTENTAR TRADUCCIÓN A TEXTO (Por si es JSON o CSV)
+            let textData = "";
+            try {
+                textData = new TextDecoder().decode(decompressed);
+                if (textData.includes('{') || textData.includes(',') || textData.length > 5) {
+                    console.log("Detección de Texto:", textData);
+                } else {
+                    textData = "";
+                }
+            } catch (e) { /* No es texto */ }
             
             if (onQrParsed) {
+                // Pasamos un objeto más rico con el texto si existe
                 onQrParsed(dataArray);
                 toast({
                     title: "¡QR Decifrado con Éxito!",
-                    description: `Se extrajeron ${dataArray.length} puntos de datos digitales.`,
+                    description: textData ? "Contiene datos de texto/JSON." : `Se extrajeron ${dataArray.length} puntos de datos digitales.`,
                     className: "bg-green-600 text-white border-none shadow-lg",
                 });
             }

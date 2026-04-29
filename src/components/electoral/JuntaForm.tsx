@@ -307,54 +307,44 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {JUNTA_LISTS.map(list => {
-                                        const votesObj = ocrPreview?.votes[list.id] || {};
-                                        const total = Object.values(votesObj).reduce((a, b) => a + b, 0);
-                                        if (total === 0) return null;
+                                    <tr className="bg-blue-900 text-white font-black text-[9px] text-center uppercase tracking-widest">
+                                        <td colSpan={2} className="p-1">
+                                            Informe de Auditoría Digital (QR - Junta)
+                                        </td>
+                                    </tr>
+                                    {ocrPreview?.rawData?.map((val, idx) => {
+                                        if (val === 0) return null;
+                                        
+                                        // Mapeo dinámico para Junta (bloques de 24)
+                                        const listIndex = Math.floor(idx / 24);
+                                        const optionInList = (idx % 24) + 1;
+                                        const list = JUNTA_LISTS[listIndex];
+                                        
+                                        const isFooter = idx >= ocrPreview.rawData!.length - 4;
+                                        const label = isFooter ? 
+                                            (idx === ocrPreview.rawData!.length - 1 ? "TOTAL GENERAL" : 
+                                             idx === ocrPreview.rawData!.length - 4 ? "NULOS" :
+                                             idx === ocrPreview.rawData!.length - 3 ? "BLANCOS" : "VOTOS A COMPUTAR") :
+                                            (list ? `LISTA ${list.listNumber} - Opción ${optionInList}` : `Dato/Lista Posición ${idx}`);
+
                                         return (
-                                            <tr key={list.id} className="border-b">
-                                                <td className="p-2 text-xs font-medium">L{list.listNumber} - {list.name}</td>
-                                                <td className="p-2 text-right font-bold text-blue-600">{total}</td>
+                                            <tr key={idx} className={`border-b ${list ? 'bg-blue-50' : 'hover:bg-slate-50'}`}>
+                                                <td className="p-2 text-xs font-bold flex items-center gap-2">
+                                                    <span className="text-[9px] text-slate-400 font-mono">[{idx}]</span>
+                                                    <span className={list ? 'text-blue-700' : 'text-slate-700'}>{label}</span>
+                                                </td>
+                                                <td className={`p-2 text-right font-black text-sm ${list ? 'text-blue-600' : 'text-slate-900'}`}>
+                                                    {val}
+                                                </td>
                                             </tr>
                                         );
                                     })}
-                                    <tr className="bg-slate-50">
-                                        <td className="p-2 text-xs font-bold italic">NUL / BLC / VAC</td>
-                                        <td className="p-2 text-right font-bold">
-                                            {ocrPreview?.extra.nulos} / {ocrPreview?.extra.blancos} / {ocrPreview?.extra.votos_computar}
-                                        </td>
-                                    </tr>
-                                    <tr className="bg-blue-100">
-                                        <td className="p-2 text-sm font-black">TOTAL CERTIFICADO</td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general || 0}</td>
-                                    </tr>
                                 </tbody>
                             </table>
                         </div>
                         <p className="text-[10px] text-muted-foreground italic text-center">
                             * Los votos preferenciales individuales se aplicarán automáticamente a cada opción.
                         </p>
-
-                        {/* NUEVO: Visualización de Bytes Crudos del QR */}
-                        {ocrPreview?.isQr && ocrPreview?.rawData && (
-                            <div className="mt-4 border-t pt-4">
-                                <h4 className="text-[10px] font-black uppercase text-blue-600 mb-2 flex items-center gap-2">
-                                    <Database className="w-3 h-3" />
-                                    Estructura de Bytes Digitales (QR)
-                                </h4>
-                                <div className="bg-slate-950 p-2 rounded text-[9px] font-mono text-green-400 grid grid-cols-6 gap-x-2 gap-y-1 max-h-48 overflow-y-auto border border-green-900/30">
-                                    {ocrPreview.rawData.map((val, idx) => (
-                                        <div key={idx} className={`flex justify-between border-b border-green-900/10 ${val > 0 ? 'bg-green-900/20 text-white px-1 font-bold' : 'opacity-30'}`}>
-                                            <span className="text-slate-500">[{idx}]</span>
-                                            <span>{val}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <p className="text-[9px] text-slate-500 mt-2 italic">
-                                    * Se muestran los 500+ bytes decifrados. Los valores en blanco son votos.
-                                </p>
-                            </div>
-                        )}
                     </div>
 
                     <DialogFooter className="gap-2 sm:gap-0">
