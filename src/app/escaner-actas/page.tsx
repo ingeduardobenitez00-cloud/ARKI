@@ -101,31 +101,40 @@ export default function EscanerActasPage() {
     // MSA Binary QR Parser (STRICT VERSION)
     const parseMSABinaryQR = (hexStr: string): any | null => {
         try {
-            // 1. Clean the string: remove "REC", spaces, and non-hex chars
-            const cleanHex = hexStr.replace(/REC/g, '').replace(/[^0-9A-Fa-f]/g, '');
-            const bytes = new Uint8Array(cleanHex.match(/.{1,2}/g)!.map(b => parseInt(b, 16)));
+            // 1. Precise Hex Extraction: match only valid hex pairs
+            const hexPairs = hexStr.match(/[0-9A-Fa-f]{2}/g);
+            if (!hexPairs || hexPairs.length < 15) return null;
             
-            if (bytes.length < 15) return null;
-
+            const bytes = new Uint8Array(hexPairs.map(b => parseInt(b, 16)));
+            
             let moduleType = 'junta';
             let extra = { nulos: 0, blancos: 0, total_general: 0 };
             let provisionalVotes: Record<string, number> = {};
 
             // 2. Determine Module Type from Byte 1
-            if (bytes[1] === 0xDC) {
-                moduleType = 'intendencia';
+            if (bytes[1] === 0xDC || bytes[1] === 0x1C) {
+                // Byte 1 signature detection
+                moduleType = bytes[1] === 0xDC ? 'intendencia' : 'junta';
+                
+                // Common offsets for REC format
                 extra.nulos = bytes[11] || 0;
-                extra.blancos = bytes[29] || 0;
-                extra.total_general = bytes[22] ? bytes[22] + 1 : 0;
-            } else {
-                moduleType = 'junta';
-                // For Junta Municipal REC format
-                extra.nulos = bytes[11] || 0;
-                extra.total_general = bytes[42] || 0;
-            }
+                
+                if (moduleType === 'intendencia') {
+                    extra.blancos = bytes[29] || 0;
+                    extra.total_general = bytes[22] ? bytes[22] + 1 : 0;
+                } else {
+                    extra.total_general = bytes[42] || 0;
+                }
 
-            // 3. Check for zlib only if it's a known long format (legacy support)
-            // For the REC format provided, we use the direct mapping above.
+                // 3. Extract preferential votes (heuristic XOR or direct)
+                // For the demo actas, let's map the first 10 positions
+                for (let i = 0; i < 20; i++) {
+                    const val = bytes[16 + i];
+                    if (val && val !== 0) {
+                        provisionalVotes[`pos_${i}`] = val;
+                    }
+                }
+            }
 
             return {
                 moduleType,
@@ -133,7 +142,7 @@ export default function EscanerActasPage() {
                 raw: { mesa: 'Detectada', local: 'Binario MSA (REC)' },
                 extra,
                 votes: {},
-                provisionalVotes: {}, // We'll add list mapping once we have more samples
+                provisionalVotes,
                 rawText: hexStr,
             };
         } catch (e) {
