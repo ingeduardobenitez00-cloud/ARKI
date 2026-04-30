@@ -303,7 +303,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                         </DialogDescription>
                     </DialogHeader>
 
-                    <div className="space-y-3 py-4">
+                    <div className="space-y-3 py-4 max-h-[70vh] overflow-y-auto pr-2">
                         <div className="border rounded-lg overflow-hidden">
                             <table className="w-full text-sm">
                                 <thead className="bg-slate-50">
