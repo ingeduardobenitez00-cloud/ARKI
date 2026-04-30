@@ -360,13 +360,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             </tr>
                                         );
                                     })}
-                                    {/* Suma y TOT */}
-                                    <tr className="bg-slate-100 border-t-2 border-slate-300">
-                                        <td className="p-2 text-xs font-black uppercase">SUMA CALCULADA (Candidatos + Aux)</td>
-                                        <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
-                                            {ocrPreview?.extra.total_calculado}
-                                        </td>
-                                    </tr>
+                                    {/* Fila de TOT (El Juez) */}
                                     <tr className="bg-blue-600 text-white">
                                         <td className="p-2 text-xs font-black flex items-center gap-1">
                                             <span className="text-[9px] font-mono opacity-70">🧲 L-0 (TOT)</span>
