@@ -102,8 +102,8 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
     const handleQrParsed = (data: number[], rawHex: string) => {
         const L = data.length;
         
-        // CONTRATO DE CAMPOS ESTRICTO (Intendente = 11 campos finales)
-        const RESULT_FIELDS_COUNT = 11;
+        // CONTRATO DE CAMPOS DINÁMICO (Candidatos + 4 campos de cierre)
+        const RESULT_FIELDS_COUNT = INTENDENTE_CANDIDATES.length + 4;
         const resultsBlock = data.slice(L - RESULT_FIELDS_COUNT);
         
         // IDENTIDAD (Todo lo que está a la izquierda de los 11 resultados)
@@ -127,11 +127,9 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         };
 
         const previewVotes: Record<string, number> = {};
-        // Solo tomamos los primeros 7 del bloque de resultados para las listas
-        for (let i = 0; i < 7; i++) {
-            if (INTENDENTE_CANDIDATES[i]) {
-                previewVotes[INTENDENTE_CANDIDATES[i].id] = resultsBlock[i] || 0;
-            }
+        // Solo tomamos los votos de las listas del bloque de resultados
+        for (let i = 0; i < INTENDENTE_CANDIDATES.length; i++) {
+            previewVotes[INTENDENTE_CANDIDATES[i].id] = resultsBlock[i] || 0;
         }
 
         // RESETEO DE CONTADOR: Suma Pura de Resultados
@@ -329,24 +327,15 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             {!ocrPreview?.extra.es_valido ? '⚠️ Buzón de Resultados (Discrepancia)' : '✅ Buzón de Resultados Electorales'}
                                         </td>
                                     </tr>
-                                    {/* MATRIZ DE IMANES: Lectura directa del resultsBlock por posición */}
-                                    {[
-                                        { label: 'Lista 510', imán: 10, dato: 1 },
-                                        { label: 'Lista 520', imán: 9,  dato: 2 },
-                                        { label: 'Lista 530', imán: 8,  dato: 3 },
-                                        { label: 'Lista 540', imán: 7,  dato: 4 },
-                                        { label: 'Lista 580', imán: 6,  dato: 5 },
-                                        { label: 'Lista 590', imán: 5,  dato: 6 },
-                                        { label: 'Lista 600', imán: 4,  dato: 7 },
-                                    ].map(({ label, imán, dato }) => {
-                                        // Lectura directa: L-11=idx0, L-10=idx1...L-5=idx6
-                                        const rb = ocrPreview?.resultsBlock;
-                                        const val = rb ? (rb[10 - imán] || 0) : 0;
+                                    {/* MATRIZ DE IMANES DINÁMICA */}
+                                    {INTENDENTE_CANDIDATES.map((candidate, idx) => {
+                                        const imán = (INTENDENTE_CANDIDATES.length + 4 - 1) - idx;
+                                        const val = ocrPreview?.resultsBlock?.[idx] || 0;
                                         return (
-                                            <tr key={label} className={`border-b hover:bg-slate-50 ${val > 0 ? 'bg-green-50' : ''}`}>
+                                            <tr key={candidate.id} className={`border-b hover:bg-slate-50 ${val > 0 ? 'bg-green-50' : ''}`}>
                                                 <td className="p-2 text-xs font-semibold flex items-center gap-1">
                                                     <span className="text-[9px] text-slate-400 font-mono">🧲 L-{imán}</span>
-                                                    <span>{label}</span>
+                                                    <span>{candidate.name}</span>
                                                 </td>
                                                 <td className={`p-2 text-right font-black text-sm ${val > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
                                                     {val}
@@ -354,14 +343,13 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             </tr>
                                         );
                                     })}
-                                    {/* Campos de Cierre — también leídos del resultsBlock */}
+                                    {/* Campos de Cierre */}
                                     {[
-                                        { label: 'NULOS (NUL)',      imán: 3, dato: 8 },
-                                        { label: 'BLANCOS (BLC)',    imán: 2, dato: 9 },
-                                        { label: 'A COMPUTAR (VAC)', imán: 1, dato: 10 },
-                                    ].map(({ label, imán, dato }) => {
-                                        const rb = ocrPreview?.resultsBlock;
-                                        const val = rb ? (rb[10 - imán] || 0) : 0;
+                                        { label: 'NULOS (NUL)',      imán: 3, idx: INTENDENTE_CANDIDATES.length },
+                                        { label: 'BLANCOS (BLC)',    imán: 2, idx: INTENDENTE_CANDIDATES.length + 1 },
+                                        { label: 'A COMPUTAR (VAC)', imán: 1, idx: INTENDENTE_CANDIDATES.length + 2 },
+                                    ].map(({ label, imán, idx }) => {
+                                        const val = ocrPreview?.resultsBlock?.[idx] || 0;
                                         return (
                                             <tr key={label} className="border-b bg-amber-50">
                                                 <td className="p-2 text-xs font-semibold flex items-center gap-1">
@@ -374,7 +362,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                     })}
                                     {/* Suma y TOT */}
                                     <tr className="bg-slate-100 border-t-2 border-slate-300">
-                                        <td className="p-2 text-xs font-black uppercase">SUMA CALCULADA (L-11 a L-2)</td>
+                                        <td className="p-2 text-xs font-black uppercase">SUMA CALCULADA (Candidatos + Aux)</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
@@ -384,7 +372,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             <span className="text-[9px] font-mono opacity-70">🧲 L-0 (TOT)</span>
                                             <span>TOTAL OFICIAL DEL ACTA</span>
                                         </td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.resultsBlock?.[10] ?? ocrPreview?.extra.total_general}</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.resultsBlock?.[INTENDENTE_CANDIDATES.length + 3] ?? ocrPreview?.extra.total_general}</td>
                                     </tr>
                                 </tbody>
                             </table>
