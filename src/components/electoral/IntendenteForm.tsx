@@ -28,6 +28,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
         votes: Record<string, number>, 
         extra: any,
         identity: { mesa: number, local: number, distrito: number },
+        resultsBlock?: number[], // Bloque de 11 campos ancados al final
         isQr?: boolean,
         rawData?: number[],
         rawHex?: string
@@ -145,6 +146,7 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
             votes: previewVotes, 
             extra: { ...extraData, total_calculado: sumaResultados, es_valido: esValido },
             identity,
+            resultsBlock, // Guardamos el bloque de 11 para lectura directa en la UI
             isQr: true,
             rawData: data,
             rawHex: rawHex
@@ -327,22 +329,23 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             {!ocrPreview?.extra.es_valido ? '⚠️ Buzón de Resultados (Discrepancia)' : '✅ Buzón de Resultados Electorales'}
                                         </td>
                                     </tr>
-                                    {/* Filas de Listas con etiquetas reales */}
+                                    {/* MATRIZ DE IMANES: Lectura directa del resultsBlock por posición */}
                                     {[
-                                        { label: 'Lista 510', idx: 0 },
-                                        { label: 'Lista 520', idx: 1 },
-                                        { label: 'Lista 530', idx: 2 },
-                                        { label: 'Lista 540', idx: 3 },
-                                        { label: 'Lista 580', idx: 4 },
-                                        { label: 'Lista 590', idx: 5 },
-                                        { label: 'Lista 600', idx: 6 },
-                                    ].map(({ label, idx }) => {
-                                        const candidateId = INTENDENTE_CANDIDATES[idx]?.id;
-                                        const val = candidateId ? (ocrPreview?.votes[candidateId] || 0) : 0;
+                                        { label: 'Lista 510', imán: 10, dato: 1 },
+                                        { label: 'Lista 520', imán: 9,  dato: 2 },
+                                        { label: 'Lista 530', imán: 8,  dato: 3 },
+                                        { label: 'Lista 540', imán: 7,  dato: 4 },
+                                        { label: 'Lista 580', imán: 6,  dato: 5 },
+                                        { label: 'Lista 590', imán: 5,  dato: 6 },
+                                        { label: 'Lista 600', imán: 4,  dato: 7 },
+                                    ].map(({ label, imán, dato }) => {
+                                        // Lectura directa: L-11=idx0, L-10=idx1...L-5=idx6
+                                        const rb = ocrPreview?.resultsBlock;
+                                        const val = rb ? (rb[10 - imán] || 0) : 0;
                                         return (
                                             <tr key={label} className={`border-b hover:bg-slate-50 ${val > 0 ? 'bg-green-50' : ''}`}>
                                                 <td className="p-2 text-xs font-semibold flex items-center gap-1">
-                                                    <span className="text-[9px] text-slate-400 font-mono">Dato {idx+1}</span>
+                                                    <span className="text-[9px] text-slate-400 font-mono">🧲 L-{imán}</span>
                                                     <span>{label}</span>
                                                 </td>
                                                 <td className={`p-2 text-right font-black text-sm ${val > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
@@ -351,33 +354,37 @@ export function IntendenteForm({ mesa, local, onSave, isSaving, initialData }: I
                                             </tr>
                                         );
                                     })}
-                                    {/* Filas de Cierre */}
+                                    {/* Campos de Cierre — también leídos del resultsBlock */}
                                     {[
-                                        { label: 'NULOS (NUL)', val: ocrPreview?.extra.nulos, dato: 8 },
-                                        { label: 'BLANCOS (BLC)', val: ocrPreview?.extra.blancos, dato: 9 },
-                                        { label: 'A COMPUTAR (VAC)', val: ocrPreview?.extra.votos_computar, dato: 10 },
-                                    ].map(({ label, val, dato }) => (
-                                        <tr key={label} className="border-b bg-amber-50">
-                                            <td className="p-2 text-xs font-semibold flex items-center gap-1">
-                                                <span className="text-[9px] text-slate-400 font-mono">Dato {dato}</span>
-                                                <span>{label}</span>
-                                            </td>
-                                            <td className="p-2 text-right font-black text-sm">{val || 0}</td>
-                                        </tr>
-                                    ))}
-                                    {/* Fila de Suma y TOT */}
+                                        { label: 'NULOS (NUL)',      imán: 3, dato: 8 },
+                                        { label: 'BLANCOS (BLC)',    imán: 2, dato: 9 },
+                                        { label: 'A COMPUTAR (VAC)', imán: 1, dato: 10 },
+                                    ].map(({ label, imán, dato }) => {
+                                        const rb = ocrPreview?.resultsBlock;
+                                        const val = rb ? (rb[10 - imán] || 0) : 0;
+                                        return (
+                                            <tr key={label} className="border-b bg-amber-50">
+                                                <td className="p-2 text-xs font-semibold flex items-center gap-1">
+                                                    <span className="text-[9px] text-slate-400 font-mono">🧲 L-{imán}</span>
+                                                    <span>{label}</span>
+                                                </td>
+                                                <td className="p-2 text-right font-black text-sm">{val}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {/* Suma y TOT */}
                                     <tr className="bg-slate-100 border-t-2 border-slate-300">
-                                        <td className="p-2 text-xs font-black uppercase">SUMA CALCULADA (Datos 1–10)</td>
+                                        <td className="p-2 text-xs font-black uppercase">SUMA CALCULADA (L-11 a L-2)</td>
                                         <td className={`p-2 text-right font-black text-lg ${ocrPreview?.extra.es_valido ? 'text-green-600' : 'text-red-600'}`}>
                                             {ocrPreview?.extra.total_calculado}
                                         </td>
                                     </tr>
                                     <tr className="bg-blue-600 text-white">
                                         <td className="p-2 text-xs font-black flex items-center gap-1">
-                                            <span className="text-[9px] font-mono opacity-70">Dato 11</span>
-                                            <span>TOTAL OFICIAL (TOT)</span>
+                                            <span className="text-[9px] font-mono opacity-70">🧲 L-0 (TOT)</span>
+                                            <span>TOTAL OFICIAL DEL ACTA</span>
                                         </td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general}</td>
+                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.resultsBlock?.[10] ?? ocrPreview?.extra.total_general}</td>
                                     </tr>
                                 </tbody>
                             </table>
