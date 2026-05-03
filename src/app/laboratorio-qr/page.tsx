@@ -27,6 +27,7 @@ export default function QRLaboratoryPage() {
     const [depto, setDepto] = useState<string>('CAPITAL');
     const [cargo, setCargo] = useState<'INTENDENTE' | 'JUNTA'>('INTENDENTE');
     const [procesado, setProcesado] = useState<ResultadoProcesamiento | null>(null);
+    const [capturedImage, setCapturedImage] = useState<string | null>(null);
     
     // Cargar configuración desde Firebase al iniciar
     useEffect(() => {
@@ -39,76 +40,94 @@ export default function QRLaboratoryPage() {
 
     const qrInstance = useRef<any>(null);
 
+    const stopCamera = async () => {
+        if (qrInstance.current && qrInstance.current.isScanning) {
+            await qrInstance.current.stop();
+        }
+    };
+
+    const startCamera = async () => {
+        try {
+            setCapturedImage(null);
+            setScanResult('');
+            setDecodedData(null);
+            setProcesado(null);
+            setError(null);
+
+            const { Html5Qrcode } = await import('html5-qrcode');
+            const container = document.getElementById("reader");
+            if (container) container.innerHTML = ""; 
+
+            qrInstance.current = new Html5Qrcode("reader");
+            await qrInstance.current.start(
+                { facingMode: "environment" }, 
+                { fps: 15, qrbox: { width: 250, height: 250 } },
+                (result: string) => {
+                    setScanResult(result);
+                    processHex(result);
+                },
+                () => { /* ignore */ }
+            );
+        } catch (err) {
+            console.error("Scanner error:", err);
+        }
+    };
+
     useEffect(() => {
-        let isMounted = true;
-        
-        const startScanner = async () => {
-            try {
-                const { Html5Qrcode } = await import('html5-qrcode');
-                
-                // Si ya hay una instancia activa, la detenemos primero
-                if (qrInstance.current && qrInstance.current.isScanning) {
-                    await qrInstance.current.stop();
-                }
-
-                const container = document.getElementById("reader");
-                if (container) container.innerHTML = ""; 
-
-                qrInstance.current = new Html5Qrcode("reader");
-                
-                if (isMounted) {
-                    await qrInstance.current.start(
-                        { facingMode: "environment" }, 
-                        { fps: 15, qrbox: { width: 250, height: 250 } },
-                        (result: string) => {
-                            setScanResult(result);
-                            processHex(result);
-                        },
-                        () => { /* ignore */ }
-                    );
-                }
-            } catch (err) {
-                console.error("Scanner error:", err);
-            }
-        };
-
-        startScanner();
-
+        startCamera();
         return () => {
-            isMounted = false;
-            if (qrInstance.current && qrInstance.current.isScanning) {
-                qrInstance.current.stop().catch(() => {});
-            }
+            stopCamera().catch(() => {});
         };
-    }, [depto, cargo]); 
+    }, [depto, cargo, db]); 
 
     const processHex = (hex: string) => {
         try {
             setError(null);
             if (!hex) return;
             
-            const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
-            if (cleanHex.length < 10) return; // Ignorar entradas muy cortas
-
-            const match = cleanHex.match(/.{1,2}/g);
-            if (!match) throw new Error("Formato HEX inválido");
-
-            const bytes = new Uint8Array(match.map(byte => parseInt(byte, 16)));
+            console.log("Raw Scanned Data:", hex);
             
-            // Verificación de firma 0x1C (v1.0.8)
-            if (bytes[0] !== 0x1C) {
-                // Si no tiene firma 0x1C, intentamos procesar de todos modos o avisamos
-                console.warn("Firma 0x1C no encontrada al inicio");
+            let bytes: Uint8Array;
+            
+            // Intento 1: ¿Es HEX?
+            const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
+            if (cleanHex.length > 20 && cleanHex.length % 2 === 0) {
+                const match = cleanHex.match(/.{1,2}/g);
+                bytes = new Uint8Array(match!.map(byte => parseInt(byte, 16)));
+            } else {
+                // Intento 2: ¿Es Base64?
+                try {
+                    const binaryString = atob(hex);
+                    bytes = new Uint8Array(binaryString.length);
+                    for (let i = 0; i < binaryString.length; i++) {
+                        bytes[i] = binaryString.charCodeAt(i);
+                    }
+                } catch (e) {
+                    throw new Error("El formato del QR no es HEX ni Base64 válido.");
+                }
+            }
+            
+            // Búsqueda dinámica de cabecera ZLIB (0x78 0x9C)
+            let zlibOffset = -1;
+            for (let i = 0; i < bytes.length - 1; i++) {
+                if (bytes[i] === 0x78 && bytes[i+1] === 0x9C) {
+                    zlibOffset = i;
+                    break;
+                }
             }
 
-            const compressedData = bytes.slice(15);
-            if (compressedData.length === 0) throw new Error("No hay datos comprimidos");
+            if (zlibOffset === -1) {
+                // Si no hay 789C, quizás los datos NO están comprimidos (muy raro en MSA)
+                throw new Error("No se encontró firma ZLIB. Verifica que sea un acta MSA original.");
+            }
 
+            const compressedData = bytes.slice(zlibOffset);
+            
             let decompressed;
             try {
                 decompressed = fflate.unzlibSync(compressedData);
             } catch (e) {
-                throw new Error("Fallo en descompresión ZLIB. El QR podría estar corrupto.");
+                throw new Error("Fallo en descompresión. Imagen borrosa o datos incompletos.");
             }
 
             const fullArray = Array.from(decompressed);
@@ -196,47 +215,63 @@ export default function QRLaboratoryPage() {
                         <CardContent className="p-4 space-y-4">
                             <div className="space-y-3">
                                 <div className="rounded-xl border-2 border-dashed border-slate-200 overflow-hidden bg-slate-50 relative min-h-[300px] flex items-center justify-center">
-                                    {/* Contenedor EXCLUSIVO para la cámara - React NO debe tener hijos aquí */}
-                                    <div id="reader" className="w-full h-full absolute inset-0"></div>
+                                    {/* Contenedor EXCLUSIVO para la cámara */}
+                                    <div id="reader" className={`w-full h-full absolute inset-0 ${capturedImage ? 'hidden' : 'block'}`}></div>
                                     
-                                    {!scanResult && (
+                                    {capturedImage && (
+                                        <img src={capturedImage} alt="Captura" className="w-full h-full object-contain absolute inset-0 z-20 bg-black" />
+                                    )}
+
+                                    {!scanResult && !capturedImage && (
                                         <div className="text-center p-6 z-10 pointer-events-none">
                                             <Camera className="w-10 h-10 text-slate-300 mx-auto mb-2" />
                                             <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Iniciando cámara...</p>
                                         </div>
                                     )}
                                 </div>
-                                <Button 
-                                    onClick={async () => {
-                                        const video = document.querySelector('#reader video') as HTMLVideoElement;
-                                        if (video && qrInstance.current) {
-                                            const canvas = document.createElement('canvas');
-                                            canvas.width = video.videoWidth;
-                                            canvas.height = video.videoHeight;
-                                            const ctx = canvas.getContext('2d');
-                                            ctx?.drawImage(video, 0, 0);
-                                            
-                                            // Efecto visual de flash
-                                            video.style.filter = 'brightness(2)';
-                                            setTimeout(() => video.style.filter = 'none', 100);
 
-                                            // Escanear la imagen capturada
-                                            try {
-                                                const { Html5Qrcode } = await import('html5-qrcode');
-                                                const result = await qrInstance.current.scanFile(canvas as any, false);
-                                                setScanResult(result);
-                                                processHex(result);
-                                            } catch (err) {
-                                                console.error("No se detectó QR en la foto:", err);
-                                                setError("No se detectó un código QR claro en la foto. Intenta de nuevo.");
+                                {!capturedImage ? (
+                                    <Button 
+                                        onClick={async () => {
+                                            const video = document.querySelector('#reader video') as HTMLVideoElement;
+                                            if (video && qrInstance.current) {
+                                                const canvas = document.createElement('canvas');
+                                                canvas.width = video.videoWidth;
+                                                canvas.height = video.videoHeight;
+                                                const ctx = canvas.getContext('2d');
+                                                ctx?.drawImage(video, 0, 0);
+                                                const dataUrl = canvas.toDataURL('image/webp');
+                                                setCapturedImage(dataUrl);
+                                                
+                                                // Detener cámara para congelar
+                                                await stopCamera();
+
+                                                // Escanear la imagen capturada
+                                                try {
+                                                    const result = await qrInstance.current.scanFile(canvas as any, false);
+                                                    setScanResult(result);
+                                                    processHex(result);
+                                                } catch (err) {
+                                                    console.error("No se detectó QR en la foto:", err);
+                                                    setError("No se detectó un código QR claro en la foto. Dale a REINTENTAR.");
+                                                }
                                             }
-                                        }
-                                    }}
-                                    className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white font-black text-lg shadow-lg shadow-purple-500/20 gap-2"
-                                >
-                                    <Camera className="w-6 h-6" />
-                                    CAPTURAR QR
-                                </Button>
+                                        }}
+                                        className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white font-black text-lg shadow-lg shadow-purple-500/20 gap-2"
+                                    >
+                                        <Camera className="w-6 h-6" />
+                                        CAPTURAR QR
+                                    </Button>
+                                ) : (
+                                    <Button 
+                                        onClick={() => startCamera()}
+                                        variant="outline"
+                                        className="w-full h-14 border-2 border-slate-200 text-slate-600 font-black text-lg gap-2"
+                                    >
+                                        <History className="w-6 h-6" />
+                                        REINTENTAR CAPTURA
+                                    </Button>
+                                )}
                             </div>
 
                             <div className="pt-4 border-t space-y-4">
