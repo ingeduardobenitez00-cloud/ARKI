@@ -58,7 +58,7 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
 
                 scanner.start(
                     { facingMode: "environment" }, 
-                    { fps: 10, qrbox: { width: 250, height: 250 } },
+                    { fps: 20, qrbox: { width: 280, height: 280 } },
                     (result) => {
                         console.log("QR Scanned:", result);
                         decodeAndProcessQr(result);
@@ -90,74 +90,38 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
     };
 
     const decodeAndProcessQr = (hex: string) => {
-        console.log("--- INICIANDO DECIFRADO QR ---");
-        console.log("Contenido crudo escaneado:", hex);
-        
+        console.log("--- PROCESANDO QR ARKI ---");
         try {
-            // 1. Limpieza extrema del HEX
             const cleanHex = hex.trim().replace(/\s/g, '').replace(/[^0-9A-Fa-f]/g, '');
-            console.log("HEX limpio para procesar:", cleanHex);
-
-            if (cleanHex.length < 32) {
-                throw new Error(`Contenido demasiado corto (${cleanHex.length} caracteres). ¿Es un acta MSA?`);
-            }
-            
-            // 2. Convertir Hex a Array de Bytes
             const hexMatch = cleanHex.match(/.{1,2}/g);
-            if (!hexMatch) throw new Error("No se pudo parsear el HEX a bytes.");
-            
+            if (!hexMatch) throw new Error("Error en HEX.");
             const bytes = new Uint8Array(hexMatch.map(byte => parseInt(byte, 16)));
-            console.log("Total bytes extraídos:", bytes.length);
+            
+            let finalData: number[] = [];
 
-            // 3. Búsqueda Inteligente del inicio de Zlib (0x78 0x9C)
-            let startIndex = -1;
-            for (let i = 0; i < bytes.length - 1; i++) {
-                if (bytes[i] === 0x78 && (bytes[i + 1] === 0x9C || bytes[i + 1] === 0x01 || bytes[i + 1] === 0xDA)) {
-                    startIndex = i;
-                    break;
+            try {
+                let zlibStart = -1;
+                for (let i = 0; i < bytes.length - 1; i++) {
+                    if (bytes[i] === 0x78 && (bytes[i+1] === 0x9C || bytes[i+1] === 0x01)) {
+                        zlibStart = i; break;
+                    }
                 }
+                if (zlibStart !== -1) {
+                    const decompressed = fflate.unzlibSync(bytes.slice(zlibStart));
+                    finalData = Array.from(decompressed);
+                } else { throw new Error("No Zlib"); }
+            } catch (e) {
+                finalData = Array.from(bytes);
             }
-
-            if (startIndex === -1) {
-                // Fallback al offset de 15 si no se encuentra el marcador
-                startIndex = 15;
-                console.warn("No se encontró marcador Zlib, usando offset por defecto 15");
-            } else {
-                console.log(`Marcador Zlib encontrado en posición: ${startIndex}`);
-            }
-
-            const compressedData = bytes.slice(startIndex);
-            console.log("Primeros bytes de data a descomprimir:", 
-                Array.from(compressedData.slice(0, 5)).map(b => b.toString(16)).join(' ')
-            );
-
-            // 4. Descomprimir usando Zlib
-            const decompressed = fflate.unzlibSync(compressedData);
-            const dataArray = Array.from(decompressed);
-            console.log("BUFFER BRUTO DESCOMPRIMIDO:", dataArray);
-
-            // REGLA 1: Sincronización de Inicio (DATA_OFFSET)
-            // Reseteado a 0 para recalibración manual
-            const DATA_OFFSET = 0; 
-            const payloadOnly = dataArray.slice(DATA_OFFSET);
 
             if (onQrParsed) {
-                // REGLA DE PRECISIÓN 5: Enviamos también el HEX original para auditoría
-                onQrParsed(payloadOnly, cleanHex); 
-                
-                toast({
-                    title: "¡QR Decifrado con Éxito!",
-                    description: `Bloque de votos extraído tras offset ${DATA_OFFSET}.`,
-                    className: "bg-green-600 text-white border-none shadow-lg",
-                });
+                onQrParsed(finalData, cleanHex);
+                stopQrScanner(); 
+                toast({ title: "¡QR Decifrado!", className: "bg-green-600 text-white" });
             }
         } catch (e: any) {
-            console.error("ERROR CRÍTICO EN DECIFRADO QR:", e);
-            toast({
-                title: "Error de Decifrado",
-                description: e.message || "El formato del QR no coincide con el protocolo MSA.",
-                variant: "destructive",
-            });
+            console.error("Error QR:", e);
+            toast({ title: "Error de Lectura", variant: "destructive" });
         }
     };
 

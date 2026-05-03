@@ -11,25 +11,29 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
 import { ActaImageCapture } from './ActaImageCapture';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { procesarQRARKI } from '@/lib/qr-processor';
+import * as fflate from 'fflate';
 
 interface JuntaFormProps {
     mesa: number;
     local: string;
+    depto?: string; // Nuevo
     onSave: (data: any, imageFile: File) => void;
     isSaving?: boolean;
-    initialData?: any; // New prop for QR auto-fill
+    initialData?: any; 
 }
 
-export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaFormProps) {
+export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, initialData }: JuntaFormProps) {
     const [votes, setVotes] = useState<Record<string, Record<number, number>>>(initialData?.votes || {});
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
 
-    // Preview OCR state
+    // Preview state
     const [ocrPreview, setOcrPreview] = useState<{ 
         votes: Record<string, Record<number, number>>, 
         extra: any,
         identity: { mesa: number, local: number, distrito: number },
+        resultsBlock?: any[],
         isQr?: boolean,
         rawData?: number[],
         rawHex?: string
@@ -38,6 +42,7 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const [isOcrDialogOpen, setIsOcrDialogOpen] = useState(false);
     const [activeListId, setActiveListId] = useState(JUNTA_LISTS[0].id);
 
+    // Handle incoming QR data asynchronously
     React.useEffect(() => {
         if (initialData) {
             if (initialData.votes) setVotes(initialData.votes);
@@ -48,128 +53,39 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     const handleOcrParsed = (text: string) => {
         const previewVotes: Record<string, Record<number, number>> = {};
         const previewExtra = { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 };
-        const lines = text.split('\n');
-
-        lines.forEach(line => {
-            const trimmed = line.trim();
-            if (!trimmed) return;
-
-            // 1. Identificar campos fijos (NUL, BLC, VAC, TOT) - Más agresivo
-            const nulosMatch = trimmed.match(/NUL.*?\D(\d+)/i);
-            if (nulosMatch && nulosMatch[1]) previewExtra.nulos = parseInt(nulosMatch[1], 10);
-            const blancosMatch = trimmed.match(/BLC.*?\D(\d+)/i);
-            if (blancosMatch && blancosMatch[1]) previewExtra.blancos = parseInt(blancosMatch[1], 10);
-            const vacMatch = trimmed.match(/VAC.*?\D(\d+)/i);
-            if (vacMatch && vacMatch[1]) previewExtra.votos_computar = parseInt(vacMatch[1], 10);
-            const totalMatch = trimmed.match(/TOT.*?\D(\d+)/i);
-            if (totalMatch && totalMatch[1]) previewExtra.total_general = parseInt(totalMatch[1], 10);
-
-            // 2. Identificar por número de lista explícito (ej: "2C ...")
-            JUNTA_LISTS.forEach(list => {
-                const listRegex = new RegExp(`(?:^|\\s)${list.listNumber}\\b\\s*([\\d\\s]+)`, 'i');
-                const match = trimmed.match(listRegex);
-                if (match && match[1]) {
-                    const numbers = match[1].trim().split(/\s+/).map(n => parseInt(n, 10)).filter(n => !isNaN(n));
-                    if (numbers.length > 0) {
-                        if (!previewVotes[list.id]) previewVotes[list.id] = {};
-                        if (numbers.length > 10) {
-                            for (let i = 0; i < Math.min(16, numbers.length); i++) {
-                                previewVotes[list.id][i + 1] = numbers[i];
-                            }
-                        } else {
-                            for (let i = 0; i < Math.min(8, numbers.length); i++) {
-                                previewVotes[list.id][17 + i] = numbers[i];
-                            }
-                        }
-                    }
-                }
-            });
-        });
-
-        // 3. FALLBACK POR ORDEN (Si las listas no fueron identificadas por nombre)
-        const candidateLines = lines.filter(l => (l.match(/\d+/g) || []).length > 5);
-        if (candidateLines.length >= 5) {
-            JUNTA_LISTS.forEach((list, index) => {
-                // Si la lista aún no tiene votos, tomamos la línea correspondiente por índice
-                if (!previewVotes[list.id] && candidateLines[index]) {
-                    const numbers = candidateLines[index].match(/\d+/g)?.map(n => parseInt(n, 10)) || [];
-                    if (numbers.length > 0) {
-                        previewVotes[list.id] = {};
-                        // Distribuir números correlativamente (1 al 24)
-                        for (let i = 0; i < Math.min(24, numbers.length); i++) {
-                            previewVotes[list.id][i + 1] = numbers[i];
-                        }
-                    }
-                }
-            });
-        }
-
-        // 4. Fallback para campos fijos por posición (últimas 4 líneas con 1 solo número)
-        const footerLines = lines.filter(l => (l.match(/\d+/g) || []).length === 1);
-        if (footerLines.length >= 4) {
-            const offset = footerLines.length - 4;
-            if (previewExtra.nulos === 0) previewExtra.nulos = parseInt(footerLines[offset].match(/\d+/)?.[0] || "0");
-            if (previewExtra.blancos === 0) previewExtra.blancos = parseInt(footerLines[offset+1].match(/\d+/)?.[0] || "0");
-            if (previewExtra.votos_computar === 0) previewExtra.votos_computar = parseInt(footerLines[offset+2].match(/\d+/)?.[0] || "0");
-            if (previewExtra.total_general === 0) previewExtra.total_general = parseInt(footerLines[offset+3].match(/\d+/)?.[0] || "0");
-        }
-
-        setOcrPreview({ votes: previewVotes, extra: previewExtra });
+        setOcrPreview({ votes: previewVotes, extra: previewExtra, identity: { mesa, local: 0, distrito: 0 } });
         setIsOcrDialogOpen(true);
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
-        const L = data.length;
-        
-        // CONTRATO DE CAMPOS JUNTA: (Nº Listas * 25) + 4 campos de cierre
-        const RESULT_FIELDS_COUNT = (JUNTA_LISTS.length * 25) + 4;
-        const resultsBlock = data.slice(L - RESULT_FIELDS_COUNT);
-        
-        // Identidad residual
-        const identityBlock = data.slice(0, L - RESULT_FIELDS_COUNT);
-        const identity = {
-            eleccion: identityBlock[0] || 0,
-            depto: identityBlock[1] || 0,
-            distrito: identityBlock[2] || 0,
-            zona: identityBlock[3] || 0,
-            local: identityBlock[4] || 0,
-            mesa: identityBlock[5] || 0,
-            mesa_bis: identityBlock[6] || 0
-        };
+        // USAR MOTOR UNIFICADO ARKI (Con desempaquetado de bits)
+        const resultado = procesarQRARKI(data, depto, 'JUNTA', 0);
 
-        // 1. Identificar el cierre (Últimos 4 bytes)
-        const extraData = {
-            total_general: resultsBlock[resultsBlock.length - 1] || 0, // TOT
-            votos_computar: resultsBlock[resultsBlock.length - 2] || 0, // VAC
-            blancos: resultsBlock[resultsBlock.length - 3] || 0,        // BLC
-            nulos: resultsBlock[resultsBlock.length - 4] || 0           // NUL
-        };
-
-        // 2. Mapear bloques de 25 votos
         const previewVotes: Record<string, Record<number, number>> = {};
-        JUNTA_LISTS.forEach((list, listIndex) => {
-            previewVotes[list.id] = {};
-            const blockStart = listIndex * 25;
-            // Solo tomamos los primeros 24 bytes (Preferenciales)
-            for (let i = 0; i < 24; i++) {
-                previewVotes[list.id][i + 1] = resultsBlock[blockStart + i] || 0;
-            }
-            // El byte 25 es el Control de Lista (se ignora para la suma de preferenciales)
-        });
-
-        // VALIDACIÓN DE INTEGRIDAD
-        let sumaTotal = extraData.nulos + extraData.blancos + extraData.votos_computar;
-        Object.values(previewVotes).forEach(listVotes => {
-            sumaTotal += Object.values(listVotes).reduce((a, b) => a + b, 0);
-        });
         
-        const esValido = sumaTotal === extraData.total_general;
+        resultado.votos.forEach(v => {
+            const listId = v.id.split('-opt-')[0];
+            const option = parseInt(v.id.split('-opt-')[1]);
+            
+            if (!previewVotes[listId]) previewVotes[listId] = {};
+            previewVotes[listId][option] = v.votos;
+        });
 
         setRawQrHex(rawHex);
         setOcrPreview({ 
             votes: previewVotes, 
-            extra: { ...extraData, total_calculado: sumaTotal, es_valido: esValido },
-            identity,
+            extra: { 
+                ...resultado.cierre, 
+                es_valido: resultado.validado,
+                total_calculado: resultado.votos.reduce((a, b) => a + b.votos, 0) + 
+                                resultado.cierre.nul + resultado.cierre.blc + resultado.cierre.vac
+            },
+            identity: {
+                mesa: data[5] || 0,
+                local: data[4] || 0,
+                distrito: data[2] || 0
+            },
+            resultsBlock: resultado.votos,
             isQr: true,
             rawData: data,
             rawHex: rawHex
@@ -178,29 +94,14 @@ export function JuntaForm({ mesa, local, onSave, isSaving, initialData }: JuntaF
     };
 
     const applyOcrData = () => {
-        if (ocrPreview && ocrPreview.rawData) {
-            const newVotes: Record<string, Record<number, number>> = {};
-            
-            // REGLA 4: Inyección por Posición para Junta (Bloques de 24)
-            JUNTA_LISTS.forEach((list, listIndex) => {
-                newVotes[list.id] = {};
-                const offset = listIndex * 24;
-                for (let i = 0; i < 24; i++) {
-                    newVotes[list.id][i + 1] = ocrPreview.rawData![offset + i] || 0;
-                }
+        if (ocrPreview) {
+            setVotes(ocrPreview.votes);
+            setExtra({
+                nulos: ocrPreview.extra.nul || ocrPreview.extra.nulos,
+                blancos: ocrPreview.extra.blc || ocrPreview.extra.blancos,
+                votos_computar: ocrPreview.extra.vac || ocrPreview.extra.votos_computar,
+                total_general: ocrPreview.extra.tot || ocrPreview.extra.total_general
             });
-
-            // Mapear los últimos campos tras las listas
-            const footerOffset = JUNTA_LISTS.length * 24;
-            const newExtra = {
-                nulos: ocrPreview.rawData[footerOffset] || 0,
-                blancos: ocrPreview.rawData[footerOffset + 1] || 0,
-                votos_computar: ocrPreview.rawData[footerOffset + 2] || 0,
-                total_general: ocrPreview.rawData[footerOffset + 3] || 0
-            };
-
-            setVotes(newVotes);
-            setExtra(prev => ({ ...prev, ...newExtra }));
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
         }

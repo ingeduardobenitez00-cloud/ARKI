@@ -14,14 +14,14 @@ export const MOLDES_ARKI: Record<string, DeptoConfig> = {
     CAPITAL: {
         INTENDENTE: {
             totalListas: 3,
-            opcionesPorLista: 1, // 1 candidato por lista
-            totalCampos: 7,
+            opcionesPorLista: 1, 
+            totalCampos: 14, // 7 (Header) + 3 (Listas) + 4 (Cierre)
             cierre: ['NUL', 'BLC', 'VAC', 'TOT']
         },
         JUNTA: {
             totalListas: 5,
             opcionesPorLista: 24,
-            totalCampos: 124,
+            totalCampos: 129, // 5 (Listas) * 25 + 4 (Cierre)
             cierre: ['NUL', 'BLC', 'VAC', 'TOT']
         }
     },
@@ -29,13 +29,13 @@ export const MOLDES_ARKI: Record<string, DeptoConfig> = {
         INTENDENTE: {
             totalListas: 7,
             opcionesPorLista: 1,
-            totalCampos: 11,
+            totalCampos: 18, // 7 (Header) + 7 (Listas) + 4 (Cierre)
             cierre: ['NUL', 'BLC', 'VAC', 'TOT']
         },
         JUNTA: {
             totalListas: 21,
             opcionesPorLista: 24,
-            totalCampos: 508,
+            totalCampos: 529, // 21 (Listas) * 25 + 4 (Cierre)
             cierre: ['NUL', 'BLC', 'VAC', 'TOT']
         }
     },
