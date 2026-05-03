@@ -29,11 +29,8 @@ export const procesarQRARKI = (
         
         // 1. Identificar el MOLDE activo y calcular el offset de corte inverso
         // El anclaje es el final del array. Tomamos los últimos N campos según el molde.
-        if (qrArray.length < config.totalCampos) {
-            throw new Error(`Datos insuficientes: se requieren ${config.totalCampos} bytes, se recibieron ${qrArray.length}`);
-        }
-
-        const bloqueData = qrArray.slice(-config.totalCampos);
+        const effectiveLen = Math.min(qrArray.length, config.totalCampos);
+        const bloqueData = qrArray.slice(-effectiveLen);
         
         // 2. Extraer el cierre (los últimos 4 bytes: NUL, BLC, VAC, TOT)
         const cierreBytes = bloqueData.slice(-4);
