@@ -9,6 +9,7 @@ export interface ResultadoProcesamiento {
         tot: number;
     };
     validado: boolean;
+    rawPayload?: number[]; // Para depuración en laboratorio
     error?: string;
 }
 
@@ -113,6 +114,7 @@ export const procesarQRARKI = (
                 votos: votosMapeadosFinal,
                 cierre: { nul: realNul, blc: realBlc, vac: realVac, tot: realTot },
                 validado: sumaTotalCalculada === realTot || realTot === 5,
+                rawPayload: votosBits, // Para Junta mostramos los bits mapeados
                 error: undefined
             };
 
@@ -135,14 +137,19 @@ export const procesarQRARKI = (
                     votos: votosMapeadosFinal,
                     cierre: { nul: realNul, blc: realBlc, vac: realVac, tot: realTot },
                     validado: sumaCalculada === realTot,
+                    rawPayload: qrArray,
                     error: undefined
                 };
             } else {
-                // CENTRAL (Restaurado a motor flexible)
-                const realNul = qrArray[2 + offset] || 0;
-                const realVac = qrArray[4 + offset] || 0; // El radar dice [4]: 13 o similar
-                const realTot = qrArray[197 + offset] || 0; // El radar dice [197]: 5
+                // CENTRAL (Motor Inteligente: Detecta longitud del acta)
+                const isShort = qrArray.length < 50;
+                const totIdx = isShort ? qrArray.length - 1 : 197 + offset;
                 
+                const realNul = qrArray[2 + offset] || 0;
+                const realVac = qrArray[4 + offset] || 0; 
+                const realTot = qrArray[totIdx] || 0; 
+                
+                // Mapeo dinámico de listas
                 const votosMapeadosFinal = [
                     { id: 'lista-510', nombre: 'Lista 510', votos: qrArray[7 + offset] || 0 },
                     { id: 'lista-520', nombre: 'Lista 520', votos: qrArray[8 + offset] || 0 },
@@ -152,10 +159,12 @@ export const procesarQRARKI = (
                 ];
                 
                 const sumaCalculada = votosMapeadosFinal.reduce((acc, v) => acc + v.votos, 0) + realNul + realVac;
+                
                 return {
                     votos: votosMapeadosFinal,
                     cierre: { nul: realNul, blc: 0, vac: realVac, tot: realTot },
-                    validado: true, // Modo laboratorio Central
+                    validado: sumaCalculada === realTot || isShort, // En cortas confiamos en el radar
+                    rawPayload: qrArray,
                     error: undefined
                 };
             }

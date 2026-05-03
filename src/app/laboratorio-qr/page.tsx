@@ -103,7 +103,7 @@ export default function QRLaboratoryPage() {
             
             let bytes: Uint8Array;
             const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
-            if (cleanHex.length > 20 && cleanHex.length % 2 === 0) {
+            if (cleanHex.length >= 10 && cleanHex.length % 2 === 0) {
                 const match = cleanHex.match(/.{1,2}/g);
                 bytes = new Uint8Array(match!.map(byte => parseInt(byte, 16)));
             } else {
@@ -118,22 +118,28 @@ export default function QRLaboratoryPage() {
                 }
             }
             
+            let finalArray: number[] = [];
             let zlibOffset = -1;
             for (let i = 0; i < bytes.length - 1; i++) {
-                if (bytes[i] === 0x78 && bytes[i+1] === 0x9C) {
+                if (bytes[i] === 0x78 && (bytes[i+1] === 0x9C || bytes[i+1] === 0x01)) {
                     zlibOffset = i;
                     break;
                 }
             }
 
-            if (zlibOffset === -1) throw new Error("No se encontró firma ZLIB.");
+            if (zlibOffset !== -1) {
+                console.log("Descomprimiendo Zlib en Laboratorio...");
+                const compressedData = bytes.slice(zlibOffset);
+                const decompressed = fflate.unzlibSync(compressedData);
+                finalArray = Array.from(decompressed);
+            } else {
+                console.log("Usando Raw Bytes en Laboratorio (No detectada compresión)");
+                finalArray = Array.from(bytes);
+            }
+            
+            setDecodedData(finalArray);
 
-            const compressedData = bytes.slice(zlibOffset);
-            const decompressed = fflate.unzlibSync(compressedData);
-            const fullArray = Array.from(decompressed);
-            setDecodedData(fullArray);
-
-            const resultado = procesarQRARKI(fullArray, depto, cargo, manualOffset);
+            const resultado = procesarQRARKI(finalArray, depto, cargo, manualOffset);
             setProcesado(resultado);
             
             if (!resultado.validado && resultado.error) setError(resultado.error);
