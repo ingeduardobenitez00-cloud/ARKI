@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, doc, updateDoc, deleteDoc, getCountFromServer, query, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, Smartphone, MapPin, Hash } from 'lucide-react';
+import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,6 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { cn } from '@/lib/utils';
 import { logAction } from '@/lib/audit';
 
 interface VotoSeguroData {
@@ -65,35 +64,43 @@ export default function VotoSeguroPage() {
   const [votoToDelete, setVotoToDelete] = useState<VotoSeguroData | null>(null);
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
-  const [totalCount, setTotalCount] = useState<number | null>(null);
-  const [limitCount, setLimitCount] = useState(2000);
-  const [refreshKey, setRefreshKey] = useState(0);
-
-  // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS CON LÍMITE
-  const registeredQuery = useMemoFirebase(() => {
-    if (!db || !user) return null;
-    return query(
-        collection(db, 'votos_confirmados'),
-        orderBy('APELLIDO', 'asc'),
-        limit(limitCount)
-    );
-  }, [db, user, limitCount, refreshKey]);
-
-  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
-
-  // CONTEO EFICIENTE DESDE EL SERVIDOR (PLAN BLAZE OPTIMIZADO)
-  useState(() => {
-    if (!db) return;
-    getCountFromServer(collection(db, 'votos_confirmados')).then(snap => {
-        setTotalCount(snap.data().count);
-    });
-  });
+  const [limitCount] = useState(2000);
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
   const isDirigente = user?.role === 'Dirigente';
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
+
+  /**
+   * QUERY OPTIMIZADA POR ROL:
+   * - Dirigentes (~650 usuarios): filtro server-side por su propio ID → ~30-50 docs c/u
+   * - Admins/Presidentes/Coordinadores (~50 usuarios): query completo con limit(2000)
+   * Esto reduce lecturas de Firestore en ~97% para la gran mayoría de usuarios.
+   * ÍNDICE REQUERIDO en Firestore: votos_confirmados → registradoPor_id ASC, APELLIDO ASC
+   */
+  const registeredQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+
+    // Dirigentes: solo sus propios votos (server-side, sin techo)
+    // Cada Dirigente carga únicamente sus registros — pueden tener hasta 1000+
+    if (isDirigente) {
+      return query(
+        collection(db, 'votos_confirmados'),
+        where('registradoPor_id', '==', user.id),
+        orderBy('APELLIDO', 'asc')
+      );
+    }
+
+    // Admins, Presidentes, Coordinadores: todos los votos con límite
+    return query(
+      collection(db, 'votos_confirmados'),
+      orderBy('APELLIDO', 'asc'),
+      limit(limitCount)
+    );
+  }, [db, user, limitCount, isDirigente]);
+
+  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
 
   // FILTRADO POR ROLES Y JURISDICCIÓN
   const filteredList = useMemo(() => {
@@ -102,7 +109,7 @@ export default function VotoSeguroPage() {
     // Admins (PC Central) ven TODO
     if (isAdmin) return rawList;
 
-    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS
+    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS (filtro cliente)
     if (isPresidente || isCoordinador) {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
@@ -110,10 +117,8 @@ export default function VotoSeguroPage() {
         });
     }
 
-    // Dirigentes solo ven LO SUYO
-    if (isDirigente) {
-        return rawList.filter(item => item.registradoPor_id === user.id);
-    }
+    // Dirigentes: la query ya viene filtrada server-side, devolver todo
+    if (isDirigente) return rawList;
 
     return [];
   }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales]);
@@ -205,7 +210,6 @@ export default function VotoSeguroPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookHeart className="h-8 w-8 text-primary" /> Listado de Voto Seguro</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control optimizado de captación por operador.</p></div>
         <div className="flex gap-2">
-            <Button onClick={() => setRefreshKey(v => v + 1)} variant="outline" className="font-black uppercase text-[10px] h-9 border-primary/20"><Loader2 className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} /> REFRESCAR</Button>
             <Button onClick={() => setIsFilenameDialogOpen(true)} disabled={filteredList.length === 0 || isExporting} variant="default" className="font-black uppercase text-[10px] h-9 shadow-lg"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
         </div>
       </div>
@@ -216,7 +220,7 @@ export default function VotoSeguroPage() {
                 <div className="flex items-center gap-3">
                     <CardTitle className="text-[11px] font-black uppercase">Resumen de Capturas</CardTitle>
                     <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
-                        {totalCount !== null ? `${totalCount} TOTALES` : filteredList.length + ' CARGADOS'}
+                        {isLoading ? '...' : `${filteredList.length} REGISTROS`}
                     </Badge>
                 </div>
             </div>

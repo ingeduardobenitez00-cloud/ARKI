@@ -57,6 +57,8 @@ export const allMenuItems = [
   { href: '/users', label: 'Usuarios', icon: Users, tooltip: 'GESTIONA LOS USUARIOS Y SUS PERMISOS.' },
   { href: '/configuracion', label: 'Configuración', icon: Settings, tooltip: 'CONFIGURA PARÁMETROS TÉCNICOS E IDENTIDAD PWA.' },
   { href: '/perfil', label: 'Mi Perfil', icon: UserCircle, tooltip: 'GESTIONA TU INFORMACIÓN PERSONAL Y CAMBIA TU CONTRASEÑA.' },
+  { href: '/laboratorio-qr', label: 'Laboratorio QR', icon: Cpu, tooltip: 'INGENIERÍA INVERSA Y VALIDACIÓN DE ACTAS.' },
+  { href: '/admin/config-setup', label: 'Setup Config', icon: Database, tooltip: 'CONFIGURACIÓN DE MOLDES ELECTORALES.' },
 ];
 
 export const menuCategories = [

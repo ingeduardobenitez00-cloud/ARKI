@@ -65,6 +65,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           }
           
           const mandatory = ['/', '/perfil'];
+          if (userData.role === 'Admin' || userData.role === 'Super-Admin') {
+            mandatory.push('/laboratorio-qr', '/admin/config-setup');
+          }
           mandatory.forEach(p => {
               if (!permissions.includes(p)) permissions.push(p);
           });
