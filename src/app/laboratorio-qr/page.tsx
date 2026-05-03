@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -195,27 +195,41 @@ export default function QRLaboratoryPage() {
                         </CardHeader>
                         <CardContent className="p-4 space-y-4">
                             <div className="space-y-3">
-                                <div id="reader" className="rounded-xl border-2 border-dashed border-slate-200 overflow-hidden bg-slate-50 relative min-h-[300px]">
+                                <div className="rounded-xl border-2 border-dashed border-slate-200 overflow-hidden bg-slate-50 relative min-h-[300px] flex items-center justify-center">
+                                    {/* Contenedor EXCLUSIVO para la cámara - React NO debe tener hijos aquí */}
+                                    <div id="reader" className="w-full h-full absolute inset-0"></div>
+                                    
                                     {!scanResult && (
-                                        <div className="text-center p-6">
+                                        <div className="text-center p-6 z-10 pointer-events-none">
                                             <Camera className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-                                            <p className="text-[10px] text-slate-400 font-bold uppercase">Escáner no iniciado</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Iniciando cámara...</p>
                                         </div>
                                     )}
                                 </div>
                                 <Button 
                                     onClick={async () => {
                                         const video = document.querySelector('#reader video') as HTMLVideoElement;
-                                        if (video) {
+                                        if (video && qrInstance.current) {
                                             const canvas = document.createElement('canvas');
                                             canvas.width = video.videoWidth;
                                             canvas.height = video.videoHeight;
                                             const ctx = canvas.getContext('2d');
                                             ctx?.drawImage(video, 0, 0);
-                                            // Aquí podríamos guardar la imagen si fuera necesario
-                                            // Por ahora, forzamos un pulso visual de captura
-                                            video.style.filter = 'brightness(2) contrast(2)';
-                                            setTimeout(() => video.style.filter = 'none', 150);
+                                            
+                                            // Efecto visual de flash
+                                            video.style.filter = 'brightness(2)';
+                                            setTimeout(() => video.style.filter = 'none', 100);
+
+                                            // Escanear la imagen capturada
+                                            try {
+                                                const { Html5Qrcode } = await import('html5-qrcode');
+                                                const result = await qrInstance.current.scanFile(canvas as any, false);
+                                                setScanResult(result);
+                                                processHex(result);
+                                            } catch (err) {
+                                                console.error("No se detectó QR en la foto:", err);
+                                                setError("No se detectó un código QR claro en la foto. Intenta de nuevo.");
+                                            }
                                         }
                                     }}
                                     className="w-full h-14 bg-purple-600 hover:bg-purple-700 text-white font-black text-lg shadow-lg shadow-purple-500/20 gap-2"
