@@ -24,11 +24,13 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onAiParsed, onQ
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-    const [isOcrProcessing, setIsOcrProcessing] = useState(false);
     const [isAiProcessing, setIsAiProcessing] = useState(false);
-    const [ocrProgress, setOcrProgress] = useState(0);
     const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
     const qrScannerRef = useRef<any>(null);
+    
+    // Crop states
+    const [isCropMode, setIsCropMode] = useState(false);
+    const [cropArea, setCropArea] = useState({ x: 10, y: 30, w: 80, h: 40 }); // en porcentajes
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -130,89 +132,39 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onAiParsed, onQ
         }
     };
 
-    const handleRunOcr = async () => {
-        if (!previewUrl || !onOcrParsed) return;
-        setIsOcrProcessing(true);
-        setOcrProgress(0);
-        
-        let worker: any = null;
-        try {
-            // --- PRE-PROCESAMIENTO DE IMAGEN ---
-            // Creamos un canvas para mejorar el contraste y convertir a escala de grises
-            const img = new Image();
-            img.src = previewUrl;
-            await new Promise((resolve) => (img.onload = resolve));
-
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.width;
-            canvas.height = img.height;
-
-            if (ctx) {
-                // Aplicar filtros de imagen para OCR
-                ctx.filter = 'grayscale(1) contrast(2) brightness(1.1)';
-                ctx.drawImage(img, 0, 0);
-            }
-            const processedImageData = canvas.toDataURL('image/jpeg', 0.9);
-
-            console.log("Iniciando Worker de Tesseract (Optimizado)...");
-            worker = await createWorker('spa', 1, {
-                logger: m => {
-                    if (m.status === 'recognizing text') {
-                        setOcrProgress(Math.round(m.progress * 100));
-                    }
-                }
-            });
-
-            // Configurar parámetros para mejorar precisión numérica
-            await worker.setParameters({
-                tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ. ', // Solo números y letras mayúsculas
-                tessjs_create_hocr: '0',
-                tessjs_create_tsv: '0',
-            });
-
-            console.log("Iniciando Reconocimiento con Filtros...");
-            const { data: { text } } = await worker.recognize(processedImageData);
-            
-            if (!text || text.trim().length === 0) {
-                throw new Error("No se pudo extraer texto de la imagen");
-            }
-
-            console.log("Resultados Crudos OCR:\n", text);
-            onOcrParsed(text);
-            
-            toast({
-                title: "OCR Completado",
-                description: "Datos extraídos. Revisa el resumen en pantalla para confirmar.",
-                className: "bg-purple-600 text-white border-none",
-            });
-
-            await worker.terminate();
-        } catch (error: any) {
-            console.error("Error detallado OCR:", error);
-            toast({
-                title: "Error en OCR",
-                description: `Error: ${error.message || "Desconocido"}. Revisa la conexión o intenta de nuevo.`,
-                variant: "destructive",
-            });
-            if (worker) {
-                try { await worker.terminate(); } catch(e) {}
-            }
-        } finally {
-            setIsOcrProcessing(false);
-        }
-    };
-
     const handleRunAi = async () => {
         if (!previewUrl || !onAiParsed) return;
         setIsAiProcessing(true);
         
         try {
+            let finalImage = previewUrl;
+
+            // Si estamos en modo recorte, generamos el recorte usando un Canvas
+            if (isCropMode) {
+                const img = new Image();
+                img.src = previewUrl;
+                await new Promise(resolve => img.onload = resolve);
+
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                if (ctx) {
+                    const sx = (cropArea.x / 100) * img.width;
+                    const sy = (cropArea.y / 100) * img.height;
+                    const sw = (cropArea.w / 100) * img.width;
+                    const sh = (cropArea.h / 100) * img.height;
+                    
+                    canvas.width = sw;
+                    canvas.height = sh;
+                    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, sw, sh);
+                    finalImage = canvas.toDataURL('image/jpeg', 0.9);
+                }
+            }
+
             const response = await fetch('/api/ia-vision', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    image: previewUrl,
+                    image: finalImage,
                     depto: depto || 'CAPITAL',
                     cargo: cargo || 'INTENDENTE',
                     listas: listas || []
@@ -236,6 +188,7 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onAiParsed, onQ
             });
         } finally {
             setIsAiProcessing(false);
+            setIsCropMode(false);
         }
     };
 
@@ -317,57 +270,80 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onAiParsed, onQ
                             <CheckCircle2 className="w-4 h-4" />
                             Acta Capturada Correctamente
                         </div>
-                        <div className="relative w-full max-w-sm aspect-[3/4] rounded-lg overflow-hidden border-2 border-green-200 shadow-sm">
+                        <div className="relative w-full max-w-sm aspect-[3/4] rounded-lg overflow-hidden border-2 border-green-200 shadow-sm bg-black">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img 
                                 src={previewUrl} 
                                 alt="Vista previa del acta" 
-                                className="w-full h-full object-cover"
+                                className={`w-full h-full object-contain ${isCropMode ? 'opacity-50' : ''}`}
                             />
-                            {isOcrProcessing && (
-                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white p-4">
+                            
+                            {/* OVERLAY DE RECORTE */}
+                            {isCropMode && (
+                                <div 
+                                    className="absolute border-2 border-dashed border-yellow-400 bg-yellow-400/10 shadow-[0_0_0_9999px_rgba(0,0,0,0.5)] cursor-move"
+                                    style={{
+                                        left: `${cropArea.x}%`,
+                                        top: `${cropArea.y}%`,
+                                        width: `${cropArea.w}%`,
+                                        height: `${cropArea.h}%`
+                                    }}
+                                >
+                                    <div className="absolute -top-6 left-0 bg-yellow-400 text-black text-[9px] font-black px-2 py-0.5 rounded-t">
+                                        ÁREA DE ESCANEO (ARRASTRAR)
+                                    </div>
+                                    {/* Controles de tamaño simples */}
+                                    <div className="absolute -bottom-2 -right-2 w-4 h-4 bg-yellow-400 rounded-full border-2 border-white" />
+                                </div>
+                            )}
+
+                            {isAiProcessing && (
+                                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center text-white p-4 z-50">
                                     <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                                    <span className="font-bold">Analizando Imagen...</span>
-                                    <span className="text-sm">{ocrProgress}% completado</span>
+                                    <span className="font-bold">Analizando con IA...</span>
+                                    <span className="text-sm">Por favor espera</span>
                                 </div>
                             )}
                         </div>
+
+                        <div className="flex gap-2 w-full max-w-sm">
+                            <Button 
+                                type="button"
+                                variant={isCropMode ? "secondary" : "outline"}
+                                onClick={() => setIsCropMode(!isCropMode)}
+                                disabled={isAiProcessing}
+                                className={`flex-1 font-bold ${isCropMode ? 'bg-yellow-400 hover:bg-yellow-500 text-black border-none' : 'border-blue-600 text-blue-600'}`}
+                            >
+                                <Wand2 className="w-4 h-4 mr-2" />
+                                {isCropMode ? "Listo" : "Enfocar Números"}
+                            </Button>
+                            
+                            <Button 
+                                type="button"
+                                variant="outline"
+                                onClick={handleRetake}
+                                disabled={isAiProcessing}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold px-3"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </Button>
+                        </div>
+
                         {onAiParsed && (
                             <Button 
                                 type="button"
                                 onClick={handleRunAi}
-                                disabled={isAiProcessing || isOcrProcessing}
-                                className="bg-blue-600 hover:bg-blue-800 font-black w-full max-w-sm animate-pulse shadow-lg border-2 border-white/20"
+                                disabled={isAiProcessing}
+                                className="bg-blue-600 hover:bg-blue-800 font-black w-full max-w-sm shadow-lg border-2 border-white/20 h-12"
                             >
                                 {isAiProcessing ? (
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                 ) : (
                                     <Wand2 className="w-4 h-4 mr-2" />
                                 )}
-                                ESCANEO INTELIGENTE (IA GEMINI)
+                                {isCropMode ? "ESCANEAR ÁREA SELECCIONADA" : "ESCANEO INTELIGENTE (IA)"}
                             </Button>
                         )}
-                        {onOcrParsed && (
-                            <Button 
-                                type="button"
-                                onClick={handleRunOcr}
-                                disabled={isOcrProcessing}
-                                className="bg-purple-600 hover:bg-purple-700 font-bold w-full max-w-sm"
-                            >
-                                <Wand2 className="w-4 h-4 mr-2" />
-                                Extraer Datos Automáticamente
-                            </Button>
-                        )}
-                        <Button 
-                            type="button"
-                            variant="outline"
-                            onClick={handleRetake}
-                            disabled={isOcrProcessing}
-                            className="text-red-600 hover:text-red-700 hover:bg-red-50 font-bold w-full max-w-sm"
-                        >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Volver a tomar foto
-                        </Button>
                     </div>
                 )}
             </CardContent>

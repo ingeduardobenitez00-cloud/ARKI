@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,9 @@ export default function QRLaboratoryPage() {
     const [manualOffset, setManualOffset] = useState<number>(0);
     const [procesado, setProcesado] = useState<ResultadoProcesamiento | null>(null);
     const [capturedImage, setCapturedImage] = useState<string | null>(null);
+    const [isAiProcessing, setIsAiProcessing] = useState(false);
+    const [aiPreview, setAiPreview] = useState<any>(null);
+    const [isAiDialogOpen, setIsAiDialogOpen] = useState(false);
     
     const listasCentral = [510, 520, 530, 540, 560, 570, 580, 590, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 700, 710, 720];
 
@@ -95,6 +99,69 @@ export default function QRLaboratoryPage() {
             stopCamera().catch(() => {});
         };
     }, [depto, cargo]); // Quitamos db para evitar reinicios infinitos
+
+    const handleAiScan = async () => {
+        if (!capturedImage) {
+            console.error("No hay imagen capturada");
+            return;
+        }
+        console.log("Iniciando Escaneo IA en Laboratorio...");
+        console.log("Depto:", depto, "Cargo:", cargo);
+        
+        setIsAiProcessing(true);
+        setError(null);
+
+        try {
+            const listas = depto === 'CENTRAL' ? listasCentral : [2, 7, 300];
+            const response = await fetch('/api/ia-vision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: capturedImage,
+                    depto,
+                    cargo,
+                    listas
+                })
+            });
+            
+            const data = await response.json();
+            console.log("Respuesta IA recibida:", data);
+
+            if (data.error) throw new Error(data.error);
+            
+            setAiPreview(data);
+            setIsAiDialogOpen(true);
+        } catch (e: any) {
+            console.error("Error en handleAiScan:", e);
+            setError("Error IA: " + e.message);
+        } finally {
+            setIsAiProcessing(false);
+        }
+    };
+
+    const handleEditAiVote = (id: string, value: string) => {
+        if (!aiPreview) return;
+        const numValue = parseInt(value) || 0;
+        setAiPreview({
+            ...aiPreview,
+            votos: {
+                ...aiPreview.votos,
+                [id]: numValue
+            }
+        });
+    };
+
+    const handleEditAiCierre = (field: string, value: string) => {
+        if (!aiPreview) return;
+        const numValue = parseInt(value) || 0;
+        setAiPreview({
+            ...aiPreview,
+            cierre: {
+                ...aiPreview.cierre,
+                [field]: numValue
+            }
+        });
+    };
 
     const processHex = (hex: string) => {
         if (!hex || hex === scanResult) return; // Evitar procesado doble
@@ -236,7 +303,7 @@ export default function QRLaboratoryPage() {
                                                 canvas.height = video.videoHeight;
                                                 const ctx = canvas.getContext('2d');
                                                 ctx?.drawImage(video, 0, 0);
-                                                const dataUrl = canvas.toDataURL('image/webp');
+                                                const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
                                                 setCapturedImage(dataUrl);
                                                 await stopCamera();
                                                 try {
@@ -254,14 +321,24 @@ export default function QRLaboratoryPage() {
                                         CAPTURAR QR
                                     </Button>
                                 ) : (
-                                    <Button 
-                                        onClick={() => startCamera()}
-                                        variant="outline"
-                                        className="w-full h-14 border-2 border-slate-200 text-slate-600 font-black text-lg gap-2"
-                                    >
-                                        <History className="w-6 h-6" />
-                                        REINTENTAR CAPTURA
-                                    </Button>
+                                    <div className="space-y-2">
+                                        <Button 
+                                            onClick={handleAiScan}
+                                            disabled={isAiProcessing}
+                                            className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-black text-lg gap-2 shadow-lg shadow-blue-500/20"
+                                        >
+                                            {isAiProcessing ? <Loader2 className="w-6 h-6 animate-spin"/> : <Wand2 className="w-6 h-6" />}
+                                            ESCANEO INTELIGENTE (IA)
+                                        </Button>
+                                        <Button 
+                                            onClick={() => startCamera()}
+                                            variant="outline"
+                                            className="w-full h-12 border-2 border-slate-200 text-slate-600 font-bold gap-2"
+                                        >
+                                            <History className="w-5 h-5" />
+                                            REINTENTAR CAPTURA
+                                        </Button>
+                                    </div>
                                 )}
                             </div>
 
@@ -505,6 +582,109 @@ export default function QRLaboratoryPage() {
                     </Card>
                 </div>
             </div>
+            {/* VISOR DE RESULTADOS IA */}
+            <Dialog open={isAiDialogOpen} onOpenChange={setIsAiDialogOpen}>
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2 text-blue-600">
+                            <Wand2 className="w-5 h-5" /> Resultados del Análisis IA
+                        </DialogTitle>
+                    </DialogHeader>
+                    
+                    {aiPreview && (
+                        <div className="space-y-4">
+                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 flex justify-between items-center">
+                                <span className="text-sm font-bold text-blue-800">Confianza del Análisis:</span>
+                                <Badge className="bg-blue-600">{(aiPreview.confianza * 100).toFixed(1)}%</Badge>
+                            </div>
+
+                            <div className="border rounded-lg overflow-hidden">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-slate-50 border-b">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Lista / Campo</th>
+                                            <th className="px-4 py-2 text-right">Votos Detectados</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {Object.entries(aiPreview.votos).map(([id, votos]) => (
+                                            <tr key={id}>
+                                                <td className="px-4 py-2 font-medium">Lista/Opción {id}</td>
+                                                <td className="px-4 py-2 text-right">
+                                                    <Input 
+                                                        type="number"
+                                                        value={votos as number}
+                                                        onChange={(e) => handleEditAiVote(id, e.target.value)}
+                                                        className="w-20 ml-auto h-8 text-right font-bold text-blue-600"
+                                                    />
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        
+                                        {/* CAMPOS ESPECIALES EDITABLES */}
+                                        <tr className="bg-slate-50">
+                                            <td className="px-4 py-1 text-[10px] font-black text-slate-400">VOTOS ESPECIALES</td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td className="px-4 py-2 font-medium">NULOS (NUL)</td>
+                                            <td className="px-4 py-2">
+                                                <Input 
+                                                    type="number"
+                                                    value={aiPreview.cierre?.nul || 0}
+                                                    onChange={(e) => handleEditAiCierre('nul', e.target.value)}
+                                                    className="w-20 ml-auto h-8 text-right font-bold text-red-500"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="px-4 py-2 font-medium">BLANCOS (BLC)</td>
+                                            <td className="px-4 py-2">
+                                                <Input 
+                                                    type="number"
+                                                    value={aiPreview.cierre?.blc || 0}
+                                                    onChange={(e) => handleEditAiCierre('blc', e.target.value)}
+                                                    className="w-20 ml-auto h-8 text-right font-bold text-slate-500"
+                                                />
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td className="px-4 py-2 font-medium">VACIADOS (VAC)</td>
+                                            <td className="px-4 py-2">
+                                                <Input 
+                                                    type="number"
+                                                    value={aiPreview.cierre?.vac || 0}
+                                                    onChange={(e) => handleEditAiCierre('vac', e.target.value)}
+                                                    className="w-20 ml-auto h-8 text-right font-bold text-orange-500"
+                                                />
+                                            </td>
+                                        </tr>
+
+                                        <tr className="bg-slate-100 font-bold border-t-2">
+                                            <td className="px-4 py-3 text-sm">TOTAL OFICIAL (TOT)</td>
+                                            <td className="px-4 py-3">
+                                                <Input 
+                                                    type="number"
+                                                    value={aiPreview.cierre?.tot || 0}
+                                                    onChange={(e) => handleEditAiCierre('tot', e.target.value)}
+                                                    className="w-24 ml-auto h-10 text-right text-lg font-black text-purple-600 bg-white"
+                                                />
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <Button 
+                                onClick={() => setIsAiDialogOpen(false)}
+                                className="w-full bg-slate-800"
+                            >
+                                CERRAR VISTA PREVIA
+                            </Button>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

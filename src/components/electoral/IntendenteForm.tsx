@@ -113,7 +113,43 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
             });
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
+            toast({ title: "Datos Inyectados", description: "El formulario se ha actualizado con los datos revisados." });
         }
+    };
+
+    const handleEditPreviewVote = (id: string, value: string) => {
+        if (!ocrPreview) return;
+        const numValue = parseInt(value) || 0;
+        const newVotes = { ...ocrPreview.votes, [id]: numValue };
+        
+        // Recalcular total y validez
+        const totalVotos = Object.values(newVotes).reduce((a: any, b: any) => a + b, 0);
+        const totalExtra = (ocrPreview.extra.nul || 0) + (ocrPreview.extra.blc || 0) + (ocrPreview.extra.vac || 0);
+        const newTotalCalculado = totalVotos + totalExtra;
+        const esValido = newTotalCalculado === (ocrPreview.extra.tot || 0);
+
+        setOcrPreview({
+            ...ocrPreview,
+            votes: newVotes,
+            resultsBlock: ocrPreview.resultsBlock?.map(b => b.id === id ? { ...b, votos: numValue } : b),
+            extra: { ...ocrPreview.extra, total_calculado: newTotalCalculado, es_valido: esValido }
+        });
+    };
+
+    const handleEditPreviewExtra = (field: string, value: string) => {
+        if (!ocrPreview) return;
+        const numValue = parseInt(value) || 0;
+        const newExtra = { ...ocrPreview.extra, [field]: numValue };
+        
+        // Recalcular total y validez
+        const totalVotos = Object.values(ocrPreview.votes).reduce((a: any, b: any) => a + b, 0);
+        const newTotalCalculado = totalVotos + (newExtra.nul || 0) + (newExtra.blc || 0) + (newExtra.vac || 0);
+        const esValido = newTotalCalculado === (newExtra.tot || 0);
+
+        setOcrPreview({
+            ...ocrPreview,
+            extra: { ...newExtra, total_calculado: newTotalCalculado, es_valido: esValido }
+        });
     };
 
     const handleVoteChange = (candidateId: string, value: string) => {
@@ -275,18 +311,55 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
                                                 <span className="text-[9px] text-slate-400 font-mono">🧲 L-{v.id.split('-').pop()}</span>
                                                 <span>{v.nombre}</span>
                                             </td>
-                                            <td className={`p-2 text-right font-black text-sm ${v.votos > 0 ? 'text-slate-900' : 'text-slate-400'}`}>
-                                                {v.votos}
+                                            <td className="p-2 text-right">
+                                                <Input 
+                                                    type="number"
+                                                    value={v.votos}
+                                                    onChange={(e) => handleEditPreviewVote(v.id, e.target.value)}
+                                                    className="w-16 ml-auto h-7 text-right text-xs font-black p-1 border-slate-300"
+                                                />
                                             </td>
                                         </tr>
                                     ))}
+                                    
+                                    {/* SECCIÓN DE CIERRE EDITABLE */}
+                                    <tr className="bg-slate-100 font-bold">
+                                        <td className="p-2 text-[10px] text-slate-500">NULOS / BLANCOS / VAC</td>
+                                        <td></td>
+                                    </tr>
+                                    <tr>
+                                        <td className="p-2 text-xs">Votos Nulos (NUL)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.nul || 0} onChange={(e) => handleEditPreviewExtra('nul', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td className="p-2 text-xs">Votos Blancos (BLC)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.blc || 0} onChange={(e) => handleEditPreviewExtra('blc', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1" />
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td className="p-2 text-xs">Votos Vaciados (VAC)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.vac || 0} onChange={(e) => handleEditPreviewExtra('vac', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1 text-blue-600" />
+                                        </td>
+                                    </tr>
+
                                     {/* Fila de TOT (El Juez) */}
                                     <tr className="bg-blue-600 text-white">
                                         <td className="p-2 text-xs font-black flex items-center gap-1">
                                             <span className="text-[9px] font-mono opacity-70">🧲 L-0 (TOT)</span>
                                             <span>TOTAL OFICIAL DEL ACTA</span>
                                         </td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.tot}</td>
+                                        <td className="p-2">
+                                            <Input 
+                                                type="number" 
+                                                value={ocrPreview?.extra.tot || 0} 
+                                                onChange={(e) => handleEditPreviewExtra('tot', e.target.value)} 
+                                                className="w-20 ml-auto h-8 text-right text-sm font-black p-1 bg-white text-blue-900" 
+                                            />
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>

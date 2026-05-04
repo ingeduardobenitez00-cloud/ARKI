@@ -19,33 +19,44 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: 'Falta la API KEY de Gemini en el entorno' }, { status: 500 });
         }
 
-        // Configuración del Prompt según el cargo y depto
+        // Configuración del Prompt de Alta Precisión
         const prompt = `
-            Eres un experto en escrutinio electoral. Tu tarea es extraer los votos de la siguiente imagen de un acta oficial.
+            Eres un experto en escrutinio electoral paraguayo. Tu tarea es extraer los votos de la imagen de un ACTA DE ESCRUTINIO.
             DEPARTAMENTO: ${depto}
             CARGO: ${cargo}
-            LISTAS A BUSCAR: ${JSON.stringify(listas)}
+            ${cargo === 'JUNTA' ? 'INSTRUCCIÓN ESPECIAL: Esta es un acta de JUNTA MUNICIPAL. Debes buscar tanto las LISTAS (ej: 2, 7, 300) como las 24 OPCIONES preferenciales (del 1 al 24). Extrae los votos de ambos sectores.' : 'INSTRUCCIÓN ESPECIAL: Esta es un acta de INTENDENTE. Solo busca los resultados por LISTA.'}
 
-            INSTRUCCIONES CRÍTICAS:
-            1. Busca los números escritos a mano o impresos al lado de cada Lista.
-            2. Extrae también: Nulos (NUL), Blancos (BLC), Votos a Computar (VAC) y el Total General (TOT).
-            3. Si un valor no es legible o está vacío, devuelve 0.
-            4. Devuelve los resultados EXCLUSIVAMENTE en formato JSON plano con esta estructura:
+            CAMPOS OBLIGATORIOS A BUSCAR:
+            1. Votos por cada Lista solicitada: ${JSON.stringify(listas)}
+            2. Votos Nulos (NUL o NULOS)
+            3. Votos en Blanco (BLC o BLANCOS)
+            4. Votos Vaciados (VAC o VACIADOS)
+            5. Total General del Acta (TOT o TOTAL)
+
+            REGLAS DE ORO:
+            - Solo devuelve JSON.
+            - Si un número no es legible, intenta deducirlo por el contexto o pon 0.
+            - Si una lista o campo no existe en el papel, pon 0.
+            
+            ESTRUCTURA JSON:
             {
-                "votos": { "id_lista": numero_votos },
+                "votos": { "id_o_numero": valor_numerico },
                 "cierre": { "nul": numero, "blc": numero, "vac": numero, "tot": numero },
                 "confianza": 0.0 a 1.0
             }
         `;
 
-        // Lista de modelos a intentar (del más rápido al más potente)
-        const modelos = ['gemini-1.5-flash', 'gemini-1.5-pro'];
+        // Lista de modelos actualizados para el año 2026 según tu diagnóstico
+        const modelos = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
         let lastError = '';
         let response: any = null;
 
         for (const modelo of modelos) {
             try {
-                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelo}:generateContent?key=${API_KEY}`, {
+                // Intentamos con el nombre completo que pide Google
+                const modelName = modelo.includes('models/') ? modelo : `models/${modelo}`;
+                
+                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -61,18 +72,17 @@ export async function POST(req: Request) {
                     })
                 });
 
-                if (response.ok) break; // Si funciona, salimos del bucle
+                if (response.ok) break;
                 
                 const errorData = await response.json();
                 lastError = errorData.error?.message || 'Error desconocido';
-                console.warn(`Modelo ${modelo} falló: ${lastError}`);
             } catch (e: any) {
                 lastError = e.message;
             }
         }
 
         if (!response || !response.ok) {
-            throw new Error(lastError || 'No se pudo conectar con ningún modelo de IA');
+            throw new Error(lastError || 'No se pudo conectar con los modelos de IA de última generación.');
         }
 
         const data = await response.json();
@@ -88,14 +98,6 @@ export async function POST(req: Request) {
 
     } catch (error: any) {
         console.error('IA VISION ERROR:', error);
-        
-        let mensajeFriendly = error.message;
-        if (mensajeFriendly.includes('not found')) {
-            mensajeFriendly = "El modelo de IA solicitado no está disponible en tu región todavía o la llave de API es muy nueva. Intenta de nuevo en unos minutos.";
-        } else if (mensajeFriendly.includes('API key')) {
-            mensajeFriendly = "La llave de API no es válida o no tiene permisos.";
-        }
-
-        return NextResponse.json({ error: mensajeFriendly }, { status: 500 });
+        return NextResponse.json({ error: "DIAGNÓSTICO: " + error.message }, { status: 500 });
     }
 }

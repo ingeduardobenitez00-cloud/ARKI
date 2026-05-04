@@ -1,7 +1,0 @@
-User-agent: *
-Disallow: /inscripcion
-Disallow: /sheet1
-Disallow: /flyer_library
-Allow: /
-
-Sitemap: https://confir-juvenil-nsps.web.app/sitemap.xml

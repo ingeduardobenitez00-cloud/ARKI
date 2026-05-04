@@ -130,7 +130,49 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
             });
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
+            toast({ title: "Datos Inyectados", description: "Votos preferenciales cargados con éxito." });
         }
+    };
+
+    const handleEditPreviewVote = (listId: string, option: number, value: string) => {
+        if (!ocrPreview) return;
+        const numValue = parseInt(value) || 0;
+        
+        const newVotes = { ...ocrPreview.votes };
+        if (!newVotes[listId]) newVotes[listId] = {};
+        newVotes[listId][option] = numValue;
+
+        // Recalcular total general
+        const totalVotosListas = Object.keys(newVotes).reduce((acc, lId) => {
+            return acc + Object.values(newVotes[lId]).reduce((a, b) => a + (b as number), 0);
+        }, 0);
+        const totalExtra = (ocrPreview.extra.nul || 0) + (ocrPreview.extra.blc || 0) + (ocrPreview.extra.vac || 0);
+        const newTotalCalculado = totalVotosListas + totalExtra;
+        const esValido = newTotalCalculado === (ocrPreview.extra.tot || 0);
+
+        setOcrPreview({
+            ...ocrPreview,
+            votes: newVotes,
+            extra: { ...ocrPreview.extra, total_calculado: newTotalCalculado, es_valido: esValido }
+        });
+    };
+
+    const handleEditPreviewExtra = (field: string, value: string) => {
+        if (!ocrPreview) return;
+        const numValue = parseInt(value) || 0;
+        const newExtra = { ...ocrPreview.extra, [field]: numValue };
+        
+        // Recalcular total
+        const totalVotosListas = Object.keys(ocrPreview.votes).reduce((acc, lId) => {
+            return acc + Object.values(ocrPreview.votes[lId]).reduce((a, b) => a + (b as number), 0);
+        }, 0);
+        const newTotalCalculado = totalVotosListas + (newExtra.nul || 0) + (newExtra.blc || 0) + (newExtra.vac || 0);
+        const esValido = newTotalCalculado === (newExtra.tot || 0);
+
+        setOcrPreview({
+            ...ocrPreview,
+            extra: { ...newExtra, total_calculado: newTotalCalculado, es_valido: esValido }
+        });
     };
 
     const handleVoteChange = (listId: string, option: number, value: string) => {
@@ -317,44 +359,73 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                                     {JUNTA_LISTS.map((list) => {
                                         const listVotes = ocrPreview?.votes[list.id] || {};
                                         const listTotal = Object.values(listVotes).reduce((a: number, b) => a + (b as number), 0);
+                                        
+                                        // Solo mostrar opciones que tengan votos o las primeras 3 para no saturar si no hay nada
+                                        const optionsToShow = Array.from({ length: 24 }, (_, i) => i + 1);
+                                        
                                         return (
-                                            <>
-                                                <tr key={`${list.id}-header`} className="bg-slate-800 text-white text-[9px] uppercase">
+                                            <React.Fragment key={list.id}>
+                                                <tr className="bg-slate-800 text-white text-[9px] uppercase">
                                                     <td colSpan={2} className="p-1 pl-2 font-black tracking-wider">
                                                         {list.name} — Total: {listTotal}
                                                     </td>
                                                 </tr>
-                                                {Array.from({ length: 24 }, (_, i) => {
-                                                    const opNum = i + 1;
+                                                {optionsToShow.map((opNum) => {
                                                     const val = listVotes[opNum] || 0;
+                                                    if (val === 0 && opNum > 5) return null; // Ocultar ceros después de la op 5 para legibilidad
                                                     return (
                                                         <tr key={`${list.id}-op-${opNum}`} className={`border-b text-xs ${val > 0 ? 'bg-blue-50' : ''}`}>
                                                             <td className="p-1 pl-3 text-slate-600">
-                                                                {list.name} – Op. {opNum}
+                                                                Opción {opNum}
                                                             </td>
-                                                            <td className={`p-1 text-right font-black ${val > 0 ? 'text-blue-700' : 'text-slate-300'}`}>
-                                                                {val}
+                                                            <td className="p-1">
+                                                                <Input 
+                                                                    type="number"
+                                                                    value={val}
+                                                                    onChange={(e) => handleEditPreviewVote(list.id, opNum, e.target.value)}
+                                                                    className="w-14 ml-auto h-6 text-right text-[10px] p-1 border-slate-200"
+                                                                />
                                                             </td>
                                                         </tr>
                                                     );
                                                 })}
-                                            </>
+                                            </React.Fragment>
                                         );
                                     })}
-                                    {/* Filas de Cierre */}
-                                    {[
-                                        { label: 'NULOS (NUL)', val: ocrPreview?.extra.nulos },
-                                        { label: 'BLANCOS (BLC)', val: ocrPreview?.extra.blancos },
-                                        { label: 'A COMPUTAR (VAC)', val: ocrPreview?.extra.votos_computar },
-                                    ].map(({ label, val }) => (
-                                        <tr key={label} className="border-b bg-amber-50">
-                                            <td className="p-2 text-xs font-semibold">{label}</td>
-                                            <td className="p-2 text-right font-black text-sm">{val || 0}</td>
-                                        </tr>
-                                    ))}
+
+                                    {/* SECCIÓN DE CIERRE EDITABLE */}
+                                    <tr className="bg-amber-100 text-amber-800 font-bold text-[10px] uppercase">
+                                        <td colSpan={2} className="p-1 pl-2">Cierre del Acta</td>
+                                    </tr>
+                                    <tr className="bg-amber-50">
+                                        <td className="p-2 text-xs">Nulos (NUL)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.nul || 0} onChange={(e) => handleEditPreviewExtra('nul', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1" />
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-amber-50">
+                                        <td className="p-2 text-xs">Blancos (BLC)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.blc || 0} onChange={(e) => handleEditPreviewExtra('blc', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1" />
+                                        </td>
+                                    </tr>
+                                    <tr className="bg-amber-50">
+                                        <td className="p-2 text-xs">Vaciados (VAC)</td>
+                                        <td className="p-2">
+                                            <Input type="number" value={ocrPreview?.extra.vac || 0} onChange={(e) => handleEditPreviewExtra('vac', e.target.value)} className="w-16 ml-auto h-7 text-right text-xs p-1" />
+                                        </td>
+                                    </tr>
+
                                     <tr className="bg-blue-600 text-white">
                                         <td className="p-2 text-xs font-black uppercase">TOTAL OFICIAL JUNTA (TOT)</td>
-                                        <td className="p-2 text-right font-black text-lg">{ocrPreview?.extra.total_general}</td>
+                                        <td className="p-2">
+                                            <Input 
+                                                type="number" 
+                                                value={ocrPreview?.extra.tot || 0} 
+                                                onChange={(e) => handleEditPreviewExtra('tot', e.target.value)} 
+                                                className="w-20 ml-auto h-8 text-right text-sm font-black p-1 bg-white text-blue-900" 
+                                            />
+                                        </td>
                                     </tr>
                                 </tbody>
                             </table>

@@ -615,38 +615,93 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
     useEffect(() => { if (isOpen) reset(defaultValues as any); }, [isOpen, editingUser, reset, defaultValues]);
 
     const onSubmit = async (data: any) => {
-        if (!currentUser || !db || !editingUser) return;
+        if (!currentUser || !db) return;
         setIsSubmitting(true);
-        console.log("Simplified Save Start", data);
         
+        const secondaryAppName = `secondary-app-${Date.now()}`;
+        let secondaryApp;
+
         try {
-            const userRef = doc(db, USERS_COLLECTION_NAME, editingUser.id);
+            let uid = editingUser?.id;
+
+            if (!editingUser) {
+                // MODO CREACIÓN: Requiere Auth secundaria para no desloguear al admin
+                secondaryApp = initializeApp(firebaseConfig, secondaryAppName);
+                const secondaryAuth = getAuthSecondary(secondaryApp);
+                const userCredential = await createUserWithEmailAndPassword(secondaryAuth, data.email, data.password);
+                uid = userCredential.user.uid;
+            }
+
+            if (!uid) throw new Error("No se pudo obtener o generar un ID de usuario válido.");
+
+            const userRef = doc(db, USERS_COLLECTION_NAME, uid);
             
-            // Payload mínimo para diagnosticar
-            const simplePayload = {
-                name: data.name || '',
-                username: data.username || '',
+            // Payload completo restaurado
+            const payload = {
+                id: uid,
+                name: data.name,
+                email: data.email,
+                username: data.username,
                 role: data.role,
-                permissions: Array.isArray(data.permissions) ? data.permissions : [],
+                telefono: data.telefono || '',
+                photoUrl: data.photoUrl || '',
+                seccionales: data.seccionales || [],
+                local: data.local || '',
+                mesas: data.mesas || [],
+                permissions: data.permissions || [],
                 moduleActions: data.moduleActions || {},
-                updatedAt: new Date().toISOString()
+                clasificacion: data.clasificacion || 'SIN CLASIFICAR',
+                updatedAt: new Date().toISOString(),
+                ...(editingUser ? {} : { 
+                    createdAt: new Date().toISOString(),
+                    active: true,
+                    createdBy: currentUser.id
+                })
             };
 
-            console.log("Sending simple payload:", simplePayload);
-            await setDoc(userRef, simplePayload, { merge: true });
-            console.log("Save successful!");
+            console.log("Guardando usuario en Firestore:", payload);
+            await setDoc(userRef, payload, { merge: true });
 
-            toast({ title: '¡Guardado Exitoso!', description: "Permisos actualizados." });
+            // Registro de Auditoría
+            logAction(db, {
+                userId: currentUser.id,
+                userName: currentUser.name,
+                module: 'USUARIOS',
+                action: editingUser ? 'ACTUALIZÓ USUARIO' : 'CREÓ USUARIO',
+                targetId: uid,
+                targetName: data.name
+            });
+
+            toast({ 
+                title: editingUser ? '¡Actualización Exitosa!' : '¡Usuario Creado!', 
+                description: editingUser ? "Los datos han sido guardados correctamente." : `La cuenta para ${data.name} ha sido habilitada.` 
+            });
+            
             onSuccess();
             onOpenChange(false);
         } catch (error: any) {
             console.error("Critical Save Error:", error);
+            let errorMessage = error.message || 'Ocurrió un error inesperado en Firestore o Auth.';
+            
+            // Traducción de errores comunes de Firebase Auth
+            if (error.code === 'auth/email-already-in-use') errorMessage = "El correo electrónico ya está registrado en el sistema.";
+            if (error.code === 'auth/invalid-email') errorMessage = "La dirección de correo electrónico no tiene un formato válido.";
+            if (error.code === 'auth/weak-password') errorMessage = "La contraseña debe tener al menos 6 caracteres.";
+            
             toast({ 
                 title: 'Error al Guardar', 
-                description: error.message || 'Error en Firestore',
+                description: errorMessage,
                 variant: 'destructive' 
             });
         } finally {
+            // Limpieza de la app secundaria para evitar fugas de memoria o errores de duplicado
+            if (secondaryApp) {
+                try {
+                    await deleteApp(secondaryApp);
+                } catch (e) {
+                    console.error("Error al eliminar instancia secundaria de Firebase:", e);
+                }
+            }
             setIsSubmitting(false);
         }
     };

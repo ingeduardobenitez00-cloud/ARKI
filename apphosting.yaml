@@ -5,3 +5,9 @@ runConfig:
   maxInstances: 1
   minInstances: 0
   memory: 512MiB
+
+env:
+  - variable: GEMINI_API_KEY
+    value: AIzaSyCIo1p0fcPi2ybkDVJ6Bbha0WOqMk_3AxI
+  - variable: NEXT_PUBLIC_GEMINI_API_KEY
+    value: AIzaSyCIo1p0fcPi2ybkDVJ6Bbha0WOqMk_3AxI
