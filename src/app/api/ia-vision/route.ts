@@ -1,67 +1,50 @@
 import { NextResponse } from 'next/server';
 
 /**
- * API DE VISIÓN ARKI v1.1
- * Utiliza Google Gemini 1.5 Flash para extraer votos de actas electorales.
+ * API DE VISIÓN ARKI v1.2 (PRODUCCIÓN)
+ * Motor híbrido con auto-reparación y múltiples modelos.
  */
 
 export async function POST(req: Request) {
     try {
         const { image, depto, cargo, listas } = await req.json();
-
-        if (!image) {
-            return NextResponse.json({ error: 'No se recibió la imagen' }, { status: 400 });
-        }
-
-        const API_KEY = process.env.GEMINI_API_KEY || process.env.NEXT_PUBLIC_GEMINI_API_KEY || '';
+        const API_KEY = process.env.GEMINI_API_KEY || '';
         
-        if (!API_KEY) {
-            return NextResponse.json({ error: 'Falta la API KEY de Gemini en el entorno' }, { status: 500 });
-        }
+        if (!API_KEY) return NextResponse.json({ error: 'Falta la API KEY en el servidor' }, { status: 500 });
 
-        // Configuración del Prompt de Alta Precisión
         const prompt = `
-            Eres un experto en escrutinio electoral paraguayo. Tu tarea es extraer los votos de la imagen de un ACTA DE ESCRUTINIO.
+            Eres un experto en escrutinio electoral paraguayo. Tu tarea es extraer los votos de la imagen de un ACTA DE ESCRUTINIO IMPRESA.
             DEPARTAMENTO: ${depto}
             CARGO: ${cargo}
-            ${cargo === 'JUNTA' ? 'INSTRUCCIÓN ESPECIAL: Esta es un acta de JUNTA MUNICIPAL. Debes buscar tanto las LISTAS (ej: 2, 7, 300) como las 24 OPCIONES preferenciales (del 1 al 24). Extrae los votos de ambos sectores.' : 'INSTRUCCIÓN ESPECIAL: Esta es un acta de INTENDENTE. Solo busca los resultados por LISTA.'}
+            ${cargo === 'JUNTA' ? 'INSTRUCCIÓN: Busca tanto las LISTAS como las 24 OPCIONES preferenciales.' : 'INSTRUCCIÓN: Busca los resultados por LISTA.'}
 
-            CAMPOS OBLIGATORIOS A BUSCAR:
-            1. Votos por cada Lista solicitada: ${JSON.stringify(listas)}
-            2. Votos Nulos (NUL o NULOS)
-            3. Votos en Blanco (BLC o BLANCOS)
-            4. Votos Vaciados (VAC o VACIADOS)
-            5. Total General del Acta (TOT o TOTAL)
+            LISTAS A BUSCAR: ${JSON.stringify(listas)}
+            CAMPOS DE CIERRE: NULOS, BLANCOS, VACIADOS, TOTAL (TOT).
 
-            REGLAS DE ORO:
-            - Solo devuelve JSON.
-            - Si un número no es legible, intenta deducirlo por el contexto o pon 0.
-            - Si una lista o campo no existe en el papel, pon 0.
+            REGLAS:
+            - Devuelve SOLO JSON puro.
+            - Si el número es 0 o no está, pon 0.
             
             ESTRUCTURA JSON:
             {
-                "votos": { "id_o_numero": valor_numerico },
-                "cierre": { "nul": numero, "blc": numero, "vac": numero, "tot": numero },
-                "confianza": 0.0 a 1.0
+                "votos": { "id": valor },
+                "cierre": { "nul": 0, "blc": 0, "vac": 0, "tot": 0 },
+                "confianza": 0.95
             }
         `;
 
-        // Lista de modelos verificados para 2026 (Estables)
-        const modelos = ['gemini-1.5-flash', 'gemini-1.5-pro'];
-        const apiVersions = ['v1', 'v1beta'];
+        // Modelos de última generación (2.5 y 3) para cuentas de pago
+        const modelos = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-1.5-flash'];
+        const apiVersions = ['v1beta', 'v1'];
         let accumulatedErrors: string[] = [];
-        let response: any = null;
-
-        console.log(`Intentando escaneo IA para ${cargo} en ${depto} con ${listas.length} listas.`);
 
         for (const modelo of modelos) {
-            let modelSuccess = false;
             for (const version of apiVersions) {
                 try {
-                    console.log(`Probando modelo: ${modelo} (API ${version})...`);
-                    const modelName = modelo.includes('models/') ? modelo : `models/${modelo}`;
+                    // Probamos una estructura de URL alternativa que a veces resuelve el "not found"
+                    const url = `https://generativelanguage.googleapis.com/${version}/models/${modelo}:generateContent?key=${API_KEY}`;
                     
-                    const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/${version}/${modelName}:generateContent?key=${API_KEY}`, {
+                    const fetchResponse = await fetch(url, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -72,58 +55,30 @@ export async function POST(req: Request) {
                                 ]
                             }],
                             generationConfig: {
-                                responseMimeType: "application/json",
-                                temperature: 0.1,
+                                temperature: 0.1
                             }
                         })
                     });
 
+                    const data = await fetchResponse.json();
+
                     if (fetchResponse.ok) {
-                        console.log(`Modelo ${modelo} (${version}) respondió exitosamente.`);
-                        response = fetchResponse;
-                        modelSuccess = true;
-                        break;
-                    }
-                    
-                    const errorData = await fetchResponse.json();
-                    const msg = errorData.error?.message || 'Error desconocido';
-                    
-                    // Manejo específico de clave filtrada
-                    if (msg.toLowerCase().includes('leaked')) {
-                        throw new Error("TU API KEY HA SIDO FILTRADA Y DESACTIVADA POR SEGURIDAD. Debes generar una nueva en Google AI Studio y actualizar tu .env.");
+                        let text = data.candidates[0].content.parts[0].text;
+                        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                        return NextResponse.json(JSON.parse(text));
                     }
 
-                    accumulatedErrors.push(`${modelo} (${version}): ${msg}`);
-                    console.warn(`Fallo con ${modelo} (${version}):`, msg);
+                    accumulatedErrors.push(`${modelo} (${version}): ${data.error?.message || 'Error'}`);
                 } catch (e: any) {
-                    if (e.message.includes('FILTRADA')) throw e; // Re-lanzar error de seguridad
-                    accumulatedErrors.push(`${modelo} (${version}) conexión: ${e.message}`);
-                    console.error(`Error crítico con ${modelo} (${version}):`, e);
+                    accumulatedErrors.push(`${modelo} error: ${e.message}`);
                 }
             }
-            if (modelSuccess) break;
         }
 
-        if (!response || !response.ok) {
-            const diagnosis = accumulatedErrors.length > 0 
-                ? accumulatedErrors.join(' | ') 
-                : 'No se pudo conectar con ningún modelo de IA. Verifica tu API KEY y cuotas.';
-            throw new Error(diagnosis);
-        }
-
-        const data = await response.json();
-
-        let text = data.candidates[0].content.parts[0].text;
-        
-        // Limpieza por si acaso devuelve markdown
-        text = text.replace(/```json/g, '').replace(/```/g, '').trim();
-
-        const aiResult = JSON.parse(text);
-
-        return NextResponse.json(aiResult);
+        throw new Error(accumulatedErrors.join(' | '));
 
     } catch (error: any) {
-        console.error('IA VISION ERROR:', error);
+        console.error('IA ERROR:', error.message);
         return NextResponse.json({ error: "DIAGNÓSTICO: " + error.message }, { status: 500 });
     }
 }

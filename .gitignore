@@ -37,9 +37,15 @@ next-env.d.ts
 # specific large files
 /scripts/padron.xlsx
 
-# local env
+# Env and Secrets
+.env
 .env*
-.env.local
-.env.development.local
+env.tmp
+*.tmp
+
+# Diagnostics
+list_models_api.js
+scratch/
+.development.local
 .env.test.local
 .env.production.local
