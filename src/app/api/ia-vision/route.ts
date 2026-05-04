@@ -46,8 +46,8 @@ export async function POST(req: Request) {
             }
         `;
 
-        // Lista de modelos verificados para 2026 (Gemini 3 Flash es el nuevo estándar de alta velocidad)
-        const modelos = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+        // Lista de modelos verificados para 2026 (Estables)
+        const modelos = ['gemini-1.5-flash', 'gemini-1.5-pro'];
         const apiVersions = ['v1', 'v1beta'];
         let accumulatedErrors: string[] = [];
         let response: any = null;
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
                                 ]
                             }],
                             generationConfig: {
-                                response_mime_type: "application/json",
+                                responseMimeType: "application/json",
                                 temperature: 0.1,
                             }
                         })
@@ -87,9 +87,16 @@ export async function POST(req: Request) {
                     
                     const errorData = await fetchResponse.json();
                     const msg = errorData.error?.message || 'Error desconocido';
+                    
+                    // Manejo específico de clave filtrada
+                    if (msg.toLowerCase().includes('leaked')) {
+                        throw new Error("TU API KEY HA SIDO FILTRADA Y DESACTIVADA POR SEGURIDAD. Debes generar una nueva en Google AI Studio y actualizar tu .env.");
+                    }
+
                     accumulatedErrors.push(`${modelo} (${version}): ${msg}`);
                     console.warn(`Fallo con ${modelo} (${version}):`, msg);
                 } catch (e: any) {
+                    if (e.message.includes('FILTRADA')) throw e; // Re-lanzar error de seguridad
                     accumulatedErrors.push(`${modelo} (${version}) conexión: ${e.message}`);
                     console.error(`Error crítico con ${modelo} (${version}):`, e);
                 }
