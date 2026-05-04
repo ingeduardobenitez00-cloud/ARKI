@@ -46,51 +46,62 @@ export async function POST(req: Request) {
             }
         `;
 
-        // Lista de modelos verificados para 2026 (Gemini 1.5 es el estándar de alta estabilidad)
-        const modelos = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
-        let lastError = '';
+        // Lista de modelos verificados para 2026 (Gemini 3 Flash es el nuevo estándar de alta velocidad)
+        const modelos = ['gemini-3-flash', 'gemini-2.5-flash', 'gemini-1.5-flash'];
+        const apiVersions = ['v1', 'v1beta'];
+        let accumulatedErrors: string[] = [];
         let response: any = null;
 
         console.log(`Intentando escaneo IA para ${cargo} en ${depto} con ${listas.length} listas.`);
 
         for (const modelo of modelos) {
-            try {
-                console.log(`Probando modelo: ${modelo}...`);
-                const modelName = modelo.includes('models/') ? modelo : `models/${modelo}`;
-                
-                response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: prompt },
-                                { inline_data: { mime_type: 'image/jpeg', data: image.split(',')[1] } }
-                            ]
-                        }],
-                        generationConfig: {
-                            response_mime_type: "application/json",
-                            temperature: 0.1, // Baja temperatura para mayor precisión en extracción de datos
-                        }
-                    })
-                });
+            let modelSuccess = false;
+            for (const version of apiVersions) {
+                try {
+                    console.log(`Probando modelo: ${modelo} (API ${version})...`);
+                    const modelName = modelo.includes('models/') ? modelo : `models/${modelo}`;
+                    
+                    const fetchResponse = await fetch(`https://generativelanguage.googleapis.com/${version}/${modelName}:generateContent?key=${API_KEY}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{
+                                parts: [
+                                    { text: prompt },
+                                    { inline_data: { mime_type: 'image/jpeg', data: image.split(',')[1] } }
+                                ]
+                            }],
+                            generationConfig: {
+                                response_mime_type: "application/json",
+                                temperature: 0.1,
+                            }
+                        })
+                    });
 
-                if (response.ok) {
-                    console.log(`Modelo ${modelo} respondió exitosamente.`);
-                    break;
+                    if (fetchResponse.ok) {
+                        console.log(`Modelo ${modelo} (${version}) respondió exitosamente.`);
+                        response = fetchResponse;
+                        modelSuccess = true;
+                        break;
+                    }
+                    
+                    const errorData = await fetchResponse.json();
+                    const msg = errorData.error?.message || 'Error desconocido';
+                    accumulatedErrors.push(`${modelo} (${version}): ${msg}`);
+                    console.warn(`Fallo con ${modelo} (${version}):`, msg);
+                } catch (e: any) {
+                    accumulatedErrors.push(`${modelo} (${version}) conexión: ${e.message}`);
+                    console.error(`Error crítico con ${modelo} (${version}):`, e);
                 }
-                
-                const errorData = await response.json();
-                lastError = `[${modelo}] ${errorData.error?.message || 'Error desconocido'}`;
-                console.warn(`Fallo con ${modelo}:`, lastError);
-            } catch (e: any) {
-                lastError = `[${modelo}] Error de conexión: ${e.message}`;
-                console.error(`Error crítico con ${modelo}:`, e);
             }
+            if (modelSuccess) break;
         }
 
         if (!response || !response.ok) {
-            throw new Error(lastError || 'No se pudo conectar con ningún modelo de IA disponible. Verifica tu cuota de API o conexión.');
+            const diagnosis = accumulatedErrors.length > 0 
+                ? accumulatedErrors.join(' | ') 
+                : 'No se pudo conectar con ningún modelo de IA. Verifica tu API KEY y cuotas.';
+            throw new Error(diagnosis);
         }
 
         const data = await response.json();
