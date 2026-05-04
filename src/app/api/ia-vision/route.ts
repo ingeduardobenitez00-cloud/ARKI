@@ -46,14 +46,16 @@ export async function POST(req: Request) {
             }
         `;
 
-        // Lista de modelos actualizados para el año 2026 según tu diagnóstico
-        const modelos = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-flash-latest'];
+        // Lista de modelos verificados para 2026 (Gemini 1.5 es el estándar de alta estabilidad)
+        const modelos = ['gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-2.0-flash-exp'];
         let lastError = '';
         let response: any = null;
 
+        console.log(`Intentando escaneo IA para ${cargo} en ${depto} con ${listas.length} listas.`);
+
         for (const modelo of modelos) {
             try {
-                // Intentamos con el nombre completo que pide Google
+                console.log(`Probando modelo: ${modelo}...`);
                 const modelName = modelo.includes('models/') ? modelo : `models/${modelo}`;
                 
                 response = await fetch(`https://generativelanguage.googleapis.com/v1beta/${modelName}:generateContent?key=${API_KEY}`, {
@@ -68,21 +70,27 @@ export async function POST(req: Request) {
                         }],
                         generationConfig: {
                             response_mime_type: "application/json",
+                            temperature: 0.1, // Baja temperatura para mayor precisión en extracción de datos
                         }
                     })
                 });
 
-                if (response.ok) break;
+                if (response.ok) {
+                    console.log(`Modelo ${modelo} respondió exitosamente.`);
+                    break;
+                }
                 
                 const errorData = await response.json();
-                lastError = errorData.error?.message || 'Error desconocido';
+                lastError = `[${modelo}] ${errorData.error?.message || 'Error desconocido'}`;
+                console.warn(`Fallo con ${modelo}:`, lastError);
             } catch (e: any) {
-                lastError = e.message;
+                lastError = `[${modelo}] Error de conexión: ${e.message}`;
+                console.error(`Error crítico con ${modelo}:`, e);
             }
         }
 
         if (!response || !response.ok) {
-            throw new Error(lastError || 'No se pudo conectar con los modelos de IA de última generación.');
+            throw new Error(lastError || 'No se pudo conectar con ningún modelo de IA disponible. Verifica tu cuota de API o conexión.');
         }
 
         const data = await response.json();
