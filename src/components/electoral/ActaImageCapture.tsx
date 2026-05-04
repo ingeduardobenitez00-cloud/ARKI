@@ -12,15 +12,20 @@ import { useToast } from '@/hooks/use-toast';
 interface ActaImageCaptureProps {
     onImageCaptured: (file: File | null) => void;
     onOcrParsed: (text: string) => void;
+    onAiParsed?: (data: any) => void;
     onQrParsed: (data: number[], rawHex: string) => void;
+    depto?: string;
+    cargo?: string;
+    listas?: any;
 }
 
-export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: ActaImageCaptureProps) {
+export function ActaImageCapture({ onImageCaptured, onOcrParsed, onAiParsed, onQrParsed, depto, cargo, listas }: ActaImageCaptureProps) {
     const { toast } = useToast();
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const galleryInputRef = useRef<HTMLInputElement>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [isOcrProcessing, setIsOcrProcessing] = useState(false);
+    const [isAiProcessing, setIsAiProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
     const [isQrScannerOpen, setIsQrScannerOpen] = useState(false);
     const qrScannerRef = useRef<any>(null);
@@ -198,6 +203,42 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
         }
     };
 
+    const handleRunAi = async () => {
+        if (!previewUrl || !onAiParsed) return;
+        setIsAiProcessing(true);
+        
+        try {
+            const response = await fetch('/api/ia-vision', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    image: previewUrl,
+                    depto: depto || 'CAPITAL',
+                    cargo: cargo || 'INTENDENTE',
+                    listas: listas || []
+                })
+            });
+
+            const data = await response.json();
+            if (data.error) throw new Error(data.error);
+
+            onAiParsed(data);
+            toast({
+                title: "IA: Análisis Completado",
+                description: `Datos extraídos con ${Math.round(data.confianza * 100)}% de confianza.`,
+                className: "bg-blue-600 text-white border-none",
+            });
+        } catch (error: any) {
+            toast({
+                title: "Error en IA",
+                description: error.message || "No se pudo procesar con IA.",
+                variant: "destructive",
+            });
+        } finally {
+            setIsAiProcessing(false);
+        }
+    };
+
     return (
         <Card className="w-full bg-slate-50 border-dashed border-2">
             <CardContent className="p-4 flex flex-col items-center justify-center space-y-4">
@@ -291,6 +332,21 @@ export function ActaImageCapture({ onImageCaptured, onOcrParsed, onQrParsed }: A
                                 </div>
                             )}
                         </div>
+                        {onAiParsed && (
+                            <Button 
+                                type="button"
+                                onClick={handleRunAi}
+                                disabled={isAiProcessing || isOcrProcessing}
+                                className="bg-blue-600 hover:bg-blue-800 font-black w-full max-w-sm animate-pulse shadow-lg border-2 border-white/20"
+                            >
+                                {isAiProcessing ? (
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                ) : (
+                                    <Wand2 className="w-4 h-4 mr-2" />
+                                )}
+                                ESCANEO INTELIGENTE (IA GEMINI)
+                            </Button>
+                        )}
                         {onOcrParsed && (
                             <Button 
                                 type="button"

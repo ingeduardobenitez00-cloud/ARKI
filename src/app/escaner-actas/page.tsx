@@ -313,7 +313,7 @@ export default function EscanerActasPage() {
                                 <IntendenteForm 
                                     mesa={selectedMesa!} 
                                     local={selectedLocal!} 
-                                    depto={selectedSeccional?.includes('CENTRAL') ? 'CENTRAL' : 'CAPITAL'}
+                                    depto={selectedSeccional === 'CENTRAL' ? 'CENTRAL' : 'CAPITAL'}
                                     onSave={handleSaveResult}
                                     isSaving={isSaving}
                                 />

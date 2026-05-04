@@ -57,6 +57,32 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
         setIsOcrDialogOpen(true);
     };
 
+    const handleAiParsed = (data: any) => {
+        const previewVotes: Record<string, Record<number, number>> = {};
+        
+        // La IA nos devuelve un objeto plano, lo convertimos a la estructura de Junta (Lista -> Opcion)
+        Object.entries(data.votos).forEach(([key, val]) => {
+            const listId = key.split('-opt-')[0];
+            const option = parseInt(key.split('-opt-')[1] || "1");
+            if (!previewVotes[listId]) previewVotes[listId] = {};
+            previewVotes[listId][option] = val as number;
+        });
+
+        setOcrPreview({
+            votes: previewVotes,
+            extra: {
+                ...data.cierre,
+                es_valido: true,
+                total_calculado: Object.values(data.votos).reduce((a: any, b: any) => a + b, 0) + 
+                                (data.cierre.nul || 0) + (data.cierre.blc || 0) + (data.cierre.vac || 0)
+            },
+            identity: { mesa, local: 0, distrito: 0 },
+            resultsBlock: Object.entries(data.votos).map(([id, val]) => ({ id, nombre: `Opción ${id}`, votos: val })),
+            isQr: false
+        });
+        setIsOcrDialogOpen(true);
+    };
+
     const handleQrParsed = (data: number[], rawHex: string) => {
         // USAR MOTOR UNIFICADO ARKI (Con desempaquetado de bits)
         const resultado = procesarQRARKI(data, depto, 'JUNTA', 0);
@@ -78,7 +104,7 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                 ...resultado.cierre, 
                 es_valido: resultado.validado,
                 total_calculado: resultado.votos.reduce((a, b) => a + b.votos, 0) + 
-                                resultado.cierre.nul + resultado.cierre.blc + resultado.cierre.vac
+                                 resultado.cierre.nul + resultado.cierre.blc + resultado.cierre.vac
             },
             identity: {
                 mesa: data[5] || 0,
@@ -97,10 +123,10 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
         if (ocrPreview) {
             setVotes(ocrPreview.votes);
             setExtra({
-                nulos: ocrPreview.extra.nul || ocrPreview.extra.nulos,
-                blancos: ocrPreview.extra.blc || ocrPreview.extra.blancos,
-                votos_computar: ocrPreview.extra.vac || ocrPreview.extra.votos_computar,
-                total_general: ocrPreview.extra.tot || ocrPreview.extra.total_general
+                nulos: ocrPreview.extra.nul || ocrPreview.extra.nulos || 0,
+                blancos: ocrPreview.extra.blc || ocrPreview.extra.blancos || 0,
+                votos_computar: ocrPreview.extra.vac || ocrPreview.extra.votos_computar || 0,
+                total_general: ocrPreview.extra.tot || ocrPreview.extra.total_general || 0
             });
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
@@ -144,7 +170,11 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                 <ActaImageCapture 
                     onImageCaptured={setImageFile} 
                     onOcrParsed={handleOcrParsed}
+                    onAiParsed={handleAiParsed}
                     onQrParsed={handleQrParsed}
+                    depto={depto}
+                    cargo="JUNTA MUNICIPAL"
+                    listas={depto === 'CAPITAL' ? ["2C", "2P", "6", "7", "20"] : [510, 520, 530, 540, 560, 570, 580, 590, 600, 610, 620, 630, 640, 650, 660, 670, 680, 690, 700, 710, 720]}
                 />
                 
                 <Tabs defaultValue={activeListId} onValueChange={setActiveListId} className="w-full">

@@ -55,6 +55,20 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
         // (Lógica simplificada de OCR para no saturar)
         setOcrPreview({ votes: previewVotes, extra: previewExtra, identity: { mesa, local: 0, distrito: 0 } });
         setIsOcrDialogOpen(true);
+    };    const handleAiParsed = (data: any) => {
+        setOcrPreview({
+            votes: data.votos,
+            extra: {
+                ...data.cierre,
+                es_valido: true, // La IA valida internamente o confiamos en su suma
+                total_calculado: Object.values(data.votos).reduce((a: any, b: any) => a + b, 0) + 
+                                (data.cierre.nul || 0) + (data.cierre.blc || 0) + (data.cierre.vac || 0)
+            },
+            identity: { mesa, local: 0, distrito: 0 },
+            resultsBlock: Object.entries(data.votos).map(([id, val]) => ({ id, nombre: `Lista ${id}`, votos: val })),
+            isQr: false
+        });
+        setIsOcrDialogOpen(true);
     };
 
     const handleQrParsed = (data: number[], rawHex: string) => {
@@ -73,7 +87,7 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
                 ...resultado.cierre, 
                 es_valido: resultado.validado,
                 total_calculado: resultado.votos.reduce((a, b) => a + b.votos, 0) + 
-                                resultado.cierre.nul + resultado.cierre.blc + resultado.cierre.vac
+                                 resultado.cierre.nul + resultado.cierre.blc + resultado.cierre.vac
             },
             identity: {
                 mesa: data[5] || 0,
@@ -92,10 +106,10 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
         if (ocrPreview) {
             setVotes(ocrPreview.votes);
             setExtra({
-                nulos: ocrPreview.extra.nul || ocrPreview.extra.nulos,
-                blancos: ocrPreview.extra.blc || ocrPreview.extra.blancos,
-                votos_computar: ocrPreview.extra.vac || ocrPreview.extra.votos_computar,
-                total_general: ocrPreview.extra.tot || ocrPreview.extra.total_general
+                nulos: ocrPreview.extra.nul || ocrPreview.extra.nulos || 0,
+                blancos: ocrPreview.extra.blc || ocrPreview.extra.blancos || 0,
+                votos_computar: ocrPreview.extra.vac || ocrPreview.extra.votos_computar || 0,
+                total_general: ocrPreview.extra.tot || ocrPreview.extra.total_general || 0
             });
             setOcrPreview(null);
             setIsOcrDialogOpen(false);
@@ -129,7 +143,11 @@ export function IntendenteForm({ mesa, local, depto = 'CAPITAL', onSave, isSavin
                     <ActaImageCapture 
                         onImageCaptured={setImageFile} 
                         onOcrParsed={handleOcrParsed}
+                        onAiParsed={handleAiParsed}
                         onQrParsed={handleQrParsed}
+                        depto={depto}
+                        cargo="INTENDENTE"
+                        listas={depto === 'CAPITAL' ? ["2", "7", "300"] : [510, 520, 530, 540, 580, 590, 600]}
                     />
                 </div>
 

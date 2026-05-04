@@ -94,12 +94,12 @@ export default function QRLaboratoryPage() {
         return () => {
             stopCamera().catch(() => {});
         };
-    }, [depto, cargo, db]); 
+    }, [depto, cargo]); // Quitamos db para evitar reinicios infinitos
 
     const processHex = (hex: string) => {
+        if (!hex || hex === scanResult) return; // Evitar procesado doble
         try {
             setError(null);
-            if (!hex) return;
             
             let bytes: Uint8Array;
             const cleanHex = hex.replace(/[^0-9A-Fa-f]/g, '');
@@ -479,7 +479,7 @@ export default function QRLaboratoryPage() {
                                                     <p className="text-lg font-black text-white">{procesado.cierre.blc}</p>
                                                 </div>
                                                 <div className="text-center border-x border-slate-800">
-                                                    <p className="text-[9px] font-bold text-slate-500 uppercase">VACIOS</p>
+                                                    <p className="text-[9px] font-bold text-slate-500 uppercase">VOTOS A COMPUTAR</p>
                                                     <p className="text-lg font-black text-white">{procesado.cierre.vac}</p>
                                                 </div>
                                                 <div className="text-center">
