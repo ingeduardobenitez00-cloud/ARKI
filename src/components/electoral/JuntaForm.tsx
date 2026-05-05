@@ -13,6 +13,7 @@ import { ActaImageCapture } from './ActaImageCapture';
 import { Dialog, DialogContent, DialogHeader, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { procesarQRARKI } from '@/lib/qr-processor';
 import * as fflate from 'fflate';
+import { useToast } from "@/hooks/use-toast";
 
 interface JuntaFormProps {
     mesa: number;
@@ -24,6 +25,7 @@ interface JuntaFormProps {
 }
 
 export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, initialData }: JuntaFormProps) {
+    const { toast } = useToast();
     const [votes, setVotes] = useState<Record<string, Record<number, number>>>(initialData?.votes || {});
     const [extra, setExtra] = useState(initialData?.extra || { nulos: 0, blancos: 0, votos_computar: 0, total_general: 0 });
     const [imageFile, setImageFile] = useState<File | null>(null);
@@ -254,7 +256,7 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
 
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-muted/50 rounded-lg border">
                     <div className="space-y-2">
-                        <Label>Nulos</Label>
+                        <Label>Nulos (NUL)</Label>
                         <Input 
                             type="number" 
                             value={extra.nulos || ''} 
@@ -262,7 +264,7 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>Blancos</Label>
+                        <Label>Blancos (BLC)</Label>
                         <Input 
                             type="number" 
                             value={extra.blancos || ''} 
@@ -270,7 +272,7 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label>Votos a Computar</Label>
+                        <Label>Votos a Computar (VAC)</Label>
                         <Input 
                             type="number" 
                             value={extra.votos_computar || ''} 
@@ -279,18 +281,44 @@ export function JuntaForm({ mesa, local, depto = 'CAPITAL', onSave, isSaving, in
                         />
                     </div>
                     <div className="space-y-2">
-                        <Label className="text-blue-700 font-bold">Total General (Resultados)</Label>
+                        <Label className="text-blue-700 font-black uppercase text-[10px] tracking-wider">Suma Calculada (Sistema)</Label>
+                        <div className={`p-3 rounded border-2 flex items-center justify-between ${isTotalValid ? 'bg-green-50 border-green-500 text-green-700' : 'bg-red-50 border-red-500 text-red-700'}`}>
+                            <span className="text-2xl font-black">{calculatedTotal}</span>
+                            {isTotalValid ? <CheckCircle className="w-6 h-6" /> : <AlertCircle className="w-6 h-6" />}
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-slate-700 font-black uppercase text-[10px] tracking-wider">Total Oficial del Acta (Papel)</Label>
                         <Input 
                             type="number" 
-                            value={calculatedTotal} 
-                            readOnly
-                            className="votos-total font-black text-lg bg-slate-50 border-blue-600 text-blue-700"
+                            value={extra.total_general || ''} 
+                            onChange={(e) => setExtra((p: any) => ({...p, total_general: parseInt(e.target.value) || 0}))} 
+                            className={`h-14 text-2xl font-black text-center ${isTotalValid ? 'border-green-500 bg-green-50' : 'border-red-400 bg-red-50'}`}
+                            placeholder="Escribe el TOT..."
                         />
-                        <p className="text-[9px] text-muted-foreground italic">
-                            * Suma de buzones de resultados electorales.
-                        </p>
                     </div>
+                    {!isTotalValid && extra.total_general > 0 && (
+                        <p className="col-span-full text-center text-xs font-bold text-red-600 animate-pulse">
+                            ⚠️ La suma no coincide con el total oficial del acta.
+                        </p>
+                    )}
                 </div>
+
+                {/* VISUALIZADOR DE FOTO CAPTURADA */}
+                {imageFile && (
+                    <div className="flex items-center gap-4 p-3 bg-blue-50 border border-blue-200 rounded-lg animate-in slide-in-from-bottom-2">
+                        <div className="relative w-16 h-16 rounded overflow-hidden border-2 border-blue-500">
+                            <img src={URL.createObjectURL(imageFile)} className="w-full h-full object-cover" alt="Capture preview" />
+                        </div>
+                        <div className="flex-1">
+                            <p className="text-xs font-black text-blue-700 uppercase">✅ Acta de Junta capturada</p>
+                            <p className="text-[10px] text-blue-600">Lista para ser guardada con los votos preferenciales.</p>
+                        </div>
+                        <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-700" onClick={() => setImageFile(null)}>
+                            Cambiar Foto
+                        </Button>
+                    </div>
+                )}
 
                 {calculatedTotal === 0 && (
                     <div className="flex items-center gap-2 text-blue-500 text-sm font-semibold justify-center bg-blue-50 p-2 rounded mt-4">

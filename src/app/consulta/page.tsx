@@ -5,7 +5,7 @@ import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
-import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -99,7 +99,7 @@ export default function ConsultaPage() {
         return query(collection(db, COLLECTION_CAPTURAS), limit(300));
     }, [db, user, refreshKey]);
 
-    const { data: rawList, isLoading: isLoadingList, error: listError } = useCollectionOnce<PadronData>(registeredQuery);
+    const { data: rawList, isLoading: isLoadingList, error: listError } = useCollection<PadronData>(registeredQuery);
 
     const registeredList = useMemo(() => {
         if (!rawList || !user) return [];
@@ -271,6 +271,10 @@ export default function ConsultaPage() {
         ]).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'REGISTRÓ VOTO SEGURO', targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}` });
             toast({ title: '¡Registro Exitoso!' });
+            
+            // Ya no hace falta setRefreshKey porque useCollection (listener) 
+            // detecta el nuevo registro automáticamente sin costo de re-lectura total.
+
             // LIMPIAR CAMPOS PARA OTRA BUSQUEDA
             setSearchTerm(''); 
             setSearchResults([]); 
@@ -435,8 +439,8 @@ export default function ConsultaPage() {
                                         <div className="flex items-center gap-2 flex-1 text-left">
                                             <span className="font-black text-xs uppercase">{userName}</span>
                                             {data.seccional && (
-                                                <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-[8px] font-black text-white shadow-sm ring-2 ring-white">
-                                                    {data.seccional}
+                                                <div className="h-5 px-2 w-fit rounded-full bg-red-600 flex items-center justify-center text-[7px] font-black text-white shadow-sm ring-2 ring-white uppercase">
+                                                    SECC {data.seccional}
                                                 </div>
                                             )}
                                         </div>

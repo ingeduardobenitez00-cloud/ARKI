@@ -193,7 +193,11 @@ export default function ReportesPage() {
                                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/5"><UserIcon className="h-4 w-4 text-primary" /></div>
                                             <div className="flex items-center gap-2 flex-1 text-left">
                                                 <span className="font-black text-xs uppercase text-slate-900">{userName}</span>
-                                                {userData.seccional && <div className="h-5 w-5 rounded-full bg-primary flex items-center justify-center text-[8px] font-black text-white shadow-sm ring-2 ring-white">{userData.seccional}</div>}
+                                                {userData.seccional && (
+                                                <div className="h-5 px-2 w-fit rounded-full bg-red-600 flex items-center justify-center text-[7px] font-black text-white shadow-sm ring-2 ring-white uppercase">
+                                                    SECC {userData.seccional}
+                                                </div>
+                                            )}
                                             </div>
                                             <div className="flex gap-2 shrink-0">
                                                 <Badge variant="outline" className="text-[9px] font-black bg-white">{userData.votos.length} TOTAL</Badge>

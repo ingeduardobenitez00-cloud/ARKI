@@ -13,13 +13,25 @@ export async function POST(req: Request) {
         if (!API_KEY) return NextResponse.json({ error: 'Falta la API KEY en el servidor' }, { status: 500 });
 
         const prompt = `
-            Eres un experto en escrutinio electoral paraguayo. Tu tarea es extraer los votos de la imagen de un ACTA DE ESCRUTINIO IMPRESA.
-            DEPARTAMENTO: ${depto}
-            CARGO: ${cargo}
-            ${cargo === 'JUNTA' ? 'INSTRUCCIÓN: Busca tanto las LISTAS como las 24 OPCIONES preferenciales.' : 'INSTRUCCIÓN: Busca los resultados por LISTA.'}
+            Eres un experto en escrutinio electoral paraguayo de alta precisión.
+            ESTÁS ANALIZANDO UN ACTA DE: ${cargo} (Departamento: ${depto})
 
-            LISTAS A BUSCAR: ${JSON.stringify(listas)}
-            CAMPOS DE CIERRE: NULOS, BLANCOS, VACIADOS, TOTAL (TOT).
+            ${cargo === 'JUNTA' 
+                ? `MODO JUNTA MUNICIPAL:
+                   1. Debes extraer los votos de las LISTAS solicitadas: ${JSON.stringify(listas)}.
+                   2. Para cada lista, DEBES buscar la cuadrícula de 24 OPCIONES PREFERENCIALES.
+                   3. Extrae los votos de cada opción (del 1 al 24) que veas marcados o escritos.
+                   4. Estructura los votos de las opciones como "LISTA-OPCION" (ej: "2-1", "2-2", "7-1").`
+                : `MODO INTENDENTE:
+                   1. Solo busca los votos totales por cada LISTA: ${JSON.stringify(listas)}.
+                   2. Ignora cualquier cuadro de opciones preferenciales si lo hubiera.`
+            }
+
+            CAMPOS TÉCNICOS OBLIGATORIOS (CIERRE):
+            - NUL (Votos Nulos)
+            - BLC (Votos en Blanco)
+            - VAC (Votos a Computar / Vaciados)
+            - TOT (Total Oficial escrito en el acta)
 
             REGLAS:
             - Devuelve SOLO JSON puro.

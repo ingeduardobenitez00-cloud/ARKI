@@ -58,6 +58,7 @@ export const allMenuItems = [
   { href: '/configuracion', label: 'Configuración', icon: Settings, tooltip: 'CONFIGURA PARÁMETROS TÉCNICOS E IDENTIDAD PWA.' },
   { href: '/perfil', label: 'Mi Perfil', icon: UserCircle, tooltip: 'GESTIONA TU INFORMACIÓN PERSONAL Y CAMBIA TU CONTRASEÑA.' },
   { href: '/laboratorio-qr', label: 'Laboratorio QR', icon: Cpu, tooltip: 'INGENIERÍA INVERSA Y VALIDACIÓN DE ACTAS.' },
+  { href: '/verificador-actas', label: 'Verificador de Actas', icon: ShieldCheck, tooltip: 'AUDITORÍA VISUAL DE FOTOS VS RESULTADOS CARGADOS.' },
   { href: '/admin/config-setup', label: 'Setup Config', icon: Database, tooltip: 'CONFIGURACIÓN DE MOLDES ELECTORALES.' },
 ];
 
@@ -91,7 +92,7 @@ export const menuCategories = [
   {
     label: 'Operación Día D',
     icon: ClipboardCheck,
-    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/configuracion-electoral', '/reportes']
+    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/configuracion-electoral', '/verificador-actas', '/reportes']
   },
   {
     label: 'Asistencia y Eventos',
