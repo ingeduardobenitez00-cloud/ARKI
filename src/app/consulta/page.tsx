@@ -91,6 +91,7 @@ export default function ConsultaPage() {
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
     
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+    const [isRestrictedAlertOpen, setIsRestrictedAlertOpen] = useState(false);
     const [votoToDelete, setVotoToDelete] = useState<PadronData | null>(null);
 
     // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS OPTIMIZADO POR ROL
@@ -304,11 +305,7 @@ export default function ConsultaPage() {
         const electorSec = String(selectedPerson.CODIGO_SEC || '');
 
         if (!isAdmin && userSeccionales.length > 0 && !userSeccionales.includes(electorSec)) {
-            toast({ 
-                title: 'ACCESO RESTRINGIDO', 
-                description: 'SOLO PUEDES REGISTRAR VOTOS SEGUROS EN TU RESPECTIVA SECCIONAL',
-                variant: 'destructive'
-            });
+            setIsRestrictedAlertOpen(true);
             return;
         }
 
@@ -524,6 +521,32 @@ export default function ConsultaPage() {
             <AlertDialog open={isDeleteAlertOpen} onOpenChange={setIsDeleteAlertOpen}>
                 <AlertDialogContent className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase">¿Eliminar Marca de Voto Seguro?</AlertDialogTitle></AlertDialogHeader>
                     <AlertDialogFooter className="gap-2"><AlertDialogCancel className="font-black uppercase text-xs h-11 rounded-xl">CANCELAR</AlertDialogCancel><AlertDialogAction onClick={handleDeleteVoto} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-xs h-11 px-6 rounded-xl">ELIMINAR AHORA</AlertDialogAction></AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={isRestrictedAlertOpen} onOpenChange={setIsRestrictedAlertOpen}>
+                <AlertDialogContent className="rounded-[2.5rem] border border-red-100 bg-white p-8 max-w-md shadow-2xl animate-in fade-in zoom-in duration-300">
+                    <AlertDialogHeader className="space-y-4">
+                        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-500 border border-red-100/50">
+                            <Lock className="h-7 w-7 stroke-[2.5]" />
+                        </div>
+                        <div className="space-y-2 text-center">
+                            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight text-red-600">
+                                Acceso Restringido
+                            </AlertDialogTitle>
+                            <AlertDialogDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500 leading-relaxed">
+                                Solo puedes registrar votos seguros de electores que pertenecen a tu seccional autorizada ({userSeccionales.join(', ')}).
+                            </AlertDialogDescription>
+                        </div>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter className="mt-8">
+                        <AlertDialogAction 
+                            onClick={() => setIsRestrictedAlertOpen(false)}
+                            className="bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest h-12 w-full rounded-2xl shadow-lg shadow-red-600/10 hover:shadow-xl transition-all duration-300"
+                        >
+                            ENTENDIDO
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
         </div>
