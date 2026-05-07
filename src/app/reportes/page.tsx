@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, query, limit, getCountFromServer } from 'firebase/firestore';
+import { collection, query, limit, getCountFromServer, where, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -47,13 +47,56 @@ export default function ReportesPage() {
   const [totalCaptures, setTotalCaptures] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // 1. ESCUCHADOR EN TIEMPO REAL CON LÍMITE PARA ESTABILIDAD DE COSTOS
+  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
+  const isPresidente = user?.role === 'Presidente';
+  const isCoordinador = user?.role === 'Coordinador';
+  const isDirigente = user?.role === 'Dirigente';
+  const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
+
+  // 1. ESCUCHADOR EN TIEMPO REAL OPTIMIZADO POR ROL PARA ESTABILIDAD DE COSTOS
   const registeredQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
-    return query(collection(db, 'votos_confirmados'), limit(2000));
-  }, [db, user, refreshKey]);
+
+    if (isDirigente) {
+      // El Dirigente solo descarga sus propios votos seguros (sin límite bajo para garantizar carga completa)
+      return query(
+        collection(db, 'votos_confirmados'),
+        where('registradoPor_id', '==', user.id),
+        orderBy('APELLIDO', 'asc')
+      );
+    }
+
+    // Coordinadores, Presidentes, Admins o PC Central descargan de manera fluida y sin límites.
+    // Se remueve la llamada a 'limit' por completo, lo que permite traer 20,000 o más registros sin restricciones del servidor de Firebase.
+    return query(
+      collection(db, 'votos_confirmados'),
+      orderBy('APELLIDO', 'asc')
+    );
+  }, [db, user, isDirigente, isCoordinador, isPresidente, userSeccionales, refreshKey]);
 
   const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
+
+  // ESCUCHADOR EN TIEMPO REAL A LOS USUARIOS PARA JURISDICCIÓN DE OPERADORES
+  const usersQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collection(db, 'users'));
+  }, [db, user]);
+
+  const { data: allUsers } = useCollection<any>(usersQuery);
+
+  const seccionalUserIds = useMemo(() => {
+    if (!allUsers || !userSeccionales.length) return new Set<string>();
+    const ids = new Set<string>();
+    allUsers.forEach(u => {
+      const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+      const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
+      if (hasOverlap) {
+        ids.add(u.id);
+      }
+    });
+    return ids;
+  }, [allUsers, userSeccionales]);
 
   // CONTEO GLOBAL DESDE EL SERVIDOR
   useState(() => {
@@ -67,12 +110,6 @@ export default function ReportesPage() {
     setRefreshKey(prev => prev + 1);
   };
 
-  const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
-  const isPresidente = user?.role === 'Presidente';
-  const isCoordinador = user?.role === 'Coordinador';
-  const isDirigente = user?.role === 'Dirigente';
-  const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
-
   // 2. FILTRADO POR ROLES Y JURISDICCIÓN
   const filteredList = useMemo(() => {
     if (!rawList || !user) return [];
@@ -80,29 +117,56 @@ export default function ReportesPage() {
     // PC Central ve TODO
     if (isAdmin) return rawList;
 
-    // Presidentes y Coordinadores ven solo su JURISDICCIÓN
+    const normalize = (nameStr: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const myNormalizedName = normalize(user.name);
+    const isGuillermoMe = myNormalizedName.includes("GUILLERMO") && myNormalizedName.includes("FERNANDEZ");
+
+    const isMyRegistration = (item: VotoSeguroData) => {
+        if (item.registradoPor_id === user.id) return true;
+        const itemRegName = normalize(item.registradoPor_nombre);
+        if (isGuillermoMe && itemRegName.includes("GUILLERMO") && itemRegName.includes("FERNANDEZ")) return true;
+        return itemRegName === myNormalizedName;
+    };
+
+    // Presidentes y Coordinadores ven su JURISDICCIÓN o sus propios registros (filtro cliente)
     if (isPresidente || isCoordinador) {
         return rawList.filter((item: VotoSeguroData) => {
             const itemSec = String(item.CODIGO_SEC || '');
-            return userSeccionales.includes(itemSec);
+            const isFromMySeccional = userSeccionales.includes(itemSec);
+            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
+            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
         });
     }
 
     if (isDirigente) {
-        return rawList.filter((item: VotoSeguroData) => item.registradoPor_id === user.id);
+        return rawList.filter((item: VotoSeguroData) => isMyRegistration(item));
     }
 
     return [];
-  }, [rawList, user, isAdmin, isCoordinador, isDirigente, userSeccionales]);
+  }, [rawList, user, isAdmin, isCoordinador, isPresidente, isDirigente, userSeccionales, seccionalUserIds]);
 
   // 3. AGRUPAMIENTO POR USUARIO CON CÁLCULO DE PARTICIPACIÓN
   const groupedData = useMemo(() => {
     const groups: GroupedReport = {};
     filteredList.forEach((voto: VotoSeguroData) => {
-        const userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
+        let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
         const itemSecc = String(voto.CODIGO_SEC || '');
         const yaVoto = voto.estado_votacion === 'Ya Votó';
+
+        // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
+        const normalized = userName
+            .trim()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase();
+        
+        // Si el nombre contiene GUILLERMO y FERNANDEZ, usar la forma estándar "GUILLERMO FERNANDEZ"
+        if (normalized.includes("GUILLERMO") && normalized.includes("FERNANDEZ")) {
+            userName = "GUILLERMO FERNANDEZ";
+        } else if (normalized.includes("GUILLEFER")) {
+            userName = "GUILLERMO FERNANDEZ";
+        }
 
         if (!groups[userName]) {
             groups[userName] = { userId, seccional: itemSecc, votos: [], votosEfectuados: 0 };

@@ -64,8 +64,6 @@ export default function VotoSeguroPage() {
   const [votoToDelete, setVotoToDelete] = useState<VotoSeguroData | null>(null);
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
-  const [limitCount] = useState(2000);
-
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
@@ -75,7 +73,7 @@ export default function VotoSeguroPage() {
   /**
    * QUERY OPTIMIZADA POR ROL:
    * - Dirigentes (~650 usuarios): filtro server-side por su propio ID → ~30-50 docs c/u
-   * - Admins/Presidentes/Coordinadores (~50 usuarios): query completo con limit(2000)
+   * - Admins/Presidentes/Coordinadores (~50 usuarios): query completo
    * Esto reduce lecturas de Firestore en ~97% para la gran mayoría de usuarios.
    * ÍNDICE REQUERIDO en Firestore: votos_confirmados → registradoPor_id ASC, APELLIDO ASC
    */
@@ -92,15 +90,36 @@ export default function VotoSeguroPage() {
       );
     }
 
-    // Admins, Presidentes, Coordinadores: todos los votos con límite
+    // Admins, Presidentes, Coordinadores: todos los votos sin límites para que soporte 20000 o más sin errores de Firestore
     return query(
       collection(db, 'votos_confirmados'),
-      orderBy('APELLIDO', 'asc'),
-      limit(limitCount)
+      orderBy('APELLIDO', 'asc')
     );
-  }, [db, user, limitCount, isDirigente]);
+  }, [db, user, isDirigente]);
 
-  const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
+  const { data: rawList, isLoading, error } = useCollection<VotoSeguroData>(registeredQuery);
+
+  // ESCUCHADOR EN TIEMPO REAL A LOS USUARIOS PARA JURISDICCIÓN DE OPERADORES
+  const usersQuery = useMemoFirebase(() => {
+    if (!db || !user) return null;
+    return query(collection(db, 'users'));
+  }, [db, user]);
+
+  const { data: allUsers } = useCollection<any>(usersQuery);
+
+  const seccionalUserIds = useMemo(() => {
+    if (!allUsers || !userSeccionales.length) return new Set<string>();
+    const ids = new Set<string>();
+    allUsers.forEach(u => {
+      const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+      const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
+      if (hasOverlap) {
+        ids.add(u.id);
+      }
+    });
+    return ids;
+  }, [allUsers, userSeccionales]);
 
   // FILTRADO POR ROLES Y JURISDICCIÓN
   const filteredList = useMemo(() => {
@@ -109,11 +128,24 @@ export default function VotoSeguroPage() {
     // Admins (PC Central) ven TODO
     if (isAdmin) return rawList;
 
-    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS (filtro cliente)
+    const normalize = (nameStr: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const myNormalizedName = normalize(user.name);
+    const isGuillermoMe = myNormalizedName.includes("GUILLERMO") && myNormalizedName.includes("FERNANDEZ");
+
+    const isMyRegistration = (item: VotoSeguroData) => {
+        if (item.registradoPor_id === user.id) return true;
+        const itemRegName = normalize(item.registradoPor_nombre);
+        if (isGuillermoMe && itemRegName.includes("GUILLERMO") && itemRegName.includes("FERNANDEZ")) return true;
+        return itemRegName === myNormalizedName;
+    };
+
+    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS o sus propios registros (filtro cliente)
     if (isPresidente || isCoordinador) {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
-            return userSeccionales.includes(itemSec);
+            const isFromMySeccional = userSeccionales.includes(itemSec);
+            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
+            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
         });
     }
 
@@ -121,15 +153,29 @@ export default function VotoSeguroPage() {
     if (isDirigente) return rawList;
 
     return [];
-  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales]);
+  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales, seccionalUserIds]);
 
   // AGRUPAMIENTO POR USUARIO CON CÍRCULO DE SECCIONAL
   const groupedData = useMemo(() => {
     const groups: GroupedVotos = {};
     filteredList.forEach(voto => {
-        const userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
+        let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
         const itemSecc = String(voto.CODIGO_SEC || '');
+
+        // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
+        const normalized = userName
+            .trim()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toUpperCase();
+        
+        // Si el nombre contiene GUILLERMO y FERNANDEZ, usar la forma estándar "GUILLERMO FERNANDEZ"
+        if (normalized.includes("GUILLERMO") && normalized.includes("FERNANDEZ")) {
+            userName = "GUILLERMO FERNANDEZ";
+        } else if (normalized.includes("GUILLEFER")) {
+            userName = "GUILLERMO FERNANDEZ";
+        }
 
         if (!groups[userName]) {
             groups[userName] = { userId, seccional: itemSecc, votos: [] };
@@ -225,6 +271,11 @@ export default function VotoSeguroPage() {
                 </div>
             </div>
         </CardHeader>
+        {error && (
+            <div className="bg-red-50 text-red-800 p-4 rounded-xl border border-red-200 font-mono text-xs m-4">
+                <strong>Error de Firestore:</strong> {error.message}
+            </div>
+        )}
         <CardContent className="p-0">
             {isLoading ? <div className="p-8 space-y-4"><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-12 w-full rounded-xl" /></div> : 
             Object.keys(groupedData).length > 0 ? (

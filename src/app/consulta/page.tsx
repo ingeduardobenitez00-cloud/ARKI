@@ -93,13 +93,53 @@ export default function ConsultaPage() {
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const [votoToDelete, setVotoToDelete] = useState<PadronData | null>(null);
 
-    // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS CON LÍMITE (OPTIMIZACIÓN DE COSTOS)
+    // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS OPTIMIZADO POR ROL
     const registeredQuery = useMemoFirebase(() => {
         if (!db || !user) return null;
-        return query(collection(db, COLLECTION_CAPTURAS), limit(300));
-    }, [db, user, refreshKey]);
+
+        const role = user.role;
+        const isDirigente = role === 'Dirigente';
+
+        if (isDirigente) {
+            // El Dirigente solo descarga sus propios votos seguros (sin límite artificial bajo para poder ver sus 400+ votos)
+            return query(
+                collection(db, COLLECTION_CAPTURAS),
+                where('registradoPor_id', '==', user.id),
+                orderBy('APELLIDO', 'asc')
+            );
+        }
+
+        // Coordinadores, Admins y Presidentes descargan todo de manera fluida y sin límites.
+        // Se remueve la llamada a 'limit' por completo, lo que permite traer 20,000 o más registros sin restricciones del servidor de Firebase.
+        return query(
+            collection(db, COLLECTION_CAPTURAS),
+            orderBy('APELLIDO', 'asc')
+        );
+    }, [db, user, userSeccionales, refreshKey]);
 
     const { data: rawList, isLoading: isLoadingList, error: listError } = useCollection<PadronData>(registeredQuery);
+
+    // ESCUCHADOR EN TIEMPO REAL A LOS USUARIOS PARA JURISDICCIÓN DE OPERADORES
+    const usersQuery = useMemoFirebase(() => {
+        if (!db || !user) return null;
+        return query(collection(db, 'users'));
+    }, [db, user]);
+
+    const { data: allUsers } = useCollection<any>(usersQuery);
+
+    const seccionalUserIds = useMemo(() => {
+        if (!allUsers || !userSeccionales.length) return new Set<string>();
+        const ids = new Set<string>();
+        allUsers.forEach(u => {
+            const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+            const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
+            if (hasOverlap) {
+                ids.add(u.id);
+            }
+        });
+        return ids;
+    }, [allUsers, userSeccionales]);
 
     const registeredList = useMemo(() => {
         if (!rawList || !user) return [];
@@ -109,26 +149,54 @@ export default function ConsultaPage() {
         
         if (isAdmin) return rawList;
 
+        const normalize = (nameStr: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+        const myNormalizedName = normalize(user.name);
+        const isGuillermoMe = myNormalizedName.includes("GUILLERMO") && myNormalizedName.includes("FERNANDEZ");
+
+        const isMyRegistration = (item: PadronData) => {
+            if (item.registradoPor_id === user.id) return true;
+            const itemRegName = normalize(item.registradoPor_nombre);
+            if (isGuillermoMe && itemRegName.includes("GUILLERMO") && itemRegName.includes("FERNANDEZ")) return true;
+            return itemRegName === myNormalizedName;
+        };
+
         if (role === 'Coordinador') {
             return rawList.filter(item => {
                 const itemSec = String(item.CODIGO_SEC || '');
-                return userSeccionales.includes(itemSec);
+                const isFromMySeccional = userSeccionales.includes(itemSec);
+                const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
+                return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
             });
         }
 
         if (role === 'Dirigente') {
-            return rawList.filter(item => item.registradoPor_id === user.id);
+            return rawList.filter(item => isMyRegistration(item));
         }
 
         return [];
-    }, [rawList, user, userSeccionales]);
+    }, [rawList, user, userSeccionales, seccionalUserIds]);
 
     const groupedCaptures = useMemo(() => {
         const groups: Record<string, { seccional: string, votos: PadronData[] }> = {};
         if (!registeredList) return groups;
         
         registeredList.forEach(item => {
-            const userName = item.registradoPor_nombre || 'USUARIO DESCONOCIDO';
+            let userName = item.registradoPor_nombre || 'USUARIO DESCONOCIDO';
+            
+            // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
+            const normalized = userName
+                .trim()
+                .normalize("NFD")
+                .replace(/[\u0300-\u036f]/g, "")
+                .toUpperCase();
+            
+            // Si el nombre contiene GUILLERMO y FERNANDEZ, usar la forma estándar "GUILLERMO FERNANDEZ"
+            if (normalized.includes("GUILLERMO") && normalized.includes("FERNANDEZ")) {
+                userName = "GUILLERMO FERNANDEZ";
+            } else if (normalized.includes("GUILLEFER")) {
+                userName = "GUILLERMO FERNANDEZ";
+            }
+            
             if (!groups[userName]) {
                 groups[userName] = {
                     seccional: String(item.CODIGO_SEC || ''),
