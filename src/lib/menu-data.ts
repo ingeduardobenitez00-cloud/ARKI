@@ -28,7 +28,8 @@ import {
     MapIcon,
     QrCode,
     BarChart3,
-    Image as ImageIcon
+    Image as ImageIcon,
+    FileSpreadsheet
 } from 'lucide-react';
 
 export const allMenuItems = [
@@ -38,6 +39,7 @@ export const allMenuItems = [
   { href: '/padron-export', label: 'Padrón Exportar', icon: FileDown, tooltip: 'GENERA REPORTES EN EXCEL Y PDF POR SECCIONAL.' },
   { href: '/consulta', label: 'Registra Votos', icon: FileSearch, tooltip: 'BUSCA ELECTORES Y MARCA SU VOTO COMO SEGURO.' },
   { href: '/telefonos', label: 'Actualizar Teléfonos', icon: Phone, tooltip: 'AGREGA O ACTUALIZA LOS NÚMEROS DE TELÉFONO DE LOS EMPADRONADOS.' },
+  { href: '/migrar-celulares', label: 'Migrar Celulares', icon: FileSpreadsheet, tooltip: 'MIGRA NÚMEROS DE CELULARES DESDE EXCEL AL PADRÓN NACIONAL Y COMPENDIO.' },
   { href: '/biblioteca', label: 'Biblioteca Multimedia', icon: Film, tooltip: 'GESTIONA LA BIBLIOTECA DE IMÁGENES Y VIDEOS DEL SISTEMA.' },
   { href: '/difusion', label: 'Difusión WhatsApp', icon: MessageSquare, tooltip: 'ENVÍA INVITACIONES, VIDEOS Y FLYERS PERSONALIZADOS POR WHATSAPP.' },
   { href: '/inscripciones-eventos', label: 'Inscripciones Públicas', icon: UserPlus, tooltip: 'GESTIONA LAS PERSONAS QUE SE INSCRIBIERON DESDE EL LINK PÚBLICO.' },
@@ -87,7 +89,7 @@ export const menuCategories = [
   {
     label: 'Comunicación',
     icon: Share2,
-    items: ['/telefonos', '/biblioteca', '/difusion']
+    items: ['/telefonos', '/migrar-celulares', '/biblioteca', '/difusion']
   },
   {
     label: 'Operación Día D',
@@ -129,6 +131,6 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
   },
   'Comunicaciones': {
-    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/perfil']
+    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/migrar-celulares', '/perfil']
   }
 };
