@@ -24,7 +24,10 @@ import {
     Smartphone,
     MapPin,
     AlertCircle,
-    Eye
+    Eye,
+    Share2,
+    MessageSquare,
+    Users
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -37,6 +40,7 @@ import { useAuth } from '@/hooks/use-auth';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { logAction } from '@/lib/audit';
 
@@ -94,6 +98,10 @@ export default function ConsultaPage() {
     const [isRestrictedAlertOpen, setIsRestrictedAlertOpen] = useState(false);
     const [votoToDelete, setVotoToDelete] = useState<PadronData | null>(null);
 
+    // ESTADOS Y HOOKS PARA DELEGACIÓN DE VOTOS SEGUROS
+    const [selectedOperatorId, setSelectedOperatorId] = useState<string>('');
+    const [isDelegating, setIsDelegating] = useState(false);
+
     // ESCUCHADOR EN TIEMPO REAL A LA COLECCIÓN DE CAPTURAS OPTIMIZADO POR ROL
     const registeredQuery = useMemoFirebase(() => {
         if (!db || !user) return null;
@@ -141,6 +149,20 @@ export default function ConsultaPage() {
         });
         return ids;
     }, [allUsers, userSeccionales]);
+
+    const operatorsInElectorSeccional = useMemo(() => {
+        if (!selectedPerson || !allUsers) return [];
+        const electorSec = String(selectedPerson.CODIGO_SEC || '');
+        return allUsers.filter(u => {
+            const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+            return userSecs.includes(electorSec) && u.id !== user?.id && (u.role === 'Dirigente' || u.role === 'Coordinador');
+        });
+    }, [selectedPerson, allUsers, user]);
+
+    const selectedOperator = useMemo(() => {
+        return operatorsInElectorSeccional.find(o => o.id === selectedOperatorId);
+    }, [operatorsInElectorSeccional, selectedOperatorId]);
 
     const registeredList = useMemo(() => {
         if (!rawList || !user) return [];
@@ -353,6 +375,79 @@ export default function ConsultaPage() {
         }).finally(() => setIsSaving(false));
     };
 
+    const handleDelegateSave = async () => {
+        if (!selectedPerson || !selectedOperator || !user || !db) return;
+
+        setIsDelegating(true);
+        try {
+            const dataToSave: any = {
+                ...selectedPerson,
+                observacion: "VOTO SEGURO",
+                TELEFONO: telefono || '',
+                INSTITUCION: institucion || '',
+                registradoPor_id: selectedOperator.id,
+                registradoPor_nombre: selectedOperator.name,
+                delegadoPor_id: user.id,
+                delegadoPor_nombre: user.name,
+                updatedAt: new Date().toISOString()
+            };
+
+            if (manualLat && manualLon) {
+                dataToSave.LATITUD = parseFloat(manualLat);
+                dataToSave.LONGITUD = parseFloat(manualLon);
+                dataToSave.ubicadoPor_id = user.id;
+                dataToSave.ubicadoPor_nombre = user.name;
+            }
+
+            const capturaRef = doc(db, COLLECTION_CAPTURAS, selectedPerson.id);
+            const padronRef = doc(db, COLLECTION_PADRON, selectedPerson.id);
+
+            await Promise.all([
+                setDoc(capturaRef, dataToSave),
+                updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono || '', INSTITUCION: institucion || '' })
+            ]);
+
+            logAction(db, { 
+                userId: user.id, 
+                userName: user.name, 
+                module: 'REGISTRO VOTOS', 
+                action: 'DELEGÓ VOTO SEGURO', 
+                targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO} asignado a ${selectedOperator.name}` 
+            });
+
+            toast({ title: '¡Delegación Exitosa!', description: `Voto asignado a ${selectedOperator.name}` });
+
+            // Abrir WhatsApp de notificación para el operador
+            const opPhone = selectedOperator.phone || selectedOperator.telefono || '';
+            if (opPhone) {
+                const cleanPhone = opPhone.replace(/\D/g, '');
+                // Formato internacional paraguayo (5959xxxxxxx)
+                const formattedPhone = cleanPhone.startsWith('09') ? '595' + cleanPhone.substring(1) : (cleanPhone.startsWith('9') ? '595' + cleanPhone : cleanPhone);
+                
+                const messageText = `¡Hola *${selectedOperator.name}*! Te saluda *${user.name}*. Acabo de captar a un elector para tu seccional y te lo acabo de asignar en el sistema: \n\n👤 *Elector:* ${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}\n🪪 *C.I.:* ${selectedPerson.CEDULA}\n📍 *Local:* ${selectedPerson.LOCAL || 'No especificado'}\n📱 *Teléfono:* ${telefono || 'No especificado'}\n\n¡Ya lo tienes en tu listado de Voto Seguro de ARKI! 💪🔴`;
+                
+                const waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
+                window.open(waUrl, '_blank');
+            }
+
+            // Limpiar campos
+            setIsRestrictedAlertOpen(false);
+            setSelectedOperatorId('');
+            setSearchTerm('');
+            setSearchResults([]);
+            setSelectedPerson(null);
+            setTelefono('');
+            setInstitucion('');
+            setManualLat('');
+            setManualLon('');
+        } catch (error: any) {
+            console.error("Error delegando voto:", error);
+            toast({ title: 'Error al delegar voto', variant: 'destructive' });
+        } finally {
+            setIsDelegating(false);
+        }
+    };
+
     const handleDeleteVoto = async () => {
         if (!votoToDelete || !db || !user) return;
         setIsDeleting(true);
@@ -524,28 +619,106 @@ export default function ConsultaPage() {
                 </AlertDialogContent>
             </AlertDialog>
 
-            <AlertDialog open={isRestrictedAlertOpen} onOpenChange={setIsRestrictedAlertOpen}>
-                <AlertDialogContent className="rounded-[2.5rem] border border-red-100 bg-white p-8 max-w-md shadow-2xl animate-in fade-in zoom-in duration-300">
+            <AlertDialog open={isRestrictedAlertOpen} onOpenChange={(open) => {
+                setIsRestrictedAlertOpen(open);
+                if (!open) setSelectedOperatorId('');
+            }}>
+                <AlertDialogContent className="rounded-[2.5rem] border border-red-100 bg-white p-8 max-w-lg shadow-2xl animate-in fade-in zoom-in duration-300">
                     <AlertDialogHeader className="space-y-4">
                         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-50 text-red-500 border border-red-100/50">
                             <Lock className="h-7 w-7 stroke-[2.5]" />
                         </div>
                         <div className="space-y-2 text-center">
                             <AlertDialogTitle className="text-xl font-black uppercase tracking-tight text-red-600">
-                                Acceso Restringido
+                                Jurisdicción Restringida
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500 leading-relaxed">
-                                Solo puedes registrar votos seguros de electores que pertenecen a tu seccional autorizada ({userSeccionales.join(', ')}).
+                                Este elector pertenece a la <span className="font-bold text-red-600">Seccional {selectedPerson?.CODIGO_SEC}</span>. 
+                                Solo puedes registrar de forma directa electores de tu(s) seccional(es) autorizada(s) ({userSeccionales.join(', ')}).
                             </AlertDialogDescription>
                         </div>
                     </AlertDialogHeader>
-                    <AlertDialogFooter className="mt-8">
-                        <AlertDialogAction 
-                            onClick={() => setIsRestrictedAlertOpen(false)}
-                            className="bg-red-600 hover:bg-red-700 text-white font-black text-xs uppercase tracking-widest h-12 w-full rounded-2xl shadow-lg shadow-red-600/10 hover:shadow-xl transition-all duration-300"
+
+                    {operatorsInElectorSeccional.length > 0 ? (
+                        <div className="my-6 p-5 border border-dashed rounded-3xl bg-slate-50 space-y-4">
+                            <div className="space-y-1 text-left">
+                                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
+                                    ¿Deseas delegar este voto a un operador local?
+                                </label>
+                                <p className="text-[10px] font-medium text-slate-500 uppercase leading-snug">
+                                    Selecciona un operador de la Seccional {selectedPerson?.CODIGO_SEC} para asignarle esta captura:
+                                </p>
+                            </div>
+                            
+                            <Select value={selectedOperatorId} onValueChange={setSelectedOperatorId}>
+                                <SelectTrigger className="h-12 w-full text-xs font-bold uppercase rounded-xl border-slate-200 bg-white">
+                                    <SelectValue placeholder="Elegir Operador de Destino..." />
+                                </SelectTrigger>
+                                <SelectContent className="z-[2000]">
+                                    {operatorsInElectorSeccional.map((op: any) => (
+                                        <SelectItem key={op.id} value={op.id} className="text-xs uppercase font-bold">
+                                            {op.name} ({op.role})
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+
+                            {selectedOperator && (
+                                <div className="p-4 border rounded-2xl bg-white space-y-3 shadow-sm animate-in slide-in-from-bottom-2 duration-300">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-10 w-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center border border-green-100">
+                                            <Users className="h-5 w-5" />
+                                        </div>
+                                        <div className="text-left flex-1">
+                                            <p className="text-xs font-black uppercase leading-none text-slate-800">{selectedOperator.name}</p>
+                                            <p className="text-[9px] font-bold uppercase text-slate-400 mt-1">{selectedOperator.role} • SECCIONAL {selectedPerson?.CODIGO_SEC}</p>
+                                        </div>
+                                    </div>
+                                    {selectedOperator.phone || selectedOperator.telefono ? (
+                                        <div className="flex items-center gap-2 bg-green-50/50 border border-green-100/50 rounded-xl p-2 px-3 text-xs font-semibold text-green-700">
+                                            <MessageSquare className="h-4 w-4 text-green-600 fill-green-600/10" />
+                                            <span>WhatsApp: {selectedOperator.phone || selectedOperator.telefono}</span>
+                                        </div>
+                                    ) : (
+                                        <p className="text-[9px] font-bold text-yellow-600 uppercase">⚠️ Sin número de teléfono registrado</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="my-6 p-6 rounded-3xl bg-slate-50 border border-slate-100 text-center space-y-2">
+                            <Users className="h-8 w-8 text-slate-300 mx-auto" />
+                            <p className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                No hay operadores locales registrados en la Seccional {selectedPerson?.CODIGO_SEC}
+                            </p>
+                            <p className="text-[9px] font-medium text-slate-400 uppercase leading-snug">
+                                No se puede realizar delegación automática en este momento.
+                            </p>
+                        </div>
+                    )}
+
+                    <AlertDialogFooter className="mt-8 flex flex-col sm:flex-col gap-3">
+                        {selectedOperator ? (
+                            <Button
+                                onClick={handleDelegateSave}
+                                disabled={isDelegating}
+                                className="bg-green-600 hover:bg-green-700 text-white font-black text-xs uppercase tracking-widest h-12 w-full rounded-2xl shadow-lg shadow-green-600/10 hover:shadow-xl transition-all duration-300 flex items-center justify-center gap-2 border-none"
+                            >
+                                {isDelegating ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4 fill-white/10" />}
+                                ASIGNAR VOTO Y NOTIFICAR POR WHATSAPP
+                            </Button>
+                        ) : null}
+                        
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setIsRestrictedAlertOpen(false);
+                                setSelectedOperatorId('');
+                            }}
+                            className="font-black text-xs uppercase tracking-widest h-12 w-full rounded-2xl text-slate-500 border border-slate-200"
                         >
-                            ENTENDIDO
-                        </AlertDialogAction>
+                            {selectedOperator ? "CANCELAR" : "CERRAR"}
+                        </Button>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
