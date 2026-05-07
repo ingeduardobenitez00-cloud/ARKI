@@ -56,11 +56,48 @@ export default function MapaTecnicoPage() {
         if (!db) return;
         setIsLoading(true);
         try {
-            const [secSnap, zonesSnap] = await Promise.all([
+            const [secSnap, zonesSnap, usersSnap] = await Promise.all([
                 getDocs(query(collection(db, 'seccionales_data'), orderBy('numero', 'asc'))),
-                getDocs(collection(db, 'zonas_data'))
+                getDocs(collection(db, 'zonas_data')),
+                getDocs(collection(db, 'users'))
             ]);
-            setData(secSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+
+            const users = usersSnap.docs.map(d => d.data());
+            const roleCountsBySec: Record<string, { Presidentes: number, Coordinadores: number, Dirigentes: number }> = {};
+
+            users.forEach(u => {
+                const role = u.role || '';
+                if (role !== 'Presidente' && role !== 'Coordinador' && role !== 'Dirigente') return;
+
+                const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+                const userSecs = rawSecc
+                    .filter(Boolean)
+                    .map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+
+                userSecs.forEach((secNum: string) => {
+                    if (!secNum) return;
+                    if (!roleCountsBySec[secNum]) {
+                        roleCountsBySec[secNum] = { Presidentes: 0, Coordinadores: 0, Dirigentes: 0 };
+                    }
+                    if (role === 'Presidente') roleCountsBySec[secNum].Presidentes++;
+                    else if (role === 'Coordinador') roleCountsBySec[secNum].Coordinadores++;
+                    else if (role === 'Dirigente') roleCountsBySec[secNum].Dirigentes++;
+                });
+            });
+
+            const seccionalesMapped = secSnap.docs.map(d => {
+                const secNumStr = String(d.id).trim();
+                const counts = roleCountsBySec[secNumStr] || { Presidentes: 0, Coordinadores: 0, Dirigentes: 0 };
+                return {
+                    id: d.id,
+                    ...d.data(),
+                    presidentes_count: counts.Presidentes,
+                    coordinadores_count: counts.Coordinadores,
+                    dirigentes_count: counts.Dirigentes
+                };
+            });
+
+            setData(seccionalesMapped);
             setZonasData(zonesSnap.docs.map(d => ({ id: d.id, ...d.data() })));
         } catch (e) {
             console.error("Error fetching data:", e);
@@ -101,17 +138,31 @@ export default function MapaTecnicoPage() {
             const capturesSnap = await getDocs(collection(db, 'votos_confirmados'));
             const totalsBySec: Record<string, number> = {};
             capturesSnap.docs.forEach(d => {
-                const sec = String(d.data().CODIGO_SEC || '');
-                if (sec) totalsBySec[sec] = (totalsBySec[sec] || 0) + 1;
+                const rawSec = d.data().CODIGO_SEC;
+                if (rawSec !== undefined && rawSec !== null) {
+                    const sec = String(rawSec).toUpperCase().replace('SECCIONAL', '').trim();
+                    const numericSec = parseInt(sec, 10);
+                    const cleanSec = isNaN(numericSec) ? sec : String(numericSec);
+                    if (cleanSec) {
+                        totalsBySec[cleanSec] = (totalsBySec[cleanSec] || 0) + 1;
+                    }
+                }
             });
             const batch = writeBatch(db);
             data.forEach(sec => {
+                const secIdClean = String(sec.id).trim();
+                const numericSecId = parseInt(secIdClean, 10);
+                const cleanSecId = isNaN(numericSecId) ? secIdClean : String(numericSecId);
+
                 const ref = doc(db, 'seccionales_data', sec.id);
-                batch.update(ref, { total_votos_seguros: totalsBySec[sec.id] || 0 });
+                batch.update(ref, { total_votos_seguros: totalsBySec[cleanSecId] || 0 });
             });
             await batch.commit();
-            toast({ title: "Votos Sincronizados" });
+            toast({ title: "Votos Sincronizados", description: "Se han recalculado y normalizado todos los votos por seccional." });
             fetchData();
+        } catch (e) {
+            console.error("Error syncing captures:", e);
+            toast({ title: "Error al sincronizar", variant: "destructive" });
         } finally { setIsSyncing(false); }
     };
 
@@ -300,19 +351,35 @@ export default function MapaTecnicoPage() {
                                                                     >
                                                                         <div className="flex items-center gap-3">
                                                                             <div className={cn(
-                                                                                "h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-black",
+                                                                                "h-6 w-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0",
                                                                                 selectedSecId === sec.id ? "bg-white/20 text-white" : "bg-slate-100 text-slate-600"
                                                                             )}>
                                                                                 {sec.numero}
                                                                             </div>
                                                                             <div className="flex flex-col">
                                                                                 <span className="text-[10px] font-black uppercase tracking-tight">Seccional {sec.numero}</span>
-                                                                                <span className={cn(
-                                                                                    "text-[8px] font-bold uppercase opacity-60",
-                                                                                    selectedSecId === sec.id ? "text-white" : "text-slate-400"
-                                                                                )}>
-                                                                                    {sec.lat !== 0 ? 'Con GPS' : 'Sin GPS'}
-                                                                                </span>
+                                                                                <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-0.5">
+                                                                                    <span className={cn(
+                                                                                        "text-[8px] font-bold uppercase opacity-60",
+                                                                                        selectedSecId === sec.id ? "text-white" : "text-slate-400"
+                                                                                    )}>
+                                                                                        {sec.lat !== 0 ? 'Con GPS' : 'Sin GPS'}
+                                                                                    </span>
+                                                                                    <span className="text-[8px] opacity-40">•</span>
+                                                                                    <span className={cn(
+                                                                                        "text-[8px] font-black uppercase",
+                                                                                        selectedSecId === sec.id ? "text-rose-300" : "text-rose-600"
+                                                                                    )}>
+                                                                                        Votos: {sec.total_votos_seguros || 0}
+                                                                                    </span>
+                                                                                    <span className="text-[8px] opacity-40">•</span>
+                                                                                    <span className={cn(
+                                                                                        "text-[8px] font-black uppercase",
+                                                                                        selectedSecId === sec.id ? "text-blue-300" : "text-blue-600"
+                                                                                    )}>
+                                                                                        U: {(sec.presidentes_count || 0) + (sec.coordinadores_count || 0) + (sec.dirigentes_count || 0)}
+                                                                                    </span>
+                                                                                </div>
                                                                             </div>
                                                                         </div>
                                                                         {sec.lat !== 0 && (

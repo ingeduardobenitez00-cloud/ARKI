@@ -144,8 +144,7 @@ export default function VotoSeguroPage() {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
-            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
-            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
+            return isFromMySeccional || isMyRegistration(item);
         });
     }
 
