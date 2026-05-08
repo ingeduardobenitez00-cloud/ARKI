@@ -30,28 +30,21 @@ import {
     Utensils,
     Footprints,
     Flag,
-    Play,
-    Pause,
-    RotateCcw,
-    Volume2,
-    VolumeX,
-    Sparkles,
-    AlertCircle,
-    CheckCircle
+    Share2,
+    CheckCircle,
+    X,
+    ShieldAlert
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import { logAction } from '@/lib/audit';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { errorEmitter } from '@/firebase/error-emitter';
-import { Checkbox } from '@/components/ui/checkbox';
 import { FirestorePermissionError } from '@/firebase/errors';
 
 interface Elector {
@@ -137,19 +130,8 @@ export default function DifusionPage() {
     const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string>('ALL');
     const [electores, setElectores] = useState<Elector[]>([]);
     const [isLoading, setIsLoading] = useState(false);
-    
-    // Co-Pilot State
-    const [isCoPilotRunning, setIsCoPilotRunning] = useState(false);
-    const [coPilotDelay, setCoPilotDelay] = useState(15); // delay in seconds
-    const [useSpintax, setUseSpintax] = useState(true);
-    const [useVariability, setUseVariability] = useState(true);
-    const [soundEnabled, setSoundEnabled] = useState(true);
-    const [coPilotIndex, setCoPilotIndex] = useState(0);
-    const [countdown, setCountdown] = useState(0);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
-    const [selectedElectorIds, setSelectedElectorIds] = useState<Set<string>>(new Set());
-    const [phonePreference, setPhonePreference] = useState<'REGISTRADO' | 'MIGRADO' | 'INTELIGENTE'>('INTELIGENTE');
-
+    
     const [invitationTemplate, setInvitationTemplate] = useState(
         "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a participar de nuestras actividades políticas de la semana.\n\n¡Contamos con tu apoyo! 🔴🚀"
     );
@@ -165,49 +147,30 @@ export default function DifusionPage() {
 
     const [currentFlyer, setCurrentFlyer] = useState<any>(null);
     const [isUploading, setIsUploading] = useState(false);
+    const [isSharingMedia, setIsSharingMedia] = useState<Record<string, boolean>>({});
+
     const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
     const [pendingFile, setPendingFile] = useState<File | null>(null);
     const [newImageName, setNewImageName] = useState('');
 
-    const timerRef = useRef<NodeJS.Timeout | null>(null);
-    const countdownRef = useRef<NodeJS.Timeout | null>(null);
+    // Mobile Batch Assistant State
+    const [batchSize, setBatchSize] = useState<number>(5);
+    const [isBatchActive, setIsBatchActive] = useState(false);
+    const [batchSentCount, setBatchSentCount] = useState(0);
+    const [showBatchCompletedAlert, setShowBatchCompletedAlert] = useState(false);
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
 
-    // Real-time beep generator via Web Audio API (zero external assets dependency!)
-    const playBeep = useCallback(() => {
-        if (!soundEnabled) return;
-        try {
-            const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const osc = ctx.createOscillator();
-            const gain = ctx.createGain();
-            osc.connect(gain);
-            gain.connect(ctx.destination);
-            osc.frequency.setValueAtTime(880, ctx.currentTime); // Pitch A5
-            gain.gain.setValueAtTime(0.08, ctx.currentTime); // Volume
-            osc.start();
-            osc.stop(ctx.currentTime + 0.15); // Play for 150ms
-        } catch (e) {
-            console.error("Audio beep error:", e);
-        }
-    }, [soundEnabled]);
-
-    // Spintax Resolver: {A|B|C} -> Pick randomly
+    // Spintax Resolver to dynamically randomize manual mobile templates
     const resolveSpintax = useCallback((text: string) => {
-        if (!useSpintax) {
-            // Remove brackets keeping the first option
-            return text.replace(/\{([^{}]+)\}/g, (match, options) => {
-                return options.split('|')[0] || '';
-            });
-        }
         return text.replace(/\{([^{}]+)\}/g, (match, options) => {
             if (options.includes('|')) {
                 const choices = options.split('|');
                 return choices[Math.floor(Math.random() * choices.length)];
             }
-            return match; // Simple variable like {nombre}
+            return match; // Keep standard placeholders like {nombre}
         });
-    }, [useSpintax]);
+    }, []);
 
     // Firestore Votos query by Role
     const registeredVotosQuery = useMemoFirebase(() => {
@@ -357,37 +320,6 @@ export default function DifusionPage() {
         if (user && !isAdmin && user.seccional) { setSelectedSeccional(user.seccional); }
     }, [db, user, isAdmin, fetchAndReconstructFlyer, base64ToBlobUrl]);
 
-    // Active queue reference based on tab
-    const queue = useMemo(() => {
-        return activeTab === 'padron' ? electores : filteredVotosList;
-    }, [activeTab, electores, filteredVotosList]);
-
-    useEffect(() => {
-        if (queue && queue.length > 0) {
-            setSelectedElectorIds(new Set(queue.map(e => e.id)));
-        } else {
-            setSelectedElectorIds(new Set());
-        }
-    }, [queue]);
-
-    const toggleSelectAll = () => {
-        if (selectedElectorIds.size === queue.length) {
-            setSelectedElectorIds(new Set());
-        } else {
-            setSelectedElectorIds(new Set(queue.map(e => e.id)));
-        }
-    };
-
-    const toggleSelectRow = (id: string) => {
-        const next = new Set(selectedElectorIds);
-        if (next.has(id)) {
-            next.delete(id);
-        } else {
-            next.add(id);
-        }
-        setSelectedElectorIds(next);
-    };
-
     const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
         setInvitationTemplate(EVENT_TEMPLATES[type]);
         setIsBirthdayMode(type === 'CUMPLEANOS');
@@ -398,8 +330,8 @@ export default function DifusionPage() {
         if (!db || isLoading || !selectedSeccional) { toast({ title: 'Selecciona una seccional' }); return; }
         setIsLoading(true);
         setElectores([]);
-        setIsCoPilotRunning(false);
-        setCoPilotIndex(0);
+        setIsBatchActive(false);
+        setBatchSentCount(0);
         try {
             const results: Elector[] = [];
             const dataCol = collection(db, 'sheet1');
@@ -433,193 +365,18 @@ export default function DifusionPage() {
         } catch (error) { toast({ title: 'Error de conexión', variant: 'destructive' }); } finally { setIsLoading(false); }
     };
 
-    const savePhoneEdit = (phoneType: 'TELEFONO' | 'TELEFONO_MIGRADO') => {
-        if (!editingPhoneId || !db || !user) return;
-        setIsSavingPhone(true);
-        const data = { [phoneType]: tempPhone };
-        const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
-        updateDoc(doc(db, collectionName, editingPhoneId), data)
-            .then(() => {
-                if (activeTab === 'padron') {
-                    setElectores(prev => prev.map(e => e.id === editingPhoneId ? { ...e, [phoneType]: tempPhone } : e));
-                }
-                toast({ title: 'Teléfono Actualizado' });
-            })
-            .catch(async () => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `${collectionName}/${editingPhoneId}`, operation: 'update', requestResourceData: data }));
-            })
-            .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); setEditingField(null); });
-    };
+    // Active Queue list shorthand
+    const activeQueue = useMemo(() => {
+        return activeTab === 'padron' ? electores : filteredVotosList;
+    }, [activeTab, electores, filteredVotosList]);
 
-    // Unified clipboard copy mechanism (Packs flyer image + custom caption together!)
-    const copyToClipboard = async (text: string, flyerUrl?: string): Promise<boolean> => {
-        try {
-            if (flyerUrl) {
-                const response = await fetch(flyerUrl);
-                const blob = await response.blob();
-                const data = [
-                    new ClipboardItem({
-                        [blob.type]: blob,
-                        'text/plain': new Blob([text], { type: 'text/plain' })
-                    })
-                ];
-                await navigator.clipboard.write(data);
-                return true;
-            } else {
-                await navigator.clipboard.writeText(text);
-                return true;
-            }
-        } catch (e) {
-            console.warn("ClipboardItem payload failed, fallback to text-only:", e);
-            try {
-                await navigator.clipboard.writeText(text);
-                return true;
-            } catch (err) {
-                console.error("Clipboard blocked:", err);
-                return false;
-            }
-        }
-    };
+    // Computed: The absolute next unprocessed contact in the queue list
+    const nextElectorToProcess = useMemo(() => {
+        return activeQueue.find(e => !processedIds.has(e.id));
+    }, [activeQueue, processedIds]);
 
-    // Main step driver of the campaign loop
-    const runCoPilotStep = useCallback(async (index: number) => {
-        if (index >= queue.length) {
-            setIsCoPilotRunning(false);
-            toast({ title: '¡Campaña Finalizada!', description: 'Se ha completado el envío masivo.' });
-            return;
-        }
-
-        const p = queue[index];
-        // If not checked, skip immediately to the next one
-        if (!selectedElectorIds.has(p.id)) {
-            setCoPilotIndex(index + 1);
-            return;
-        }
-
-        // If already processed, skip immediately to the next one
-        if (processedIds.has(p.id)) {
-            setCoPilotIndex(index + 1);
-            return;
-        }
-
-        // Get target phone number based on strategy preference
-        let targetPhone = '';
-        if (phonePreference === 'REGISTRADO') {
-            targetPhone = p.TELEFONO || '';
-        } else if (phonePreference === 'MIGRADO') {
-            targetPhone = p.TELEFONO_MIGRADO || '';
-        } else {
-            // Inteligente: prefer registered manual phone, fallback to Excel migrated
-            targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
-        }
-
-        if (!targetPhone || targetPhone.trim().length < 6) {
-            // Skip contact without valid number
-            setCoPilotIndex(index + 1);
-            return;
-        }
-
-        // 1. Generate customized text with Spintax
-        let msg = resolveSpintax(invitationTemplate);
-        msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                 .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                 .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
-                 .replace(/\[MESA\]/g, String(p.MESA || '---'))
-                 .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
-        
-        if (includeVotingData) {
-            msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
-        }
-
-        // 2. Play warning alert audio beep
-        playBeep();
-
-        // 3. Load payload to clipboard (Image/Video + Caption message)
-        const copied = await copyToClipboard(msg, currentFlyer?.url);
-        if (copied) {
-            toast({ 
-                title: `Portapapeles Cargado: ${p.NOMBRE}`, 
-                description: 'Presiona Ctrl + V en WhatsApp para pegar la imagen con el texto.',
-                variant: 'default'
-            });
-        }
-
-        // 4. Open/Refresh WhatsApp Web tab using named Window Reuse strategy (zero clutter!)
-        const finalPhone = formatParaguayPhone(targetPhone);
-        const flyerUrlParam = currentFlyer?.url ? `&arki_flyer_url=${encodeURIComponent(currentFlyer.url)}` : '';
-        const captionParam = msg ? `&text=${encodeURIComponent(msg)}` : '';
-        const autoSendParam = '&arki_auto_send=true';
-        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}${captionParam}${flyerUrlParam}${autoSendParam}`, 'arki_co_pilot_tab');
-
-        // 5. Mark as processed & sync local log
-        const nextProcessed = new Set(processedIds);
-        nextProcessed.add(p.id);
-        setProcessedIds(nextProcessed);
-        sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextProcessed)));
-
-        // Audit log action
-        if (db && user) {
-            logAction(db, {
-                userId: user.id,
-                userName: user.name,
-                module: 'DIFUSION',
-                action: 'ENVIÓ AUTO_PILOTO',
-                targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})`
-            });
-        }
-
-        // 6. Compute next step delay with anti-ban random variability
-        let actualDelay = coPilotDelay;
-        if (useVariability) {
-            const randomVar = Math.floor(Math.random() * 7) - 3; // +/- 3 seconds random shift
-            actualDelay = Math.max(10, coPilotDelay + randomVar); // clamp to min 10s delay
-        }
-
-        setCountdown(actualDelay);
-
-        // 7. Setup ticking visual timer
-        if (countdownRef.current) clearInterval(countdownRef.current);
-        countdownRef.current = setInterval(() => {
-            setCountdown(prev => {
-                if (prev <= 1) {
-                    clearInterval(countdownRef.current!);
-                    return 0;
-                }
-                return prev - 1;
-            });
-        }, 1000);
-
-        // 8. Schedule the next contact
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => {
-            setCoPilotIndex(prev => prev + 1);
-        }, actualDelay * 1000);
-
-    }, [queue, processedIds, selectedElectorIds, coPilotDelay, useVariability, phonePreference, invitationTemplate, includeVotingData, currentFlyer, playBeep, resolveSpintax, db, user]);
-
-    // Handle play / pause trigger
-    useEffect(() => {
-        if (isCoPilotRunning) {
-            runCoPilotStep(coPilotIndex);
-        } else {
-            if (timerRef.current) clearTimeout(timerRef.current);
-            if (countdownRef.current) clearInterval(countdownRef.current);
-        }
-        return () => {
-            if (timerRef.current) clearTimeout(timerRef.current);
-            if (countdownRef.current) clearInterval(countdownRef.current);
-        };
-    }, [isCoPilotRunning, coPilotIndex, runCoPilotStep]);
-
-    const handleResetCampaign = () => {
-        setIsCoPilotRunning(false);
-        setCoPilotIndex(0);
-        setProcessedIds(new Set());
-        sessionStorage.removeItem('wa_processed_ids');
-        toast({ title: 'Campaña Reiniciada', description: 'Se limpió el historial de envíos de esta sesión.' });
-    };
-
-    const handleDirectSend = (p: Elector, targetPhone: string) => {
+    // Formats, records local logs, and issues native api.whatsapp.com redirect
+    const handleSendWhatsApp = (p: Elector, targetPhone: string) => {
         if (!targetPhone || !user) return;
         let msg = resolveSpintax(invitationTemplate);
         msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
@@ -643,12 +400,137 @@ export default function DifusionPage() {
                 userId: user.id,
                 userName: user.name,
                 module: 'DIFUSION',
-                action: 'ENVIÓ DIRECTO',
+                action: 'ENVIÓ MANUAL MOVIL',
                 targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})`
             });
         }
         
-        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}&arki_auto_send=true`, 'arki_co_pilot_tab');
+        // Deep link perfect for native WhatsApp application launch on Android / iOS!
+        window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`, '_blank');
+    };
+
+    // Invokes native Android / iOS share sheets for media sending
+    const handleShareMediaDirect = async (p: Elector, targetPhone: string): Promise<boolean> => {
+        if (!targetPhone || !currentFlyer || !user) return false;
+        const personId = p.id;
+        setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
+
+        let msg = resolveSpintax(invitationTemplate);
+        msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                 .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                 .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
+                 .replace(/\[MESA\]/g, String(p.MESA || '---'))
+                 .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
+        
+        if (includeVotingData) {
+            msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
+        }
+
+        try {
+            const response = await fetch(currentFlyer.url);
+            const blob = await response.blob();
+            const extension = currentFlyer.type === 'video' ? 'mp4' : 'jpg';
+            const file = new File([blob], `${currentFlyer.name}.${extension}`, { type: blob.type });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                // Native mobile share popup trigger! Perfect for cellphones!
+                await navigator.share({
+                    files: [file],
+                    text: msg
+                });
+                
+                const nextSet = new Set(processedIds);
+                nextSet.add(p.id);
+                setProcessedIds(nextSet);
+                sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+
+                logAction(db!, { 
+                    userId: user.id, 
+                    userName: user.name, 
+                    module: 'DIFUSION', 
+                    action: `COMPARTIÓ NATIVO ${currentFlyer.type.toUpperCase()}`, 
+                    targetName: `${p.NOMBRE} ${p.APELLIDO}` 
+                });
+                return true;
+            } else {
+                // Fallback for PC/older systems: download media and launch WhatsApp chat
+                const link = document.createElement('a');
+                link.href = currentFlyer.url;
+                link.download = `${currentFlyer.name}.${extension}`;
+                link.click();
+                handleSendWhatsApp(p, targetPhone);
+                return true;
+            }
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Acción cancelada o no soportada", variant: "default" });
+            return false;
+        } finally {
+            setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
+        }
+    };
+
+    // Sequential batch sender trigger!
+    const handleTriggerNextAssistant = async () => {
+        if (!nextElectorToProcess) {
+            toast({ title: 'No hay más electores pendientes.' });
+            setIsBatchActive(false);
+            return;
+        }
+
+        const p = nextElectorToProcess;
+        // Prefer manual registered phone first, fallback to Excel migrated
+        const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
+        
+        if (!targetPhone || targetPhone.trim().length < 6) {
+            // No phone, skip this contact by adding to processed list automatically
+            const nextSet = new Set(processedIds);
+            nextSet.add(p.id);
+            setProcessedIds(nextSet);
+            sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+            toast({ title: `Omitido ${p.NOMBRE} (Sin Teléfono)` });
+            return;
+        }
+
+        // If media flyer is selected, use navigator.share trigger
+        if (currentFlyer) {
+            const shared = await handleShareMediaDirect(p, targetPhone);
+            if (shared) {
+                const nextCount = batchSentCount + 1;
+                setBatchSentCount(nextCount);
+                if (nextCount >= batchSize) {
+                    setIsBatchActive(false);
+                    setShowBatchCompletedAlert(true);
+                }
+            }
+        } else {
+            // Text only prefilled redirect trigger
+            handleSendWhatsApp(p, targetPhone);
+            const nextCount = batchSentCount + 1;
+            setBatchSentCount(nextCount);
+            if (nextCount >= batchSize) {
+                setIsBatchActive(false);
+                setShowBatchCompletedAlert(true);
+            }
+        }
+    };
+
+    const savePhoneEdit = (phoneType: 'TELEFONO' | 'TELEFONO_MIGRADO') => {
+        if (!editingPhoneId || !db || !user) return;
+        setIsSavingPhone(true);
+        const data = { [phoneType]: tempPhone };
+        const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+        updateDoc(doc(db, collectionName, editingPhoneId), data)
+            .then(() => {
+                if (activeTab === 'padron') {
+                    setElectores(prev => prev.map(e => e.id === editingPhoneId ? { ...e, [phoneType]: tempPhone } : e));
+                }
+                toast({ title: 'Teléfono Actualizado' });
+            })
+            .catch(async () => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `${collectionName}/${editingPhoneId}`, operation: 'update', requestResourceData: data }));
+            })
+            .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); setEditingField(null); });
     };
 
     // Background files library uploads
@@ -708,202 +590,127 @@ export default function DifusionPage() {
         setIsLoading(false);
     };
 
-    // Calculate progress stats for the dashboard widget
-    const progressPercent = useMemo(() => {
-        if (queue.length === 0) return 0;
-        const sentInQueue = queue.filter(e => processedIds.has(e.id)).length;
-        return Math.round((sentInQueue / queue.length) * 100);
-    }, [queue, processedIds]);
-
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 max-w-7xl mx-auto px-1 sm:px-4 pb-24">
+            
+            {/* Elegant Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
-                        <Sparkles className="h-8 w-8 text-primary animate-pulse" /> Co-Piloto Masivo Anti-Ban
+                    <h1 className="text-2xl sm:text-3xl font-black uppercase tracking-tight flex items-center gap-3">
+                        <MessageSquare className="h-7 w-7 sm:h-8 sm:w-8 text-primary animate-pulse" /> Difusión Estratégica Móvil
                     </h1>
-                    <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">
-                        Campañas seguras en piloto automático emulando comportamiento humano orgánico.
+                    <p className="text-muted-foreground font-medium uppercase text-[9px] sm:text-[10px] tracking-widest mt-1">
+                        Campañas por lotes de un toque optimizadas para operadores trabajando desde celulares.
                     </p>
                 </div>
-                {isCoPilotRunning && (
+                {isBatchActive && (
                     <Badge className="bg-green-600 animate-pulse h-9 px-4 text-xs font-black uppercase flex items-center gap-2">
-                        <Zap className="h-4 w-4 mr-1 fill-white" /> CO-PILOTO ACTIVO
+                        <Zap className="h-4 w-4 mr-1 fill-white" /> ASISTENTE ACTIVO
                     </Badge>
                 )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
-                {/* Panel de Configuración de Campaña & Dashboard */}
+                {/* Configuration Sidebar */}
                 <div className="lg:col-span-1 space-y-4">
                     
-                    {/* Panel del Co-Piloto Masivo Dashboard Gauges */}
-                    <Card className="border-primary/10 shadow-lg overflow-hidden bg-slate-900 text-white rounded-2xl">
+                    {/* NEW Mobile Batch Control Widget */}
+                    <Card className="border-primary/15 shadow-md overflow-hidden bg-slate-900 text-white rounded-2xl">
                         <div className="bg-slate-950 p-4 border-b border-slate-800 flex items-center justify-between">
                             <h3 className="text-xs font-black uppercase flex items-center gap-2 text-primary">
-                                <Zap className="h-4 w-4 text-primary fill-primary" /> Campaña Auto-Piloto
+                                <Zap className="h-4 w-4 text-primary fill-primary animate-bounce" /> Asistente de Lotes
                             </h3>
-                            <Button 
-                                size="icon" 
-                                variant="ghost" 
-                                className="h-7 w-7 rounded-full text-slate-400 hover:text-white"
-                                onClick={() => setSoundEnabled(!soundEnabled)}
-                            >
-                                {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4 text-destructive" />}
-                            </Button>
                         </div>
                         <CardContent className="space-y-4 pt-4">
                             
-                            {/* Visual Progress Gauge */}
                             <div className="space-y-1.5">
-                                <div className="flex justify-between text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                    <span>Progreso General</span>
-                                    <span>{progressPercent}%</span>
-                                </div>
-                                <Progress value={progressPercent} className="h-3 bg-slate-800" />
-                                <div className="flex justify-between text-[9px] font-black text-slate-400">
-                                    <span>CONTACTOS: {queue.length}</span>
-                                    <span>ENVIADOS: {queue.filter(e => processedIds.has(e.id)).length}</span>
-                                </div>
-                            </div>
-
-                            {/* Active Countdown Widget */}
-                            {isCoPilotRunning && (
-                                <div className="p-3 bg-slate-950 border border-slate-800 rounded-xl text-center space-y-1 animate-pulse">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-primary">Próximo Elector en Cola</p>
-                                    <h3 className="text-3xl font-black">{countdown}s</h3>
-                                    <p className="text-[8px] text-slate-500 font-bold uppercase truncate">
-                                        Procesando: {queue[coPilotIndex]?.NOMBRE} {queue[coPilotIndex]?.APELLIDO}
-                                    </p>
-                                </div>
-                            )}
-
-                            {/* Automation Action Controls */}
-                            <div className="grid grid-cols-3 gap-2 pt-2">
-                                {isCoPilotRunning ? (
-                                    <Button 
-                                        onClick={() => setIsCoPilotRunning(false)} 
-                                        className="h-11 text-[10px] font-black uppercase bg-amber-500 hover:bg-amber-600 text-white flex items-center justify-center gap-1.5 rounded-xl col-span-2"
-                                    >
-                                        <Pause className="h-4 w-4" /> PAUSAR
-                                    </Button>
-                                ) : (
-                                    <Button 
-                                        onClick={() => {
-                                            if (queue.length === 0) {
-                                                toast({ title: 'Cola de contactos vacía', description: 'Por favor, escanea o carga contactos primero.' });
-                                                return;
-                                            }
-                                            setIsCoPilotRunning(true);
-                                        }} 
-                                        className="h-11 text-[10px] font-black uppercase bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-1.5 rounded-xl col-span-2"
-                                    >
-                                        <Play className="h-4 w-4" /> INICIAR
-                                    </Button>
-                                )}
-                                <Button 
-                                    onClick={handleResetCampaign} 
-                                    variant="outline" 
-                                    className="h-11 text-[10px] font-black uppercase border-slate-800 hover:bg-slate-800 hover:text-white flex items-center justify-center gap-1.5 rounded-xl text-white"
-                                >
-                                    <RotateCcw className="h-4 w-4" /> REINIC.
-                                </Button>
-                            </div>
-
-                            {/* Informational Instructions Alert */}
-                            <div className="p-3 bg-blue-950/40 border border-blue-900/30 rounded-xl flex gap-2">
-                                <AlertCircle className="h-4 w-4 text-blue-400 shrink-0 mt-0.5" />
-                                <div className="space-y-1 text-slate-300">
-                                    <h4 className="text-[9px] font-black uppercase tracking-wider text-blue-400">Instrucciones de Uso</h4>
-                                    <p className="text-[8px] font-medium leading-relaxed uppercase">
-                                        1. Ten WhatsApp Web abierto a un lado.<br/>
-                                        2. Al sonar el "beep" y actualizarse el chat, haz clic en WhatsApp, presiona <strong className="text-white">Ctrl + V</strong> y <strong className="text-white">Enter</strong>.<br/>
-                                        3. El Co-Piloto pasará automáticamente al siguiente en cola sin que debas hacer nada más.
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* Campaign Settings & Config Panel */}
-                    <Card className="border-primary/10 shadow-sm overflow-hidden rounded-2xl">
-                        <div className="bg-muted/30 p-4 border-b font-black text-xs uppercase flex items-center gap-2">
-                            <Type className="h-4 w-4 text-primary" /> Ajustes del Co-Piloto
-                        </div>
-                        <CardContent className="space-y-4 pt-4">
-                            <div className="space-y-2">
-                                <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Accesos Rápidos</Label>
-                                <div className="grid grid-cols-2 gap-1.5">
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('REUNION')} className="h-9 text-[9px] font-black uppercase flex items-center gap-1 justify-start px-2"><Users className="h-3.5 w-3.5 text-slate-500" /> REUNIÓN</Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CENA')} className="h-9 text-[9px] font-black uppercase flex items-center gap-1 justify-start px-2"><Utensils className="h-3.5 w-3.5 text-slate-500" /> CENA</Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CAMINATA')} className="h-9 text-[9px] font-black uppercase flex items-center gap-1 justify-start px-2"><Footprints className="h-3.5 w-3.5 text-slate-500" /> CAMINATA</Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('PEGATINA')} className="h-9 text-[9px] font-black uppercase flex items-center gap-1 justify-start px-2"><Flag className="h-3.5 w-3.5 text-slate-500" /> PEGATINA</Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CUMPLEANOS')} className={cn("h-9 text-[9px] font-black uppercase flex items-center gap-1 justify-start px-2 col-span-2", isBirthdayMode && "bg-primary/10 border-primary text-primary")}><Cake className={cn("h-3.5 w-3.5", isBirthdayMode ? "text-primary" : "text-slate-500")} /> CUMPLEAÑOS</Button>
-                                </div>
-                            </div>
-
-                            <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase">Mensaje de Campaña (con Spintax)</Label>
-                                <Textarea 
-                                    value={invitationTemplate} 
-                                    onChange={(e) => setInvitationTemplate(e.target.value)} 
-                                    className="min-h-[110px] text-xs font-bold border-primary/10" 
-                                    placeholder="Usa {nombre} para el elector y {saludo1|saludo2} para variaciones..." 
-                                />
-                            </div>
-
-                            {/* Spintax and Variability switches */}
-                            <div className="space-y-3 pt-2 border-t">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Sparkles className="h-3.5 w-3.5 text-primary" /> Saludos Variados (Spintax)</Label>
-                                    <Switch checked={useSpintax} onCheckedChange={setUseSpintax} />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><ClockIcon className="h-3.5 w-3.5 text-primary" /> Intervalos variables (+/- 3s)</Label>
-                                    <Switch checked={useVariability} onCheckedChange={setUseVariability} />
-                                </div>
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-primary" /> Incluir Datos de Mesa</Label>
-                                    <Switch checked={includeVotingData} onCheckedChange={setIncludeVotingData} />
-                                </div>
-                            </div>
-
-                            {/* Safety Delay Slider */}
-                            <div className="space-y-2 pt-2 border-t">
-                                <div className="flex justify-between text-[10px] font-black uppercase">
-                                    <span>Delay de Seguridad (Segs)</span>
-                                    <span className="text-primary">{coPilotDelay} segundos</span>
-                                </div>
-                                <Slider 
-                                    value={[coPilotDelay]} 
-                                    onValueChange={(val) => setCoPilotDelay(val[0])} 
-                                    min={10} 
-                                    max={45} 
-                                    step={1} 
-                                    className="py-1"
-                                />
-                                <span className="text-[8px] text-muted-foreground font-semibold uppercase block">
-                                    Un mayor tiempo de delay reduce drásticamente el riesgo de detección por WhatsApp.
-                                </span>
-                            </div>
-
-                            {/* Phone target strategy select */}
-                            <div className="space-y-1">
-                                <Label className="text-[10px] font-black uppercase ml-1">Estrategia de Contacto</Label>
-                                <Select value={phonePreference} onValueChange={(val: any) => setPhonePreference(val)}>
-                                    <SelectTrigger className="h-9 text-xs font-bold rounded-xl border-primary/10"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="INTELIGENTE">Inteligente (Manual &gt; Excel)</SelectItem>
-                                        <SelectItem value="REGISTRADO">Solo Números Registrados</SelectItem>
-                                        <SelectItem value="MIGRADO">Solo Números Migrados (Excel)</SelectItem>
+                                <Label className="text-[10px] font-black uppercase text-slate-400">Tamaño del Lote</Label>
+                                <Select value={String(batchSize)} onValueChange={(val) => setBatchSize(Number(val))}>
+                                    <SelectTrigger className="h-10 text-xs font-black rounded-xl bg-slate-950 border-slate-800 text-white"><SelectValue /></SelectTrigger>
+                                    <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                                        <SelectItem value="5" className="font-black text-xs">Lotes de 5 personas</SelectItem>
+                                        <SelectItem value="10" className="font-black text-xs">Lotes de 10 personas</SelectItem>
+                                        <SelectItem value="20" className="font-black text-xs">Lotes de 20 personas</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            {/* Multimedia selection */}
+                            <div className="space-y-1 bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 text-center">
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider">Historial de Envío de Sesión</p>
+                                <h4 className="text-2xl font-black text-white">{processedIds.size}</h4>
+                                <p className="text-[8px] font-bold text-slate-500 uppercase">CONTACTOS TOTALES EN COLA: {activeQueue.length}</p>
+                            </div>
+
+                            {!isBatchActive ? (
+                                <Button 
+                                    onClick={() => {
+                                        if (activeQueue.length === 0) {
+                                            toast({ title: "Lista de contactos vacía", description: "Busca contactos de la seccional primero." });
+                                            return;
+                                        }
+                                        setBatchSentCount(0);
+                                        setIsBatchActive(true);
+                                        toast({ title: "Asistente Iniciado", description: `Enviando en lotes de ${batchSize} personas.` });
+                                    }}
+                                    className="w-full h-11 text-[11px] font-black uppercase bg-primary hover:bg-primary/95 text-white rounded-xl flex items-center justify-center gap-2"
+                                >
+                                    <Zap className="h-4 w-4 fill-white" /> Iniciar Asistente Móvil
+                                </Button>
+                            ) : (
+                                <Button 
+                                    onClick={() => setIsBatchActive(false)}
+                                    className="w-full h-11 text-[11px] font-black uppercase bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 rounded-xl flex items-center justify-center gap-2"
+                                >
+                                    <X className="h-4 w-4" /> Desactivar Asistente
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="border-primary/10 shadow-md overflow-hidden rounded-2xl">
+                        <CardHeader className="bg-muted/30 pb-3 border-b">
+                            <CardTitle className="text-[11px] font-black uppercase flex items-center gap-2">
+                                <Filter className="h-4 w-4 text-primary" /> Filtros y Contenidos
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-5 pt-4">
+                            
+                            {/* Fast template buttons */}
+                            <div className="space-y-2">
+                                <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Plantillas Rápidas</Label>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('REUNION')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Users className="h-4 w-4 text-slate-500" /> REUNIÓN</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CENA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Utensils className="h-4 w-4 text-slate-500" /> CENA</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CAMINATA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Footprints className="h-4 w-4 text-slate-500" /> CAMINATA</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('PEGATINA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Flag className="h-4 w-4 text-slate-500" /> PEGATINA</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CUMPLEANOS')} className={cn("h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2 col-span-2", isBirthdayMode && "bg-primary/10 border-primary text-primary")}><Cake className={cn("h-4 w-4", isBirthdayMode ? "text-primary" : "text-slate-500")} /> MODO CUMPLEAÑOS</Button>
+                                </div>
+                            </div>
+
+                            {/* Invitation Template */}
+                            <div className="space-y-1.5">
+                                <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
+                                <Textarea 
+                                    value={invitationTemplate} 
+                                    onChange={(e) => setInvitationTemplate(e.target.value)} 
+                                    className="min-h-[110px] text-xs font-bold border-primary/10 rounded-xl" 
+                                    placeholder="Usa {nombre} para personalizar..." 
+                                />
+                                <span className="text-[8px] text-muted-foreground font-semibold uppercase block leading-tight">
+                                    Coloca saludos dinámicos entre llaves (ej. <code className="text-primary font-black">&#123;¡Hola!|Buenas&#125;</code>) para rotar los mensajes de forma aleatoria.
+                                </span>
+                            </div>
+
+                            {/* Include voting data toggle */}
+                            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-primary" /> Incluir Datos de Mesa</Label>
+                                <Switch checked={includeVotingData} onCheckedChange={setIncludeVotingData} />
+                            </div>
+
+                            {/* Flyer library */}
                             <div className="space-y-3 p-3 border rounded-2xl bg-muted/20">
-                                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><ImageIcon className="h-3 w-3 text-primary" /> Multimedia a Enviar</Label>
+                                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5 text-primary" /> Multimedia Oficial</Label>
                                 {currentFlyer && (
                                     <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-primary/10 bg-black/5 flex items-center justify-center group">
                                         {currentFlyer.type === 'video' ? <Film className="h-8 w-8 text-primary/40" /> : <img src={currentFlyer.url} alt="Preview" className="w-full h-full object-contain" />}
@@ -913,37 +720,37 @@ export default function DifusionPage() {
                                     </div>
                                 )}
                                 <Select value={currentFlyer?.id || ''} onValueChange={handleSelectFlyer}>
-                                    <SelectTrigger className="h-9 text-[10px] font-bold rounded-lg"><SelectValue placeholder="Elegir recurso..." /></SelectTrigger>
+                                    <SelectTrigger className="h-10 text-[10px] font-bold rounded-xl"><SelectValue placeholder="Elegir recurso..." /></SelectTrigger>
                                     <SelectContent>{availableFlyers?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
                                 </Select>
                                 <Label htmlFor="dif-upload" className="cursor-pointer block">
-                                    <div className="h-9 border border-dashed border-primary/30 rounded-lg flex items-center justify-center text-[10px] font-black hover:bg-primary/5 transition-colors text-primary">
+                                    <div className="h-10 border border-dashed border-primary/30 rounded-xl flex items-center justify-center text-[10px] font-black hover:bg-primary/5 transition-colors text-primary">
                                         {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1.5"/>} SUBIR ARCHIVO
                                     </div>
                                 </Label>
                                 <input id="dif-upload" type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} disabled={isUploading} />
                             </div>
 
-                            {/* Search Trigger Panel */}
-                            <div className="space-y-3 pt-2 border-t">
+                            {/* Search segment and triggers */}
+                            <div className="space-y-3 pt-2 border-t border-slate-100">
                                 <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Cake className="h-3.5 w-3.5 text-primary" /> Segmentar Fecha</Label>
+                                    <Label className="text-[10px] font-black uppercase flex items-center gap-2"><Cake className="h-3.5 w-3.5 text-primary" /> Segmentar Cumpleaños</Label>
                                     <Switch checked={isBirthdayMode} onCheckedChange={(val) => { setIsBirthdayMode(val); if(val) setInvitationTemplate(EVENT_TEMPLATES.CUMPLEANOS); }} />
                                 </div>
 
                                 {isBirthdayMode && (
-                                    <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2">
+                                    <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <div className="space-y-1">
                                             <Label className="text-[8px] font-black uppercase ml-1">Mes</Label>
                                             <Select value={birthdayMonth} onValueChange={setBirthdayMonth}>
-                                                <SelectTrigger className="h-8 text-[9px] font-bold"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="h-9 text-[10px] font-bold rounded-lg"><SelectValue /></SelectTrigger>
                                                 <SelectContent>{MESES.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}</SelectContent>
                                             </Select>
                                         </div>
                                         <div className="space-y-1">
                                             <Label className="text-[8px] font-black uppercase ml-1">Día</Label>
                                             <Select value={birthdayDay} onValueChange={setBirthdayDay}>
-                                                <SelectTrigger className="h-8 text-[9px] font-bold"><SelectValue /></SelectTrigger>
+                                                <SelectTrigger className="h-9 text-[10px] font-bold rounded-lg"><SelectValue /></SelectTrigger>
                                                 <SelectContent>{DIAS.map(d => <SelectItem key={d.value} value={d.value}>{d.label}</SelectItem>)}</SelectContent>
                                             </Select>
                                         </div>
@@ -953,7 +760,7 @@ export default function DifusionPage() {
                                 <div className="space-y-1">
                                     <Label className="text-[10px] font-black uppercase ml-1">Jurisdicción de Búsqueda</Label>
                                     <Select value={selectedSeccional} onValueChange={setSelectedSeccional} disabled={!isAdmin && !!user?.seccional}>
-                                        <SelectTrigger className="h-10 font-bold text-xs rounded-xl border-primary/10"><SelectValue placeholder="Elegir Seccional..." /></SelectTrigger>
+                                        <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/10"><SelectValue placeholder="Elegir Seccional..." /></SelectTrigger>
                                         <SelectContent>
                                             {isAdmin && (
                                                 <SelectItem value="ALL">Todas las Seccionales</SelectItem>
@@ -967,7 +774,7 @@ export default function DifusionPage() {
                                     <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
                                         <Label className="text-[10px] font-black uppercase ml-1 text-primary">Cargado Por (Registrador)</Label>
                                         <Select value={selectedOperatorFilter} onValueChange={setSelectedOperatorFilter}>
-                                            <SelectTrigger className="h-10 font-bold text-xs rounded-xl border-primary/30"><SelectValue placeholder="Todos los operadores..." /></SelectTrigger>
+                                            <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/30"><SelectValue placeholder="Todos los operadores..." /></SelectTrigger>
                                             <SelectContent>
                                                 <SelectItem value="ALL">Todos los operadores</SelectItem>
                                                 {registeredOperators.map(op => (
@@ -978,7 +785,7 @@ export default function DifusionPage() {
                                     </div>
                                 )}
 
-                                <Button className="w-full font-black h-12 text-xs uppercase shadow-md rounded-xl" onClick={handleSearch} disabled={isLoading || !selectedSeccional || selectedSeccional === 'ALL'}>
+                                <Button className="w-full font-black h-13 text-xs uppercase shadow-md rounded-xl bg-primary hover:bg-primary/90 text-white" onClick={handleSearch} disabled={isLoading || !selectedSeccional || selectedSeccional === 'ALL'}>
                                     {isLoading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <DatabaseZap className="mr-2 h-4 w-4" />} 
                                     BUSCAR EN PADRÓN
                                 </Button>
@@ -987,23 +794,19 @@ export default function DifusionPage() {
                     </Card>
                 </div>
 
-                {/* Tabla Derecha de Cola de Contactos */}
+                {/* Queue / Electores Table Area */}
                 <div className="lg:col-span-3 space-y-4">
                     
-                    {/* Tabs switcher */}
+                    {/* Tabs Switcher */}
                     <div className="flex bg-muted/40 p-1 rounded-2xl border border-primary/5 shadow-inner">
                         <button 
                             className={cn(
                                 "flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all duration-300 rounded-xl",
                                 activeTab === 'padron' 
-                                    ? "bg-primary text-white shadow-md scale-[1.02]" 
+                                    ? "bg-primary text-white shadow-md scale-[1.01]" 
                                     : "text-muted-foreground hover:text-slate-800 hover:bg-muted/50"
                             )}
-                            onClick={() => {
-                                setActiveTab('padron');
-                                setIsCoPilotRunning(false);
-                                setCoPilotIndex(0);
-                            }}
+                            onClick={() => setActiveTab('padron')}
                         >
                             🔍 Padrón General ({electores.length})
                         </button>
@@ -1011,209 +814,234 @@ export default function DifusionPage() {
                             className={cn(
                                 "flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all duration-300 rounded-xl",
                                 activeTab === 'votos' 
-                                    ? "bg-primary text-white shadow-md scale-[1.02]" 
+                                    ? "bg-primary text-white shadow-md scale-[1.01]" 
                                     : "text-muted-foreground hover:text-slate-800 hover:bg-muted/50"
                             )}
-                            onClick={() => {
-                                setActiveTab('votos');
-                                setIsCoPilotRunning(false);
-                                setCoPilotIndex(0);
-                            }}
+                            onClick={() => setActiveTab('votos')}
                         >
                             🎯 Votos Seguros ({filteredVotosList.length})
                         </button>
                     </div>
 
-                    {/* Table showing active Queue queue */}
-                    <Card className="overflow-hidden border-primary/10 shadow-lg min-h-[600px] rounded-2xl">
-                        <Table>
-                            <TableHeader>
-                                <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
-                                    <TableHead className="w-[50px] pl-4">
-                                        <Checkbox 
-                                            checked={queue.length > 0 && selectedElectorIds.size === queue.length} 
-                                            onCheckedChange={toggleSelectAll} 
-                                            className="border-slate-300"
-                                        />
-                                    </TableHead>
-                                    <TableHead className="pl-2 w-[80px]">Cola</TableHead>
-                                    <TableHead>Elector / Identidad</TableHead>
-                                    <TableHead>WhatsApp Registrado</TableHead>
-                                    <TableHead>WhatsApp Migrado</TableHead>
-                                    <TableHead className="text-right pr-6">Acción Manual</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {((activeTab === 'padron' && isLoading) || (activeTab === 'votos' && isLoadingVotos)) ? (
-                                    Array.from({ length: 10 }).map((_, i) => (
-                                        <TableRow key={i}>
-                                            <TableCell colSpan={6} className="px-6 py-4">
-                                                <Skeleton className="h-12 w-full rounded-lg" />
-                                            </TableCell>
-                                        </TableRow>
-                                    ))
-                                ) : (
-                                    queue.length > 0 ? (
-                                        queue.map((p, index) => {
-                                            const isCurrentlyProcessing = isCoPilotRunning && coPilotIndex === index;
-                                            const isSent = processedIds.has(p.id);
-                                            const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
-                                            const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
-
-                                            return (
-                                                <TableRow 
-                                                    key={p.id} 
-                                                    className={cn(
-                                                        "transition-all duration-300", 
-                                                        isCurrentlyProcessing && "bg-primary/10 border-l-4 border-primary shadow-md font-black animate-pulse",
-                                                        isSent ? "bg-green-50/40 text-slate-500" : "hover:bg-muted/20"
-                                                    )}
-                                                >
-                                                    {/* Checkbox selector */}
-                                                    <TableCell className="pl-4 py-4">
-                                                        <Checkbox 
-                                                            checked={selectedElectorIds.has(p.id)} 
-                                                            onCheckedChange={() => toggleSelectRow(p.id)} 
-                                                            className={cn("transition-colors", isSent && "opacity-50")}
-                                                        />
-                                                    </TableCell>
-                                                    {/* Queue state indicator */}
-                                                    <TableCell className="pl-2 py-4">
-                                                        {isCurrentlyProcessing ? (
-                                                            <Badge className="bg-primary hover:bg-primary font-black text-[9px] animate-bounce">ACTIVO</Badge>
-                                                        ) : isSent ? (
-                                                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 font-black text-[9px] flex items-center gap-1 w-max">
-                                                                <CheckCircle className="h-3 w-3 text-green-700" /> ENVIADO
-                                                            </Badge>
-                                                        ) : (
-                                                            <span className="text-[10px] font-black text-muted-foreground ml-2">#{index + 1}</span>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex flex-col">
-                                                            <span className={cn("text-xs uppercase tracking-tight", isCurrentlyProcessing ? "font-black text-slate-900" : "font-bold text-slate-800")}>
-                                                                {p.NOMBRE} {p.APELLIDO}
-                                                            </span>
-                                                            <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
-                                                            {includeVotingData && (
-                                                                <span className="text-[8px] text-blue-600 font-bold uppercase mt-0.5">
-                                                                    Mesa: {p.MESA} / Orden: {p.ORDEN}
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {editingPhoneId === p.id && editingField === 'TELEFONO' ? (
-                                                            <div className="flex gap-1 animate-in zoom-in-95">
-                                                                <Input 
-                                                                    value={tempPhone} 
-                                                                    onChange={(e) => setTempPhone(e.target.value)} 
-                                                                    className="h-9 text-xs font-black w-40" 
-                                                                    autoFocus 
-                                                                    onBlur={() => savePhoneEdit('TELEFONO')} 
-                                                                    onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO')} 
-                                                                />
-                                                                <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO')} disabled={isSavingPhone}>
-                                                                    <CheckCircle2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO'); setTempPhone(p.TELEFONO || ''); }}>
-                                                                <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                                                                {hasPhone ? (
-                                                                    <span className="text-xs font-black text-green-700 underline decoration-dotted underline-offset-4">{p.TELEFONO}</span>
-                                                                ) : (
-                                                                    <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Agregar número</span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        {editingPhoneId === p.id && editingField === 'TELEFONO_MIGRADO' ? (
-                                                            <div className="flex gap-1 animate-in zoom-in-95">
-                                                                <Input 
-                                                                    value={tempPhone} 
-                                                                    onChange={(e) => setTempPhone(e.target.value)} 
-                                                                    className="h-9 text-xs font-black w-40" 
-                                                                    autoFocus 
-                                                                    onBlur={() => savePhoneEdit('TELEFONO_MIGRADO')} 
-                                                                    onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO_MIGRADO')} 
-                                                                />
-                                                                <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO_MIGRADO')} disabled={isSavingPhone}>
-                                                                    <CheckCircle2 className="h-4 w-4" />
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO_MIGRADO'); setTempPhone(p.TELEFONO_MIGRADO || ''); }}>
-                                                                <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                                                                {hasPhoneMig ? (
-                                                                    <span className="text-xs font-black text-blue-700 underline decoration-dotted underline-offset-4">{p.TELEFONO_MIGRADO}</span>
-                                                                ) : (
-                                                                    <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin migrar</span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </TableCell>
-                                                    <TableCell className="text-right pr-6">
-                                                        <div className="flex justify-end gap-1.5">
-                                                            {/* Direct wa.me prefilled send button for TELEFONO */}
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="default" 
-                                                                className="bg-green-600 hover:bg-green-700 text-white font-black text-[9px] h-8 px-2.5 rounded-lg flex items-center gap-1 shadow-sm uppercase"
-                                                                onClick={() => handleDirectSend(p, p.TELEFONO || '')}
-                                                                disabled={!hasPhone}
-                                                            >
-                                                                <MessageSquare className="h-3 w-3" /> REGIST.
-                                                            </Button>
-
-                                                            {/* Direct wa.me prefilled send button for TELEFONO_MIGRADO */}
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="default" 
-                                                                className="bg-blue-600 hover:bg-blue-700 text-white font-black text-[9px] h-8 px-2.5 rounded-lg flex items-center gap-1 shadow-sm uppercase"
-                                                                onClick={() => handleDirectSend(p, p.TELEFONO_MIGRADO || '')}
-                                                                disabled={!hasPhoneMig}
-                                                            >
-                                                                <MessageSquare className="h-3 w-3" /> MIGRAD.
-                                                            </Button>
-
-                                                            {/* Jump and prioritize directly to this elector */}
-                                                            <Button 
-                                                                size="sm" 
-                                                                variant="outline" 
-                                                                onClick={() => {
-                                                                    setCoPilotIndex(index);
-                                                                    setIsCoPilotRunning(true);
-                                                                }}
-                                                                className={cn("h-8 text-[9px] font-black rounded-lg uppercase shadow-sm border-slate-200 text-slate-800 hover:bg-slate-50", isCurrentlyProcessing && "bg-primary text-white border-primary hover:bg-primary")}
-                                                            >
-                                                                {isCurrentlyProcessing ? 'PROCESANDO...' : 'ENVIAR CO-PILOTO'}
-                                                            </Button>
-                                                        </div>
-                                                    </TableCell>
-                                                </TableRow>
-                                            );
-                                        })
+                    {/* Table */}
+                    <Card className="overflow-hidden border-primary/10 shadow-lg min-h-[550px] rounded-2xl">
+                        <div className="overflow-x-auto">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
+                                        <TableHead className="pl-4 sm:pl-6">Elector / Identidad</TableHead>
+                                        <TableHead>WhatsApp Registrado</TableHead>
+                                        <TableHead>WhatsApp Migrado</TableHead>
+                                        <TableHead className="text-right pr-4 sm:pr-6">Acción Individual</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {((activeTab === 'padron' && isLoading) || (activeTab === 'votos' && isLoadingVotos)) ? (
+                                        Array.from({ length: 8 }).map((_, i) => (
+                                            <TableRow key={i}>
+                                                <TableCell colSpan={4} className="px-6 py-4">
+                                                    <Skeleton className="h-12 w-full rounded-lg" />
+                                                </TableCell>
+                                            </TableRow>
+                                        ))
                                     ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={6} className="h-96 text-center opacity-20">
-                                                <Filter className="h-20 w-20 mx-auto mb-4 text-primary" />
-                                                <p className="font-black text-sm uppercase tracking-[0.3em]">
-                                                    {activeTab === 'padron' ? 'Esperando Selección de Seccional' : 'Sin Votos Seguros Registrados'}
-                                                </p>
-                                                <p className="text-[10px] font-bold uppercase mt-2">
-                                                    {activeTab === 'padron' ? 'El sistema escaneará los electores de la seccional elegida.' : 'Comienza a cargar votos seguros desde el verificador.'}
-                                                </p>
-                                            </TableCell>
-                                        </TableRow>
-                                    )
-                                )}
-                            </TableBody>
-                        </Table>
+                                        activeQueue.length > 0 ? (
+                                            activeQueue.map((p, index) => {
+                                                const isSent = processedIds.has(p.id);
+                                                const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
+                                                const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
+
+                                                return (
+                                                    <TableRow 
+                                                        key={p.id} 
+                                                        className={cn(
+                                                            "transition-all duration-150", 
+                                                            isSent ? "bg-green-50/40 text-slate-500" : "hover:bg-muted/20"
+                                                        )}
+                                                    >
+                                                        <TableCell className="py-4 pl-4 sm:pl-6">
+                                                            <div className="flex flex-col">
+                                                                <span className="text-xs uppercase font-black text-slate-800 flex items-center gap-1.5">
+                                                                    {p.NOMBRE} {p.APELLIDO}
+                                                                    {isSent && <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 font-black text-[7px] py-0 px-1"><CheckCircle className="h-2 w-2 text-green-700 mr-0.5 inline-block" /> ENVIADO</Badge>}
+                                                                </span>
+                                                                <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
+                                                                {includeVotingData && (
+                                                                    <span className="text-[8px] text-blue-600 font-bold uppercase mt-0.5">
+                                                                        Mesa: {p.MESA} / Orden: {p.ORDEN}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {editingPhoneId === p.id && editingField === 'TELEFONO' ? (
+                                                                <div className="flex gap-1 animate-in zoom-in-95">
+                                                                    <Input 
+                                                                        value={tempPhone} 
+                                                                        onChange={(e) => setTempPhone(e.target.value)} 
+                                                                        className="h-9 text-xs font-black w-36 sm:w-40" 
+                                                                        autoFocus 
+                                                                        onBlur={() => savePhoneEdit('TELEFONO')} 
+                                                                        onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO')} 
+                                                                    />
+                                                                    <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO')} disabled={isSavingPhone}>
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO'); setTempPhone(p.TELEFONO || ''); }}>
+                                                                    <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                    {hasPhone ? (
+                                                                        <span className="text-xs font-black text-green-700 underline decoration-dotted underline-offset-4">{p.TELEFONO}</span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Agregar número</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {editingPhoneId === p.id && editingField === 'TELEFONO_MIGRADO' ? (
+                                                                <div className="flex gap-1 animate-in zoom-in-95">
+                                                                    <Input 
+                                                                        value={tempPhone} 
+                                                                        onChange={(e) => setTempPhone(e.target.value)} 
+                                                                        className="h-9 text-xs font-black w-36 sm:w-40" 
+                                                                        autoFocus 
+                                                                        onBlur={() => savePhoneEdit('TELEFONO_MIGRADO')} 
+                                                                        onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO_MIGRADO')} 
+                                                                    />
+                                                                    <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO_MIGRADO')} disabled={isSavingPhone}>
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO_MIGRADO'); setTempPhone(p.TELEFONO_MIGRADO || ''); }}>
+                                                                    <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                    {hasPhoneMig ? (
+                                                                        <span className="text-xs font-black text-blue-700 underline decoration-dotted underline-offset-4">{p.TELEFONO_MIGRADO}</span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin migrar</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell className="text-right pr-4 sm:pr-6">
+                                                            <div className="flex justify-end items-center gap-1.5 sm:gap-2">
+                                                                
+                                                                {/* Native Share button (downloads flyer & opens Android/iOS native sharing sheet) */}
+                                                                {currentFlyer && (hasPhone || hasPhoneMig) && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => handleShareMediaDirect(p, hasPhone ? p.TELEFONO! : p.TELEFONO_MIGRADO!)}
+                                                                        className="h-8 px-2 text-[9px] font-black rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white uppercase flex items-center gap-1 shadow-sm"
+                                                                        disabled={isSharingMedia[p.id]}
+                                                                    >
+                                                                        {isSharingMedia[p.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Share2 className="h-3 w-3" />}
+                                                                        {isSharingMedia[p.id] ? 'COMPARTIENDO...' : 'COMPARTIR'}
+                                                                    </Button>
+                                                                )}
+
+                                                                {/* Standard deep-linked fast message to registered TELEFONO */}
+                                                                {hasPhone && (
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        onClick={() => handleSendWhatsApp(p, p.TELEFONO!)} 
+                                                                        className="h-8 px-2 text-[9px] font-black rounded-lg bg-green-500 hover:bg-green-600 shadow-sm uppercase flex items-center gap-1 text-white"
+                                                                    >
+                                                                        <MessageSquare className="h-3 w-3 fill-white" /> REGIST.
+                                                                    </Button>
+                                                                )}
+
+                                                                {/* Standard deep-linked fast message to migrated Excel TELEFONO */}
+                                                                {hasPhoneMig && (
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        onClick={() => handleSendWhatsApp(p, p.TELEFONO_MIGRADO!)} 
+                                                                        className="h-8 px-2 text-[9px] font-black rounded-lg bg-sky-600 hover:bg-sky-700 shadow-sm uppercase flex items-center gap-1 text-white"
+                                                                    >
+                                                                        <MessageSquare className="h-3 w-3 fill-white" /> MIGRAD.
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={4} className="h-96 text-center opacity-20">
+                                                    <Filter className="h-20 w-20 mx-auto mb-4 text-primary" />
+                                                    <p className="font-black text-sm uppercase tracking-[0.3em]">
+                                                        {activeTab === 'padron' ? 'Esperando Selección de Seccional' : 'Sin Votos Seguros Registrados'}
+                                                    </p>
+                                                    <p className="text-[10px] font-bold uppercase mt-2">
+                                                        {activeTab === 'padron' ? 'El sistema escaneará los electores de la seccional elegida.' : 'Comienza a cargar votos seguros desde el verificador.'}
+                                                    </p>
+                                                </TableCell>
+                                            </TableRow>
+                                        )
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
                     </Card>
                 </div>
             </div>
+
+            {/* STICKY FLOATING BOTTOM BATCH ASSISTANT FOR CELLPHONES (THUMB FRIENDLY) */}
+            {isBatchActive && (
+                <div className="fixed bottom-4 left-1/2 -translate-x-1/2 w-[94%] max-w-sm bg-slate-900 border border-slate-800 text-white p-4 rounded-3xl shadow-2xl z-50 flex flex-col gap-2.5 animate-in slide-in-from-bottom duration-300">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                            <span className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+                            <h4 className="text-[10px] font-black uppercase tracking-wider text-primary">Asistente Móvil de Lote</h4>
+                        </div>
+                        <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-6 w-6 rounded-full text-slate-400 hover:text-white"
+                            onClick={() => setIsBatchActive(false)}
+                        >
+                            <X className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+
+                    <div className="flex justify-between items-center text-[11px] font-black uppercase text-slate-300">
+                        <span>Lote actual:</span>
+                        <span className="text-green-400">{batchSentCount} de {batchSize} enviados</span>
+                    </div>
+
+                    {/* Progress visual line */}
+                    <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                        <div className="bg-green-500 h-full transition-all duration-300" style={{ width: `${(batchSentCount / batchSize) * 100}%` }} />
+                    </div>
+
+                    {nextElectorToProcess ? (
+                        <div className="bg-slate-950 p-2.5 rounded-xl border border-slate-800/60 flex flex-col gap-0.5">
+                            <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">Siguiente a Enviar:</span>
+                            <span className="text-xs font-black text-white uppercase truncate">
+                                {nextElectorToProcess.NOMBRE} {nextElectorToProcess.APELLIDO}
+                            </span>
+                            <span className="text-[8px] font-bold text-slate-400 uppercase truncate">
+                                Tel: {nextElectorToProcess.TELEFONO || nextElectorToProcess.TELEFONO_MIGRADO || 'Sin Número'}
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="bg-slate-950 p-2 text-center rounded-xl border border-slate-800 text-xs font-black text-slate-400 uppercase">
+                            ¡Cola finalizada! No hay más pendientes
+                        </div>
+                    )}
+
+                    <Button
+                        onClick={handleTriggerNextAssistant}
+                        disabled={!nextElectorToProcess}
+                        className="h-12 w-full font-black text-xs uppercase bg-green-600 hover:bg-green-700 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg"
+                    >
+                        {currentFlyer ? <Share2 className="h-4 w-4" /> : <MessageSquare className="h-4 w-4 fill-white" />}
+                        {currentFlyer ? 'COMPARTIR MULTIMEDIA' : 'DISPARAR WHATSAPP'}
+                    </Button>
+                </div>
+            )}
 
             {/* Media Upload Identifying Name Dialog */}
             <Dialog open={isNameDialogOpen} onOpenChange={setIsNameDialogOpen}>
@@ -1236,6 +1064,51 @@ export default function DifusionPage() {
                 </DialogContent>
             </Dialog>
 
+            {/* NEW BATCH COMPLETED ANTI-BAN PROTECTION POPUP */}
+            <Dialog open={showBatchCompletedAlert} onOpenChange={setShowBatchCompletedAlert}>
+                <DialogContent className="sm:max-w-md rounded-3xl border-slate-800 bg-slate-950 text-white shadow-2xl">
+                    <div className="p-6 text-center space-y-5">
+                        <div className="mx-auto h-16 w-16 bg-green-500/10 border border-green-500/20 text-green-400 rounded-full flex items-center justify-center">
+                            <CheckCircle className="h-10 w-10 animate-bounce" />
+                        </div>
+                        
+                        <div className="space-y-1">
+                            <h3 className="text-xl font-black uppercase tracking-tight text-white">¡Lote Completado! 🚀</h3>
+                            <p className="text-[10px] font-black text-primary uppercase tracking-widest">Enviados {batchSentCount} de {batchSize} contactos</p>
+                        </div>
+
+                        <div className="p-4 bg-slate-900 border border-slate-800 rounded-2xl text-left space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-amber-400 flex items-center gap-1.5">
+                                <ShieldAlert className="h-4 w-4 text-amber-400 animate-pulse" /> PAUSA DE SEGURIDAD (ANTI-BAN)
+                            </Label>
+                            <p className="text-[9px] font-bold uppercase text-slate-300 leading-relaxed">
+                                Te sugerimos **esperar 30 segundos** antes de iniciar el próximo lote. Esto enfría el volumen de tráfico de tu chip y hace que WhatsApp registre tu actividad como un comportamiento humano natural, protegiendo tu línea contra bloqueos automáticos.
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col gap-2 pt-2">
+                            <Button 
+                                onClick={() => {
+                                    setBatchSentCount(0);
+                                    setIsBatchActive(true);
+                                    setShowBatchCompletedAlert(false);
+                                }}
+                                className="h-12 text-xs font-black uppercase bg-primary hover:bg-primary/95 text-white rounded-2xl w-full"
+                            >
+                                Iniciar Siguiente Lote 🔴
+                            </Button>
+                            <Button 
+                                variant="ghost" 
+                                onClick={() => setShowBatchCompletedAlert(false)}
+                                className="h-10 text-xs font-black uppercase text-slate-400 hover:text-white rounded-xl"
+                            >
+                                Cerrar Asistente
+                            </Button>
+                        </div>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
             <div className="text-center pt-10 opacity-40">
                 <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-900">
                     SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 2P OPCION 2
@@ -1243,24 +1116,4 @@ export default function DifusionPage() {
             </div>
         </div>
     );
-}
-
-function ClockIcon(props: React.SVGProps<SVGSVGElement>) {
-    return (
-        <svg
-            {...props}
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-        >
-            <circle cx="12" cy="12" r="10" />
-            <polyline points="12 6 12 12 16 14" />
-        </svg>
-    )
 }
