@@ -432,7 +432,7 @@ export default function DifusionPage() {
         const nextSet = new Set(processedIds); nextSet.add(p.id); setProcessedIds(nextSet);
         sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
         logAction(db, { userId: user.id, userName: user.name, module: 'DIFUSION', action: 'ENVIÓ WHATSAPP', targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})` });
-        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}&arki_auto_send=true`, 'arki_co_pilot_tab');
     };
 
     const handleShareMediaDirect = async (p: Elector, targetPhone: string) => {

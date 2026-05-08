@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      width: 320px;
+      margin: 0;
+      padding: 16px;
+      font-family: system-ui, -apple-system, sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 12px;
+    }
+    .logo {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, #10b981, #059669);
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 900;
+      font-size: 18px;
+      color: white;
+      box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+    }
+    .title {
+      font-size: 16px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: -0.025em;
+      margin: 0;
+      background: linear-gradient(to right, #10b981, #34d399);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .subtitle {
+      font-size: 10px;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin: 0;
+    }
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background-color: #064e3b;
+      border: 1px solid #047857;
+      color: #34d399;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      width: fit-content;
+      margin-bottom: 16px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      background-color: #34d399;
+      border-radius: 50%;
+      animation: pulse 1.5s infinite;
+    }
+    .card {
+      background-color: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 12px;
+      padding: 12px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 11px;
+      font-weight: 800;
+      text-transform: uppercase;
+      color: #38bdf8;
+      margin: 0 0 8px 0;
+      letter-spacing: 0.025em;
+    }
+    .step {
+      font-size: 11px;
+      margin-bottom: 6px;
+      line-height: 1.4;
+      color: #cbd5e1;
+    }
+    .step strong {
+      color: #f8fafc;
+    }
+    .footer {
+      text-align: center;
+      font-size: 9px;
+      color: #64748b;
+      margin-top: 16px;
+      text-transform: uppercase;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.4; }
+      50% { opacity: 1; }
+      100% { opacity: 0.4; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo">A</div>
+    <div>
+      <h1 class="title">ARKI Co-Pilot</h1>
+      <p class="subtitle">WhatsApp Automation</p>
+    </div>
+  </div>
+
+  <div class="status-badge">
+    <div class="status-dot"></div>
+    Conectado a la Consola
+  </div>
+
+  <div class="card">
+    <h3 class="card-title">Instrucciones de Uso</h3>
+    <div class="step">1. Abre la consola de <strong>ARKI</strong> en tu navegador.</div>
+    <div class="step">2. Ve a <strong>Difusión Masiva</strong> o Difusión Individual.</div>
+    <div class="step">3. Haz clic en el botón de enviar WhatsApp.</div>
+    <div class="step">4. La extensión se encargará de abrir el chat, <strong>pegar el flyer, escribir el texto y enviar solo</strong> de forma automática.</div>
+  </div>
+
+  <div class="card" style="border-color: #10b981; background: rgba(16, 185, 129, 0.05);">
+    <h3 class="card-title" style="color: #10b981;">Modo Inteligente</h3>
+    <div class="step" style="margin-bottom: 0;">La extensión detecta automáticamente los flyers guardados en tu biblioteca y los adjunta sin que tengas que copiar y pegar manualmente.</div>
+  </div>
+
+  <div class="footer">
+    Soporte Técnico ARKI - v1.0
+  </div>
+</body>
+</html>

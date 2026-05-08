@@ -546,7 +546,10 @@ export default function DifusionMasivaPage() {
 
         // 4. Open/Refresh WhatsApp Web tab using named Window Reuse strategy (zero clutter!)
         const finalPhone = formatParaguayPhone(targetPhone);
-        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}`, 'arki_co_pilot_tab');
+        const flyerUrlParam = currentFlyer?.url ? `&arki_flyer_url=${encodeURIComponent(currentFlyer.url)}` : '';
+        const captionParam = msg ? `&text=${encodeURIComponent(msg)}` : '';
+        const autoSendParam = '&arki_auto_send=true';
+        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}${captionParam}${flyerUrlParam}${autoSendParam}`, 'arki_co_pilot_tab');
 
         // 5. Mark as processed & sync local log
         const nextProcessed = new Set(processedIds);
@@ -645,7 +648,7 @@ export default function DifusionMasivaPage() {
             });
         }
         
-        window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}&arki_auto_send=true`, 'arki_co_pilot_tab');
     };
 
     // Background files library uploads
