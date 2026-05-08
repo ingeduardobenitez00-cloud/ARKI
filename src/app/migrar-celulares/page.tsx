@@ -286,13 +286,22 @@ export default function MigrarCelularesPage() {
                 continue;
             }
 
-            // 2. Limpieza de Teléfono
-            let telClean = rawTel !== undefined && rawTel !== null ? String(rawTel).trim().replace(/\s+/g, '') : '';
-            if (telClean.toLowerCase() === 'null' || telClean.toLowerCase() === 'undefined') {
-                telClean = '';
+            // 2. Limpieza de Teléfono (Fórmula matemática infalible de los últimos 9 dígitos)
+            let telRaw = rawTel !== undefined && rawTel !== null ? String(rawTel).replace(/\D/g, '') : '';
+            if (telRaw.toLowerCase() === 'null' || telRaw.toLowerCase() === 'undefined') {
+                telRaw = '';
             }
 
-            if (telClean === '') {
+            let telClean = '';
+            if (telRaw !== '') {
+                if (telRaw.length >= 9) {
+                    telClean = '595' + telRaw.slice(-9);
+                } else {
+                    telClean = '595' + telRaw.replace(/^0+/, '');
+                }
+            }
+
+            if (telClean === '595' || telClean === '') {
                 localSkipped++;
                 continue;
             }

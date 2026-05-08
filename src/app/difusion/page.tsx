@@ -94,10 +94,11 @@ const DIAS = [
 const formatParaguayPhone = (phone: string): string => {
     let clean = String(phone).replace(/\D/g, '');
     if (!clean) return '';
-    if (clean.startsWith('595')) {
-        clean = clean.substring(3);
+    if (clean.length >= 9) {
+        clean = clean.slice(-9);
+    } else {
+        clean = clean.replace(/^0+/, '');
     }
-    clean = clean.replace(/^0+/, '');
     return `595${clean}`;
 };
 
