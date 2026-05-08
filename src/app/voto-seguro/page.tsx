@@ -112,7 +112,7 @@ export default function VotoSeguroPage() {
     const ids = new Set<string>();
     allUsers.forEach(u => {
       const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
-      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
       const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
       if (hasOverlap) {
         ids.add(u.id);
@@ -144,7 +144,8 @@ export default function VotoSeguroPage() {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
-            return isFromMySeccional || isMyRegistration(item);
+            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
+            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
         });
     }
 
@@ -194,10 +195,10 @@ export default function VotoSeguroPage() {
     if (filteredList.length === 0) return;
     setIsExporting(true);
     try {
-        const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO'].join(';');
+        const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO', 'TELEFONO_MIGRADO'].join(';');
         let csvContent = "\uFEFF" + headers + "\n";
         filteredList.forEach(row => {
-            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO]
+            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO]
                 .map(v => `"${String(v || '').replace(/;/g, ' ').toUpperCase()}"`).join(';');
             csvContent += line + "\n";
         });
@@ -227,28 +228,90 @@ export default function VotoSeguroPage() {
     }).finally(() => { setIsDeleting(false); setIsAlertOpen(false); setVotoToDelete(null); });
   };
 
-  const renderTable = (items: VotoSeguroData[]) => (
-    <div className="overflow-x-auto">
-        <Table>
-            <TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase"><TableHead className="w-[100px] text-center">Cédula</TableHead><TableHead>Elector</TableHead><TableHead className="text-center">SECC</TableHead><TableHead>Local / Mesa</TableHead><TableHead>Teléfono</TableHead><TableHead className="text-right">Acción</TableHead></TableRow></TableHeader>
-            <TableBody>
-                {items.map((p) => (
-                    <TableRow key={p.id} className="hover:bg-muted/20">
-                        <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
-                        <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
-                        <TableCell className="text-center"><Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge></TableCell>
-                        <TableCell className="text-[10px] uppercase">
-                            <div>{p.LOCAL}</div>
-                            <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>
-                        </TableCell>
-                        <TableCell className="text-[11px] font-bold text-green-700">{p.TELEFONO || '---'}</TableCell>
-                        <TableCell className="text-right"><Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { setVotoToDelete(p); setIsAlertOpen(true); }}><Trash2 className="h-4 w-4" /></Button></TableCell>
-                    </TableRow>
-                ))}
-            </TableBody>
-        </Table>
-    </div>
-  );
+  const renderTable = (items: VotoSeguroData[]) => {
+    const hasAnyMigrated = items.some(p => String(p.TELEFONO_MIGRADO || '').trim().length >= 6);
+
+    return (
+      <div className="overflow-x-auto">
+          <Table>
+              <TableHeader>
+                  <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
+                      <TableHead className="w-[100px] text-center">Cédula</TableHead>
+                      <TableHead>Elector</TableHead>
+                      <TableHead className="text-center">SECC</TableHead>
+                      <TableHead>Local / Mesa</TableHead>
+                      <TableHead>Registrado (Usuario)</TableHead>
+                      {hasAnyMigrated && <TableHead>WhatsApp Migrado</TableHead>}
+                      <TableHead className="text-right">Acción</TableHead>
+                  </TableRow>
+              </TableHeader>
+              <TableBody>
+                  {items.map((p) => (
+                      <TableRow key={p.id} className="hover:bg-muted/20">
+                          <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
+                          <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
+                          <TableCell className="text-center"><Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge></TableCell>
+                          <TableCell className="text-[10px] uppercase">
+                              <div>{p.LOCAL}</div>
+                              <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>
+                          </TableCell>
+                          <TableCell>
+                              {p.TELEFONO ? (
+                                  <div className="text-[11px] font-black text-green-700 flex items-center gap-1.5 bg-green-50/40 border border-green-100/50 rounded-xl px-2.5 py-1.5 w-max">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                                      {p.TELEFONO}
+                                  </div>
+                              ) : (
+                                  <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Registro</div>
+                              )}
+                          </TableCell>
+                          {hasAnyMigrated && (
+                              <TableCell>
+                                  {p.TELEFONO_MIGRADO ? (
+                                      <div className="text-[11px] font-black text-blue-700 flex items-center gap-1.5 bg-blue-50/40 border border-blue-100/50 rounded-xl px-2.5 py-1.5 w-max">
+                                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                          {p.TELEFONO_MIGRADO}
+                                      </div>
+                                  ) : (
+                                      <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Migrar</div>
+                                  )}
+                              </TableCell>
+                          )}
+                          <TableCell className="text-right">
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { setVotoToDelete(p); setIsAlertOpen(true); }}>
+                                  <Trash2 className="h-4 w-4" />
+                              </Button>
+                          </TableCell>
+                      </TableRow>
+                  ))}
+              </TableBody>
+          </Table>
+      </div>
+    );
+  };
+
+  const isAllowedRole = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente' || user?.role === 'Coordinador' || user?.role === 'Dirigente';
+
+  if (user && !isAllowedRole) {
+      return (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto text-center p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+              <div className="h-20 w-20 rounded-full bg-red-50 text-red-500 flex items-center justify-center border border-red-100 shadow-sm">
+                  <Lock className="h-10 w-10 stroke-[2]" />
+              </div>
+              <div className="space-y-2">
+                  <h2 className="text-xl font-black uppercase text-red-600 tracking-tight">Acceso Restringido</h2>
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-relaxed">
+                      Comunícate con El PC para la carga de votos seguro. Tu rol es de <span className="text-red-600 font-extrabold">{user.role}</span> y tu rol tiene que cambiar.
+                  </p>
+              </div>
+              <div className="pt-2">
+                  <Badge variant="outline" className="text-[10px] font-black uppercase border-slate-200 bg-slate-50 text-slate-500 py-1.5 px-3 rounded-full">
+                      SOPORTE ARKI
+                  </Badge>
+              </div>
+          </div>
+      );
+  }
 
   return (
     <div className="space-y-6">

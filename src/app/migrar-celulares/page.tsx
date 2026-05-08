@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, getDocs, doc, writeBatch } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch, deleteField } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -300,7 +300,7 @@ export default function MigrarCelularesPage() {
             // 3. Preparación de actualización de Padrón (sheet1)
             const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
             const updateObj: any = {
-                TELEFONO: telClean,
+                TELEFONO_MIGRADO: telClean, // Guardar UNICAMENTE en campo migrado independiente para no pisar el original
                 telefonoUpdatedBy_id: user.id,
                 telefonoUpdatedBy_nombre: user.name,
                 telefonoUpdatedAt: new Date().toISOString()
@@ -314,7 +314,7 @@ export default function MigrarCelularesPage() {
             if (activeCapturasSet.has(cedulaStr)) {
                 const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
                 currentBatch.set(capturasRef, {
-                    TELEFONO: telClean,
+                    TELEFONO_MIGRADO: telClean, // Guardar en campo separado para NO sobrescribir el manual
                     updatedAt: new Date().toISOString(),
                     updatedBy_id: user.id,
                     updatedBy_nombre: user.name
@@ -373,6 +373,144 @@ export default function MigrarCelularesPage() {
         toast({
             title: "Migración Exitosa",
             description: `Se han actualizado ${localUpdatedPadron} números de celular de forma masiva.`,
+        });
+    };
+
+    const runReversion = async () => {
+        if (!db || !user || sheetData.length === 0) return;
+        if (!mapping.cedula || !mapping.telefono) {
+            toast({
+                title: "Asignación incompleta",
+                description: "Debes elegir qué columnas corresponden a Cédula y Teléfono.",
+                variant: "destructive"
+            });
+            return;
+        }
+
+        setStatus('migrating');
+        setLogs([]);
+        setProgress(0);
+        setProcessedCount(0);
+        setUpdatedPadronCount(0);
+        setUpdatedCapturasCount(0);
+        setNotFoundCount(0);
+        setSkippedCount(0);
+
+        addLog('info', '🔄 Iniciando reversión / deshacer de la migración actual...');
+        addLog('info', '📥 Cargando identificadores activos de Votos Seguros...');
+
+        let activeCapturasSet = new Set<string>();
+        try {
+            const capturasSnapshot = await getDocs(collection(db, COLLECTION_CAPTURAS));
+            capturasSnapshot.forEach(docSnap => {
+                activeCapturasSet.add(docSnap.id);
+            });
+            addLog('success', `Se cargaron ${activeCapturasSet.size} registros de Votos Seguros para reversión doble.`);
+        } catch (err) {
+            addLog('warn', '⚠️ No se pudieron pre-cargar los Votos Seguros. Se continuará con el borrado del padrón principal.');
+        }
+
+        addLog('info', '⚡ Procesando borrados en lotes de 500 para máximo rendimiento...');
+
+        const totalRecords = sheetData.length;
+        let localUpdatedPadron = 0;
+        let localUpdatedCapturas = 0;
+        let localSkipped = 0;
+
+        let currentBatch = writeBatch(db);
+        let currentBatchSize = 0;
+
+        for (let i = 0; i < totalRecords; i++) {
+            const row = sheetData[i];
+            const rawCed = row[mapping.cedula];
+
+            // 1. Limpieza y validación de Cédula
+            if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
+                localSkipped++;
+                continue;
+            }
+
+            const cedulaStr = String(rawCed).replace(/\D/g, '');
+            if (cedulaStr === '') {
+                localSkipped++;
+                continue;
+            }
+
+            // 2. Preparación de borrado en Padrón (sheet1)
+            const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
+            currentBatch.set(padronRef, {
+                TELEFONO: deleteField(),
+                TELEFONO_MIGRADO: deleteField(),
+                telefonoUpdatedBy_id: deleteField(),
+                telefonoUpdatedBy_nombre: deleteField(),
+                telefonoUpdatedAt: deleteField()
+            }, { merge: true });
+
+            currentBatchSize++;
+            localUpdatedPadron++;
+
+            // 3. Borrado en Votos Seguros (votos_confirmados) si existe
+            if (activeCapturasSet.has(cedulaStr)) {
+                const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
+                currentBatch.set(capturasRef, {
+                    TELEFONO_MIGRADO: deleteField(),
+                    updatedAt: deleteField(),
+                    updatedBy_id: deleteField(),
+                    updatedBy_nombre: deleteField()
+                }, { merge: true });
+                currentBatchSize++;
+                localUpdatedCapturas++;
+            }
+
+            // Commit batch at size limits
+            if (currentBatchSize >= 450 || i === totalRecords - 1) {
+                try {
+                    await currentBatch.commit();
+                    currentBatch = writeBatch(db);
+                    currentBatchSize = 0;
+
+                    const processed = i + 1;
+                    const percent = Math.round((processed / totalRecords) * 100);
+                    
+                    setProgress(percent);
+                    setProcessedCount(processed);
+                    setUpdatedPadronCount(localUpdatedPadron);
+                    setUpdatedCapturasCount(localUpdatedCapturas);
+                    setSkippedCount(localSkipped);
+
+                    addLog('info', `Progreso: ${processed}/${totalRecords} revertidos...`);
+                } catch (batchErr) {
+                    console.error("Error al revertir lote de Firebase:", batchErr);
+                    addLog('error', `❌ Error al revertir lote en Firestore. Continuando con el siguiente...`);
+                }
+            }
+        }
+
+        // Registro de Auditoría Final
+        try {
+            await logAction(db, {
+                userId: user.id,
+                userName: user.name,
+                module: 'REVERSION MIGRACION EXCEL',
+                action: 'REVERTIÓ CELULARES MASIVAMENTE',
+                targetName: `Archivo: ${file?.name} - Removidos: ${localUpdatedPadron} en Padrón y ${localUpdatedCapturas} en Votos Seguros`
+            });
+        } catch (auditErr) {
+            console.warn("Fallo al registrar auditoría:", auditErr);
+        }
+
+        setStatus('done');
+        addLog('success', '🔄 ¡Reversión finalizada con éxito!');
+        addLog('success', `------------------------------------------------`);
+        addLog('success', `✅ Total Procesados del Archivo: ${totalRecords}`);
+        addLog('success', `📲 Teléfonos borrados en Padrón (sheet1): ${localUpdatedPadron}`);
+        addLog('success', `🎯 Teléfonos borrados en Votos Seguros: ${localUpdatedCapturas}`);
+        addLog('success', `⚠️ Omitidos (Cédula vacía): ${localSkipped}`);
+        addLog('success', `------------------------------------------------`);
+
+        toast({
+            title: "Reversión Completada",
+            description: `Se han removido con éxito todos los teléfonos importados por este Excel.`,
         });
     };
 
@@ -566,13 +704,23 @@ export default function MigrarCelularesPage() {
                                 Paso 3: Consola e Inicio
                             </CardTitle>
                             {status === 'mapping' && mapping.cedula && mapping.telefono && (
-                                <Button 
-                                    onClick={runMigration} 
-                                    className="bg-primary hover:bg-primary/95 text-white font-black text-xs uppercase h-10 px-5 rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
-                                >
-                                    <Play className="h-3.5 w-3.5 fill-white/20" />
-                                    Iniciar Migración
-                                </Button>
+                                <div className="flex gap-2">
+                                    <Button 
+                                        onClick={runReversion} 
+                                        variant="outline"
+                                        className="border-red-200 text-red-700 hover:bg-red-50 font-black text-xs uppercase h-10 px-4 rounded-xl flex items-center gap-1.5 transition-transform active:scale-95"
+                                    >
+                                        <XCircle className="h-4 w-4 text-red-600" />
+                                        Revertir este Excel
+                                    </Button>
+                                    <Button 
+                                        onClick={runMigration} 
+                                        className="bg-primary hover:bg-primary/95 text-white font-black text-xs uppercase h-10 px-5 rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
+                                    >
+                                        <Play className="h-3.5 w-3.5 fill-white/20" />
+                                        Iniciar Migración
+                                    </Button>
+                                </div>
                             )}
                         </CardHeader>
                         <CardContent className="pt-6 flex-1 flex flex-col space-y-6">
@@ -662,12 +810,12 @@ export default function MigrarCelularesPage() {
                                         <div className="border border-green-100 bg-green-50/10 rounded-2xl p-4 text-center space-y-1.5 shadow-sm">
                                             <p className="text-[9px] font-black uppercase text-green-600 tracking-wider">Padrón</p>
                                             <p className="text-2xl font-black text-green-600 leading-none">{updatedPadronCount}</p>
-                                            <p className="text-[8px] font-bold text-green-500 uppercase leading-none">teléfonos actualizados</p>
+                                            <p className="text-[8px] font-bold text-green-500 uppercase leading-none">teléfonos en columna aparte</p>
                                         </div>
                                         <div className="border border-primary/10 bg-primary/[0.01] rounded-2xl p-4 text-center space-y-1.5 shadow-sm">
                                             <p className="text-[9px] font-black uppercase text-primary tracking-wider">Votos Seguros</p>
                                             <p className="text-2xl font-black text-primary leading-none">{updatedCapturasCount}</p>
-                                            <p className="text-[8px] font-bold text-primary/80 uppercase leading-none">capturas sincronizadas</p>
+                                            <p className="text-[8px] font-bold text-primary/80 uppercase leading-none">teléfonos en columna aparte</p>
                                         </div>
                                         <div className="border bg-slate-50/30 rounded-2xl p-4 text-center space-y-1.5 shadow-sm">
                                             <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Omitidos</p>
@@ -675,6 +823,28 @@ export default function MigrarCelularesPage() {
                                             <p className="text-[8px] font-bold text-muted-foreground uppercase leading-none">sin datos/vacíos</p>
                                         </div>
                                     </div>
+
+                                    {status === 'done' && (
+                                        <div className="pt-4 border-t border-dashed border-red-200 animate-in fade-in slide-in-from-top-2 duration-300">
+                                            <div className="p-4 bg-red-50/50 border border-red-100 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4">
+                                                <div className="flex items-start gap-2.5">
+                                                    <AlertTriangle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                                                    <div className="space-y-0.5">
+                                                        <h4 className="text-[11px] font-black uppercase text-red-900 tracking-wide">¿Te equivocaste de archivo o mapeo?</h4>
+                                                        <p className="text-[9px] font-bold text-red-700 uppercase leading-snug">Puedes revertir y borrar todos los teléfonos importados por este Excel de forma limpia.</p>
+                                                    </div>
+                                                </div>
+                                                <Button 
+                                                    onClick={runReversion}
+                                                    variant="destructive"
+                                                    size="sm"
+                                                    className="font-black text-[9px] uppercase tracking-wider py-4 px-4 h-9 rounded-xl shadow-md shrink-0 flex items-center gap-1.5 active:scale-95 transition-all"
+                                                >
+                                                    <XCircle className="h-4 w-4" /> REVERTIR ESTA CARGA
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             )}
 
