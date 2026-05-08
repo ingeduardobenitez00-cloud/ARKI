@@ -176,10 +176,19 @@ export default function ReportesPage() {
     });
 
     const sorted: GroupedReport = {};
-    Object.keys(groups).sort().forEach(k => {
-        groups[k].votos.sort((a,b) => (a.APELLIDO || '').localeCompare(b.APELLIDO || ''));
-        sorted[k] = groups[k];
-    });
+    Object.keys(groups)
+        .sort((a, b) => {
+            const secA = parseInt(String(groups[a].seccional || '').replace(/\D/g, ''), 10) || 999999;
+            const secB = parseInt(String(groups[b].seccional || '').replace(/\D/g, ''), 10) || 999999;
+            if (secA !== secB) {
+                return secA - secB;
+            }
+            return a.localeCompare(b);
+        })
+        .forEach(k => {
+            groups[k].votos.sort((a,b) => (a.APELLIDO || '').localeCompare(b.APELLIDO || ''));
+            sorted[k] = groups[k];
+        });
     return sorted;
   }, [filteredList]);
 
