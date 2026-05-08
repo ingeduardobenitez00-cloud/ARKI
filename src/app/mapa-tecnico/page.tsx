@@ -72,7 +72,7 @@ export default function MapaTecnicoPage() {
                 const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
                 const userSecs = rawSecc
                     .filter(Boolean)
-                    .map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+                    .map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
 
                 userSecs.forEach((secNum: string) => {
                     if (!secNum) return;
@@ -140,7 +140,7 @@ export default function MapaTecnicoPage() {
             capturesSnap.docs.forEach(d => {
                 const rawSec = d.data().CODIGO_SEC;
                 if (rawSec !== undefined && rawSec !== null) {
-                    const sec = String(rawSec).toUpperCase().replace('SECCIONAL', '').trim();
+                    const sec = String(rawSec).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
                     const numericSec = parseInt(sec, 10);
                     const cleanSec = isNaN(numericSec) ? sec : String(numericSec);
                     if (cleanSec) {

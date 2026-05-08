@@ -89,7 +89,7 @@ export default function ReportesPage() {
     const ids = new Set<string>();
     allUsers.forEach(u => {
       const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
-      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+      const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
       const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
       if (hasOverlap) {
         ids.add(u.id);
@@ -133,7 +133,8 @@ export default function ReportesPage() {
         return rawList.filter((item: VotoSeguroData) => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
-            return isFromMySeccional || isMyRegistration(item);
+            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
+            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
         });
     }
 

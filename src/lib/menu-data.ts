@@ -42,6 +42,7 @@ export const allMenuItems = [
   { href: '/migrar-celulares', label: 'Migrar Celulares', icon: FileSpreadsheet, tooltip: 'MIGRA NÚMEROS DE CELULARES DESDE EXCEL AL PADRÓN NACIONAL Y COMPENDIO.' },
   { href: '/biblioteca', label: 'Biblioteca Multimedia', icon: Film, tooltip: 'GESTIONA LA BIBLIOTECA DE IMÁGENES Y VIDEOS DEL SISTEMA.' },
   { href: '/difusion', label: 'Difusión WhatsApp', icon: MessageSquare, tooltip: 'ENVÍA INVITACIONES, VIDEOS Y FLYERS PERSONALIZADOS POR WHATSAPP.' },
+  { href: '/difusion-masiva', label: 'Co-Piloto Masivo', icon: Share2, tooltip: 'ENVÍA CAMPAÑAS EN AUTOMÁTICO REUTILIZANDO PESTAÑAS (ANTI-BAN).' },
   { href: '/inscripciones-eventos', label: 'Inscripciones Públicas', icon: UserPlus, tooltip: 'GESTIONA LAS PERSONAS QUE SE INSCRIBIERON DESDE EL LINK PÚBLICO.' },
   { href: '/inscripciones-archivadas', label: 'Historial Inscripciones', icon: History, tooltip: 'CONSULTA LAS LISTAS DE INSCRIPCIONES PÚBLICAS ARCHIVADAS.' },
   { href: '/ajustes-inscripcion', label: 'Ajustes Portal Público', icon: AppWindow, tooltip: 'CONFIGURA EL NOMBRE, FLYER Y ESTADO DEL PORTAL DE INSCRIPCIÓN.' },
@@ -89,7 +90,7 @@ export const menuCategories = [
   {
     label: 'Comunicación',
     icon: Share2,
-    items: ['/telefonos', '/migrar-celulares', '/biblioteca', '/difusion']
+    items: ['/telefonos', '/migrar-celulares', '/biblioteca', '/difusion', '/difusion-masiva']
   },
   {
     label: 'Operación Día D',
@@ -119,10 +120,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']
@@ -131,6 +132,6 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
   },
   'Comunicaciones': {
-    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/migrar-celulares', '/perfil']
+    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
   }
 };

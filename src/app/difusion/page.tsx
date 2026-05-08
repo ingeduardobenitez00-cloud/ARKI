@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, orderBy, limit, startAfter, getDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollectionOnce } from '@/firebase/firestore/use-collection-once';
+import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -59,6 +60,7 @@ interface Elector {
     NOMBRE: string;
     APELLIDO: string;
     TELEFONO?: string;
+    TELEFONO_MIGRADO?: string; // Teléfono migrado de Excel
     LOCAL?: string;
     MESA?: string | number;
     ORDEN?: string | number;
@@ -89,6 +91,36 @@ const DIAS = [
     }))
 ];
 
+const formatParaguayPhone = (phone: string): string => {
+    let clean = String(phone).replace(/\D/g, '');
+    if (!clean) return '';
+    if (clean.startsWith('595')) {
+        clean = clean.substring(3);
+    }
+    clean = clean.replace(/^0+/, '');
+    return `595${clean}`;
+};
+
+const getBirthDateParts = (fecha: any) => {
+    if (!fecha) return null;
+    try {
+        const s = String(fecha).trim();
+        if (!isNaN(Number(s)) && Number(s) > 10000) {
+            const dt = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
+            return { month: (dt.getUTCMonth() + 1).toString().padStart(2, '0'), day: dt.getUTCDate().toString().padStart(2, '0') };
+        }
+        const p = s.split(/[-/.\s]+/);
+        if (p.length >= 2) {
+            let day = p[0], month = p[1];
+            if (p[0].length === 4) { month = p[1]; day = p[2] || '01'; }
+            const cleanDay = day.replace(/\D/g, '').padStart(2, '0');
+            const cleanMonth = month.replace(/\D/g, '').padStart(2, '0');
+            return { month: cleanMonth, day: cleanDay };
+        }
+    } catch (e) {}
+    return null;
+};
+
 const SETTINGS_COLLECTION = 'system_settings';
 const FLYERS_COLLECTION = 'flyer_library';
 const CHUNK_SIZE = 800 * 1024;
@@ -98,8 +130,10 @@ export default function DifusionPage() {
     const db = useFirestore();
     const { toast } = useToast();
     
+    const [activeTab, setActiveTab] = useState<'padron' | 'votos'>('padron');
     const [seccionales, setSeccionales] = useState<any[]>([]);
     const [selectedSeccional, setSelectedSeccional] = useState('');
+    const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string>('ALL');
     const [electores, setElectores] = useState<Elector[]>([]);
     const [isLoading, setIsLoading] = useState(false);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
@@ -113,6 +147,7 @@ export default function DifusionPage() {
     const [birthdayDay, setBirthdayDay] = useState('ALL');
 
     const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
+    const [editingField, setEditingField] = useState<'TELEFONO' | 'TELEFONO_MIGRADO' | null>(null);
     const [tempPhone, setTempPhone] = useState('');
     const [isSavingPhone, setIsSavingPhone] = useState(false);
 
@@ -125,6 +160,25 @@ export default function DifusionPage() {
     const [newImageName, setNewImageName] = useState('');
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
+
+    // Consulta segura de Votos Confirmados según el Rol del usuario
+    const registeredVotosQuery = useMemoFirebase(() => {
+        if (!db || !user) return null;
+        const isDirigente = user.role === 'Dirigente';
+        if (isDirigente) {
+            return query(
+                collection(db, 'votos_confirmados'),
+                where('registradoPor_id', '==', user.id),
+                orderBy('APELLIDO', 'asc')
+            );
+        }
+        return query(
+            collection(db, 'votos_confirmados'),
+            orderBy('APELLIDO', 'asc')
+        );
+    }, [db, user]);
+
+    const { data: votosList, isLoading: isLoadingVotos } = useCollection<any>(registeredVotosQuery);
 
     const flyersQuery = useMemoFirebase(() => {
         if (!db) return null;
@@ -175,6 +229,57 @@ export default function DifusionPage() {
             return null;
         }
     }, [db, base64ToBlobUrl]);
+
+    const filteredVotosList = useMemo(() => {
+        if (!votosList || !user) return [];
+        const isPresidente = user.role === 'Presidente';
+        const isCoordinador = user.role === 'Coordinador';
+        const isDirigente = user.role === 'Dirigente';
+        const userSeccionales = user.seccionales || [];
+
+        let list = votosList;
+        if (isPresidente || isCoordinador) {
+            list = votosList.filter(item => {
+                const itemSec = String(item.CODIGO_SEC || '');
+                return userSeccionales.includes(itemSec) || item.registradoPor_id === user.id;
+            });
+        }
+
+        // Filtrar por Seccional seleccionada
+        if (selectedSeccional && selectedSeccional !== 'ALL') {
+            list = list.filter(item => String(item.CODIGO_SEC || '').toUpperCase() === selectedSeccional.toUpperCase());
+        }
+
+        // Filtrar por cumpleaños si está activo
+        if (isBirthdayMode) {
+            list = list.filter(item => {
+                const parts = getBirthDateParts(item.FECHA_NACI);
+                if (!parts) return false;
+                return parts.month === birthdayMonth && (birthdayDay === 'ALL' || parts.day === birthdayDay);
+            });
+        }
+
+        if (selectedOperatorFilter && selectedOperatorFilter !== 'ALL') {
+            list = list.filter(item => (item.registradoPor_id || 'unknown') === selectedOperatorFilter);
+        }
+
+        return list;
+    }, [votosList, user, selectedSeccional, isBirthdayMode, birthdayMonth, birthdayDay, selectedOperatorFilter]);
+
+    const registeredOperators = useMemo(() => {
+        if (!votosList) return [];
+        const map = new Map<string, string>();
+        votosList.forEach(item => {
+            const id = item.registradoPor_id || 'unknown';
+            const name = item.registradoPor_nombre || 'Desconocido';
+            if (!map.has(id)) {
+                map.set(id, name);
+            }
+        });
+        const list = Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        return list;
+    }, [votosList]);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -273,25 +378,6 @@ export default function DifusionPage() {
         setIsLoading(false);
     };
 
-    const getBirthDateParts = (fecha: any) => {
-        if (!fecha) return null;
-        try {
-            const s = String(fecha).trim();
-            if (!isNaN(Number(s)) && Number(s) > 10000) {
-                const dt = new Date(Math.round((Number(s) - 25569) * 86400 * 1000));
-                return { month: (dt.getUTCMonth() + 1).toString().padStart(2, '0'), day: dt.getUTCDate().toString().padStart(2, '0') };
-            }
-            const p = s.split(/[-/.\s]+/);
-            if (p.length >= 2) {
-                let day = p[0], month = p[1];
-                if (p[0].length === 4) { month = p[1]; day = p[2] || '01'; }
-                const cleanDay = day.replace(/\D/g, '').padStart(2, '0');
-                const cleanMonth = month.replace(/\D/g, '').padStart(2, '0');
-                return { month: cleanMonth, day: cleanDay };
-            }
-        } catch (e) {}
-        return null;
-    };
 
     const handleSearch = async () => {
         if (!db || isLoading || !selectedSeccional) { toast({ title: 'Selecciona una seccional' }); return; }
@@ -311,7 +397,8 @@ export default function DifusionPage() {
                     snap.docs.forEach(docSnap => {
                         const data = docSnap.data() as Elector;
                         const phone = String(data.TELEFONO || '').trim();
-                        if (!phone || phone.length < 6) return;
+                        const phoneMig = String(data.TELEFONO_MIGRADO || '').trim();
+                        if ((!phone || phone.length < 6) && (!phoneMig || phoneMig.length < 6)) return;
                         if (isBirthdayMode) {
                             const parts = getBirthDateParts(data.FECHA_NACI);
                             if (!parts || parts.month !== birthdayMonth || (birthdayDay !== 'ALL' && parts.day !== birthdayDay)) return;
@@ -329,27 +416,34 @@ export default function DifusionPage() {
         } catch (error) { toast({ title: 'Error de conexión', variant: 'destructive' }); } finally { setIsLoading(false); }
     };
 
-    const handleSendWhatsApp = (p: Elector) => {
-        if (!p.TELEFONO || !user) return;
+    const handleSendWhatsApp = (p: Elector, targetPhone: string) => {
+        if (!targetPhone || !user) return;
         let msg = invitationTemplate.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim());
+        msg = msg.replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                 .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
+                 .replace(/\[MESA\]/g, String(p.MESA || '---'))
+                 .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
         
         if (includeVotingData) {
             msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
         }
 
-        const phone = String(p.TELEFONO).replace(/\D/g, '');
-        const finalPhone = phone.startsWith('595') ? phone : `595${phone.replace(/^0/, '')}`;
+        const finalPhone = formatParaguayPhone(targetPhone);
         const nextSet = new Set(processedIds); nextSet.add(p.id); setProcessedIds(nextSet);
         sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
-        logAction(db, { userId: user.id, userName: user.name, module: 'DIFUSION', action: 'ENVIÓ WHATSAPP', targetName: `${p.NOMBRE} ${p.APELLIDO}` });
+        logAction(db, { userId: user.id, userName: user.name, module: 'DIFUSION', action: 'ENVIÓ WHATSAPP', targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})` });
         window.open(`https://wa.me/${finalPhone}?text=${encodeURIComponent(msg)}`, '_blank');
     };
 
-    const handleShareMediaDirect = async (p: Elector) => {
-        if (!p.TELEFONO || !currentFlyer || !user) return;
+    const handleShareMediaDirect = async (p: Elector, targetPhone: string) => {
+        if (!targetPhone || !currentFlyer || !user) return;
         const personId = p.id;
         setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
         let msg = invitationTemplate.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim());
+        msg = msg.replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                 .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
+                 .replace(/\[MESA\]/g, String(p.MESA || '---'))
+                 .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
         
         if (includeVotingData) {
             msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
@@ -365,24 +459,27 @@ export default function DifusionPage() {
                 logAction(db!, { userId: user.id, userName: user.name, module: 'DIFUSION', action: `COMPARTIÓ ${currentFlyer.type.toUpperCase()}`, targetName: `${p.NOMBRE} ${p.APELLIDO}` });
             } else {
                 const link = document.createElement('a'); link.href = currentFlyer.url; link.download = `${currentFlyer.name}.${extension}`; link.click();
-                handleSendWhatsApp(p);
+                handleSendWhatsApp(p, targetPhone);
             }
         } catch (e) { toast({ title: "Error al compartir", variant: "destructive" }); } finally { setIsSharingMedia(prev => ({ ...prev, [personId]: false })); }
     };
 
-    const savePhoneEdit = () => {
+    const savePhoneEdit = (phoneType: 'TELEFONO' | 'TELEFONO_MIGRADO') => {
         if (!editingPhoneId || !db || !user) return;
         setIsSavingPhone(true);
-        const data = { TELEFONO: tempPhone };
-        updateDoc(doc(db, 'sheet1', editingPhoneId), data)
+        const data = { [phoneType]: tempPhone };
+        const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+        updateDoc(doc(db, collectionName, editingPhoneId), data)
             .then(() => {
-                setElectores(prev => prev.map(e => e.id === editingPhoneId ? { ...e, TELEFONO: tempPhone } : e));
+                if (activeTab === 'padron') {
+                    setElectores(prev => prev.map(e => e.id === editingPhoneId ? { ...e, [phoneType]: tempPhone } : e));
+                }
                 toast({ title: 'Teléfono Actualizado' });
             })
             .catch(async () => {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `sheet1/${editingPhoneId}`, operation: 'update', requestResourceData: data }));
+                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `${collectionName}/${editingPhoneId}`, operation: 'update', requestResourceData: data }));
             })
-            .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); });
+            .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); setEditingField(null); });
     };
 
     return (
@@ -479,11 +576,31 @@ export default function DifusionPage() {
                                     <Label className="text-[10px] font-black uppercase ml-1">Jurisdicción de Búsqueda</Label>
                                     <Select value={selectedSeccional} onValueChange={setSelectedSeccional} disabled={!isAdmin && !!user?.seccional}>
                                         <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/10"><SelectValue placeholder="Elegir Seccional..." /></SelectTrigger>
-                                        <SelectContent>{seccionales.map(s => <SelectItem key={s.id} value={String(s.nombre)}>Seccional {s.nombre}</SelectItem>)}</SelectContent>
+                                        <SelectContent>
+                                            {isAdmin && (
+                                                <SelectItem value="ALL">Todas las Seccionales</SelectItem>
+                                            )}
+                                            {seccionales.map(s => <SelectItem key={s.id} value={String(s.nombre)}>Seccional {s.nombre}</SelectItem>)}
+                                        </SelectContent>
                                     </Select>
                                 </div>
 
-                                <Button className="w-full font-black h-14 text-sm uppercase shadow-xl rounded-2xl active:scale-95 transition-all" onClick={handleSearch} disabled={isLoading || !selectedSeccional}>
+                                {activeTab === 'votos' && (
+                                    <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                                        <Label className="text-[10px] font-black uppercase ml-1 text-primary">Cargado Por (Registrador)</Label>
+                                        <Select value={selectedOperatorFilter} onValueChange={setSelectedOperatorFilter}>
+                                            <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/30"><SelectValue placeholder="Todos los operadores..." /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="ALL">Todos los operadores</SelectItem>
+                                                {registeredOperators.map(op => (
+                                                    <SelectItem key={op.id} value={op.id}>{op.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                <Button className="w-full font-black h-14 text-sm uppercase shadow-xl rounded-2xl active:scale-95 transition-all" onClick={handleSearch} disabled={isLoading || !selectedSeccional || selectedSeccional === 'ALL'}>
                                     {isLoading ? <Loader2 className="animate-spin mr-3 h-5 w-5" /> : <DatabaseZap className="mr-3 h-5 w-5" />} 
                                     ESCANEAR PADRÓN
                                 </Button>
@@ -492,50 +609,174 @@ export default function DifusionPage() {
                     </Card>
                 </div>
 
-                <div className="lg:col-span-3">
+                <div className="lg:col-span-3 space-y-4">
+                    {/* Switcher de Pestañas Premium */}
+                    <div className="flex bg-muted/40 p-1 rounded-2xl border border-primary/5 shadow-inner">
+                        <button 
+                            className={cn(
+                                "flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all duration-300 rounded-xl",
+                                activeTab === 'padron' 
+                                    ? "bg-primary text-white shadow-md scale-[1.02]" 
+                                    : "text-muted-foreground hover:text-slate-800 hover:bg-muted/50"
+                            )}
+                            onClick={() => setActiveTab('padron')}
+                        >
+                            🔍 Padrón General ({electores.length})
+                        </button>
+                        <button 
+                            className={cn(
+                                "flex-1 py-3 text-center text-xs font-black uppercase tracking-wider transition-all duration-300 rounded-xl",
+                                activeTab === 'votos' 
+                                    ? "bg-primary text-white shadow-md scale-[1.02]" 
+                                    : "text-muted-foreground hover:text-slate-800 hover:bg-muted/50"
+                            )}
+                            onClick={() => setActiveTab('votos')}
+                        >
+                            🎯 Votos Seguros ({filteredVotosList.length})
+                        </button>
+                    </div>
+
                     <Card className="overflow-hidden border-primary/10 shadow-lg min-h-[600px] rounded-2xl">
                         <Table>
-                            <TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase"><TableHead className="pl-6">Elector / Identidad</TableHead><TableHead>WhatsApp (Clic para Editar)</TableHead><TableHead className="text-right pr-6">Acciones Estratégicas</TableHead></TableRow></TableHeader>
+                            <TableHeader>
+                                <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
+                                    <TableHead className="pl-6">Elector / Identidad</TableHead>
+                                    <TableHead>WhatsApp Registrado</TableHead>
+                                    <TableHead>WhatsApp Migrado</TableHead>
+                                    <TableHead className="text-right pr-6">Acciones</TableHead>
+                                </TableRow>
+                            </TableHeader>
                             <TableBody>
-                                {isLoading ? Array.from({ length: 10 }).map((_, i) => (<TableRow key={i}><TableCell colSpan={3} className="px-6 py-4"><Skeleton className="h-12 w-full rounded-lg" /></TableCell></TableRow>)) :
-                                electores.length > 0 ? electores.map(p => (
-                                    <TableRow key={p.id} className={cn("transition-colors", processedIds.has(p.id) ? "bg-green-50/50" : "hover:bg-muted/20")}>
-                                        <TableCell className="py-4 pl-6">
-                                            <div className="flex flex-col">
-                                                <span className="font-black text-xs uppercase tracking-tight text-slate-900">{p.NOMBRE} {p.APELLIDO}</span>
-                                                <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
-                                                {includeVotingData && (
-                                                    <span className="text-[8px] text-blue-600 font-bold uppercase mt-0.5">
-                                                        Mesa: {p.MESA} / Orden: {p.ORDEN}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {editingPhoneId === p.id ? (
-                                                <div className="flex gap-1 animate-in zoom-in-95"><Input value={tempPhone} onChange={(e) => setTempPhone(e.target.value)} className="h-9 text-xs font-black w-40" autoFocus onBlur={savePhoneEdit} onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit()} /><Button size="icon" className="h-9 w-9 rounded-lg" onClick={savePhoneEdit} disabled={isSavingPhone}><CheckCircle2 className="h-4 w-4" /></Button></div>
-                                            ) : (
-                                                <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setTempPhone(p.TELEFONO || ''); }}>
-                                                    <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
-                                                    <span className="text-xs font-black text-green-700 underline decoration-dotted underline-offset-4">{p.TELEFONO}</span>
-                                                </div>
-                                            )}
-                                        </TableCell>
-                                        <TableCell className="text-right pr-6">
-                                            <div className="flex justify-end gap-2">
-                                                {currentFlyer && (
-                                                    <Button size="sm" variant="secondary" className="h-9 px-4 text-[10px] font-black bg-blue-600 text-white hover:bg-blue-700 shadow-md rounded-xl" onClick={() => handleShareMediaDirect(p)} disabled={isSharingMedia[p.id]}>
-                                                        {isSharingMedia[p.id] ? <Loader2 className="animate-spin h-3.5 w-3.5" /> : <Share2 className="mr-2 h-3.5 w-3.5" />} 
-                                                        MULTIMEDIA
-                                                    </Button>
-                                                )}
-                                                <Button size="sm" onClick={() => handleSendWhatsApp(p)} className={cn("h-9 px-5 text-[10px] font-black rounded-xl shadow-md transition-all", processedIds.has(p.id) ? "bg-slate-800" : "bg-green-500 hover:bg-green-600")}>
-                                                    {processedIds.has(p.id) ? 'RE-ENVIAR' : 'ENVIAR WHATSAPP'}
-                                                </Button>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                )) : <TableRow><TableCell colSpan={3} className="h-96 text-center opacity-20"><Filter className="h-20 w-20 mx-auto mb-4 text-primary" /><p className="font-black text-sm uppercase tracking-[0.3em]">Esperando Selección de Seccional</p><p className="text-[10px] font-bold uppercase mt-2">El sistema escaneará solo los electores con teléfono cargado.</p></TableCell></TableRow>}
+                                {((activeTab === 'padron' && isLoading) || (activeTab === 'votos' && isLoadingVotos)) ? (
+                                    Array.from({ length: 10 }).map((_, i) => (
+                                        <TableRow key={i}>
+                                            <TableCell colSpan={4} className="px-6 py-4">
+                                                <Skeleton className="h-12 w-full rounded-lg" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : (
+                                    (activeTab === 'padron' ? electores : filteredVotosList).length > 0 ? (
+                                        (activeTab === 'padron' ? electores : filteredVotosList).map(p => {
+                                            const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
+                                            const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
+
+                                            return (
+                                                <TableRow key={p.id} className={cn("transition-colors", processedIds.has(p.id) ? "bg-green-50/50" : "hover:bg-muted/20")}>
+                                                    <TableCell className="py-4 pl-6">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-black text-xs uppercase tracking-tight text-slate-900">{p.NOMBRE} {p.APELLIDO}</span>
+                                                            <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
+                                                            {includeVotingData && (
+                                                                <span className="text-[8px] text-blue-600 font-bold uppercase mt-0.5">
+                                                                    Mesa: {p.MESA} / Orden: {p.ORDEN}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {editingPhoneId === p.id && editingField === 'TELEFONO' ? (
+                                                            <div className="flex gap-1 animate-in zoom-in-95">
+                                                                <Input 
+                                                                    value={tempPhone} 
+                                                                    onChange={(e) => setTempPhone(e.target.value)} 
+                                                                    className="h-9 text-xs font-black w-40" 
+                                                                    autoFocus 
+                                                                    onBlur={() => savePhoneEdit('TELEFONO')} 
+                                                                    onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO')} 
+                                                                />
+                                                                <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO')} disabled={isSavingPhone}>
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO'); setTempPhone(p.TELEFONO || ''); }}>
+                                                                <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                {hasPhone ? (
+                                                                    <span className="text-xs font-black text-green-700 underline decoration-dotted underline-offset-4">{p.TELEFONO}</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Agregar número</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell>
+                                                        {editingPhoneId === p.id && editingField === 'TELEFONO_MIGRADO' ? (
+                                                            <div className="flex gap-1 animate-in zoom-in-95">
+                                                                <Input 
+                                                                    value={tempPhone} 
+                                                                    onChange={(e) => setTempPhone(e.target.value)} 
+                                                                    className="h-9 text-xs font-black w-40" 
+                                                                    autoFocus 
+                                                                    onBlur={() => savePhoneEdit('TELEFONO_MIGRADO')} 
+                                                                    onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO_MIGRADO')} 
+                                                                />
+                                                                <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO_MIGRADO')} disabled={isSavingPhone}>
+                                                                    <CheckCircle2 className="h-4 w-4" />
+                                                                </Button>
+                                                            </div>
+                                                        ) : (
+                                                            <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO_MIGRADO'); setTempPhone(p.TELEFONO_MIGRADO || ''); }}>
+                                                                <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                {hasPhoneMig ? (
+                                                                    <span className="text-xs font-black text-blue-700 underline decoration-dotted underline-offset-4">{p.TELEFONO_MIGRADO}</span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin migrar</span>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </TableCell>
+                                                    <TableCell className="text-right pr-6">
+                                                        <div className="flex justify-end gap-1.5">
+                                                            {/* Botones de WhatsApp dedicados según disponibilidad de números */}
+                                                            {hasPhone && (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    onClick={() => handleSendWhatsApp(p, p.TELEFONO!)} 
+                                                                    className="h-8 px-2.5 text-[9px] font-black rounded-lg bg-green-500 hover:bg-green-600 shadow-sm uppercase flex items-center gap-1 text-white"
+                                                                >
+                                                                    <MessageSquare className="h-3 w-3 fill-white" /> REGIST.
+                                                                </Button>
+                                                            )}
+                                                            {hasPhoneMig && (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    onClick={() => handleSendWhatsApp(p, p.TELEFONO_MIGRADO!)} 
+                                                                    className="h-8 px-2.5 text-[9px] font-black rounded-lg bg-sky-600 hover:bg-sky-700 shadow-sm uppercase flex items-center gap-1 text-white"
+                                                                >
+                                                                    <MessageSquare className="h-3 w-3 fill-white" /> MIGRAD.
+                                                                </Button>
+                                                            )}
+                                                            {currentFlyer && (
+                                                                <Button 
+                                                                    size="sm" 
+                                                                    variant="secondary" 
+                                                                    className="h-8 px-2 text-[9px] font-black bg-blue-100 hover:bg-blue-200 text-blue-800 shadow-sm rounded-lg" 
+                                                                    onClick={() => handleShareMediaDirect(p, p.TELEFONO || p.TELEFONO_MIGRADO || '')} 
+                                                                    disabled={isSharingMedia[p.id]}
+                                                                >
+                                                                    {isSharingMedia[p.id] ? <Loader2 className="animate-spin h-3.5 w-3.5" /> : <Share2 className="h-3 w-3" />}
+                                                                </Button>
+                                                            )}
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={4} className="h-96 text-center opacity-20">
+                                                <Filter className="h-20 w-20 mx-auto mb-4 text-primary" />
+                                                <p className="font-black text-sm uppercase tracking-[0.3em]">
+                                                    {activeTab === 'padron' ? 'Esperando Selección de Seccional' : 'Sin Votos Seguros Registrados'}
+                                                </p>
+                                                <p className="text-[10px] font-bold uppercase mt-2">
+                                                    {activeTab === 'padron' ? 'El sistema escaneará los electores de la seccional elegida.' : 'Comienza a cargar votos seguros desde el verificador.'}
+                                                </p>
+                                            </TableCell>
+                                        </TableRow>
+                                    )
+                                )}
                             </TableBody>
                         </Table>
                     </Card>

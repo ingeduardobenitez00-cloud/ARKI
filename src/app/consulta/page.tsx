@@ -141,7 +141,7 @@ export default function ConsultaPage() {
         const ids = new Set<string>();
         allUsers.forEach(u => {
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
-            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
             const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
             if (hasOverlap) {
                 ids.add(u.id);
@@ -155,7 +155,7 @@ export default function ConsultaPage() {
         const electorSec = String(selectedPerson.CODIGO_SEC || '');
         return allUsers.filter(u => {
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
-            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+            const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
             return userSecs.includes(electorSec) && u.id !== user?.id && (u.role === 'Dirigente' || u.role === 'Coordinador');
         });
     }, [selectedPerson, allUsers, user]);
@@ -502,6 +502,29 @@ export default function ConsultaPage() {
             </Table>
         </div>
     );
+
+    const isAllowedRole = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente' || user?.role === 'Coordinador' || user?.role === 'Dirigente';
+
+    if (user && !isAllowedRole) {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto text-center p-8 space-y-6 animate-in fade-in zoom-in duration-300">
+                <div className="h-20 w-20 rounded-full bg-red-50 text-red-500 flex items-center justify-center border border-red-100 shadow-sm">
+                    <Lock className="h-10 w-10 stroke-[2]" />
+                </div>
+                <div className="space-y-2">
+                    <h2 className="text-xl font-black uppercase text-red-600 tracking-tight">Acceso Restringido</h2>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-700 leading-relaxed">
+                        Comunícate con El PC para la carga de votos seguro. Tu rol es de <span className="text-red-600 font-extrabold">{user.role}</span> y tu rol tiene que cambiar.
+                    </p>
+                </div>
+                <div className="pt-2">
+                    <Badge variant="outline" className="text-[10px] font-black uppercase border-slate-200 bg-slate-50 text-slate-500 py-1.5 px-3 rounded-full">
+                        SOPORTE ARKI
+                    </Badge>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="space-y-6">

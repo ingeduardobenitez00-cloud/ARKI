@@ -73,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           });
 
           const rawSecc = userData.seccionales || (userData.seccional ? [userData.seccional] : []);
-          const seccionales = rawSecc.map(s => String(s).toUpperCase().replace('SECCIONAL', '').trim());
+          const seccionales = rawSecc.map(s => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
 
           setAppUser({ ...userData, permissions, seccionales });
         } else {

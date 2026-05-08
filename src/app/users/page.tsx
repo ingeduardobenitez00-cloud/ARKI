@@ -212,12 +212,13 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
         reader.readAsDataURL(file);
     };
 
-    const toggleSeccional = (nombre: string) => {
-        const current = [...assignedSeccionales];
-        if (current.includes(nombre)) {
-            setValue('seccionales', current.filter(s => s !== nombre));
+    const toggleSeccional = (id: string) => {
+        const cleanId = String(id).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+        const current = [...assignedSeccionales].map(s => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
+        if (current.includes(cleanId)) {
+            setValue('seccionales', current.filter(s => s !== cleanId));
         } else {
-            setValue('seccionales', [...current, nombre]);
+            setValue('seccionales', [...current, cleanId]);
         }
     };
 
@@ -241,8 +242,8 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                 if (data.TELEFONO) setValue('telefono', data.TELEFONO);
                 
                 if (data.CODIGO_SEC) {
-                    const secVal = String(data.CODIGO_SEC);
-                    const currentSecs = assignedSeccionales;
+                    const secVal = String(data.CODIGO_SEC).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+                    const currentSecs = assignedSeccionales.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
                     if (!currentSecs.includes(secVal)) {
                         setValue('seccionales', [...currentSecs, secVal]);
                     }
@@ -427,16 +428,24 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
 
                         <ScrollArea className="h-32 border rounded-xl bg-white p-3 shadow-inner">
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                {filteredSeccionales.map(s => (
-                                    <div key={s.id} className="flex items-center space-x-2">
-                                        <Checkbox 
-                                            id={`sec-${s.nombre}`} 
-                                            checked={assignedSeccionales.includes(s.nombre)} 
-                                            onCheckedChange={() => toggleSeccional(s.nombre)}
-                                        />
-                                        <Label htmlFor={`sec-${s.nombre}`} className="text-[10px] font-bold uppercase cursor-pointer">SECC {s.nombre}</Label>
-                                    </div>
-                                ))}
+                                {filteredSeccionales.map(s => {
+                                    const cleanId = String(s.id).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+                                    const cleanNombre = String(s.nombre).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+                                    const isChecked = assignedSeccionales.some((as: any) => {
+                                        const cleanAs = String(as).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+                                        return cleanAs === cleanId || cleanAs === cleanNombre;
+                                    });
+                                    return (
+                                        <div key={s.id} className="flex items-center space-x-2">
+                                            <Checkbox 
+                                                id={`sec-${s.id}`} 
+                                                checked={isChecked} 
+                                                onCheckedChange={() => toggleSeccional(cleanId)}
+                                            />
+                                            <Label htmlFor={`sec-${s.id}`} className="text-[10px] font-bold uppercase cursor-pointer">SECC {s.nombre}</Label>
+                                        </div>
+                                    );
+                                })}
                             </div>
                         </ScrollArea>
                     </div>
@@ -987,7 +996,7 @@ export default function UsersPage() {
                       label = key;
                       icon = <Layers className="h-5 w-5 text-primary" />;
                     } else {
-                      const cleanKey = String(key).toUpperCase().replace('SECCIONAL', '').trim();
+                      const cleanKey = String(key).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
                       label = `Seccional ${cleanKey}`;
                       icon = <MapPin className="h-5 w-5 text-primary" />;
                     }
@@ -1080,7 +1089,7 @@ export default function UsersPage() {
                                                                 const raw = (user.seccionales || (user.seccional ? [user.seccional] : []));
                                                                 if (raw.length === 0) return <span className="text-[8px] font-black text-muted-foreground uppercase opacity-50">Global</span>;
                                                                 return raw.map(s => {
-                                                                    const clean = String(s).toUpperCase().replace('SECCIONAL', '').trim();
+                                                                    const clean = String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
                                                                     return <Badge key={clean} variant="outline" className="text-[7px] font-black uppercase border-slate-100 bg-white shadow-sm">SECC {clean}</Badge>;
                                                                 });
                                                             })()}
