@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
+    Search,
     Loader2, 
     MessageSquare, 
     CheckCircle2,
@@ -62,11 +63,11 @@ interface Elector {
 }
 
 const EVENT_TEMPLATES = {
-    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a participar de nuestra REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a una CENA de confraternidad con el equipo. ¡No faltes!\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nEstaremos realizando una CAMINATA en tu zona. ¡Súmate al equipo del Arki!\n\n¡Contamos con tu apoyo! 🔴🚀",
-    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nGran jornada de PEGATINA. Vení a ponerle color a la ciudad.\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nDesde el equipo de la Lista 2P te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉\n\n¡Que pases un excelente día! 🔴🚀"
+    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestra gran REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🚀",
+    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a compartir una CENA de confraternidad con todo el equipo. ¡Será un gusto conversar contigo!\n\n¡Contamos con tu apoyo! 🚀",
+    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nEstaremos realizando una gran CAMINATA en tu zona. ¡Súmate a la marea roja para conocernos mejor!\n\n¡Contamos con tu apoyo! 🚀",
+    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nGran jornada de PEGATINA en la ciudad. ¡Vení a ponerle color y alegría a nuestro proyecto!\n\n¡Contamos con tu apoyo! 🚀",
+    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\n¡Hoy es un día especial! Desde el equipo de la Lista 2P te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉 Que pases un excelente día. ¡Un gran abrazo! 🚀"
 };
 
 const MESES = [
@@ -133,7 +134,7 @@ export default function DifusionPage() {
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
     
     const [invitationTemplate, setInvitationTemplate] = useState(
-        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a participar de nuestras actividades políticas de la semana.\n\n¡Contamos con tu apoyo! 🔴🚀"
+        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
     );
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
@@ -158,6 +159,25 @@ export default function DifusionPage() {
     const [isBatchActive, setIsBatchActive] = useState(false);
     const [batchSentCount, setBatchSentCount] = useState(0);
     const [showBatchCompletedAlert, setShowBatchCompletedAlert] = useState(false);
+
+    // Búsqueda unitaria en el Sidebar
+    const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
+    const [sidebarSearchResults, setSidebarSearchResults] = useState<Elector[]>([]);
+    const [isSidebarSearching, setIsSidebarSearching] = useState(false);
+    const [selectedSidebarElector, setSelectedSidebarElector] = useState<Elector | null>(null);
+    const [sidebarPhone, setSidebarPhone] = useState('');
+    const [isSavingSidebarPhone, setIsSavingSidebarPhone] = useState(false);
+    const [sidebarMessage, setSidebarMessage] = useState('');
+    const [sidebarFlyerId, setSidebarFlyerId] = useState('NONE');
+    const [sidebarFlyer, setSidebarFlyer] = useState<any>(null);
+    const [isSidebarFlyerLoading, setIsSidebarFlyerLoading] = useState(false);
+    const [sidebarBaseTemplate, setSidebarBaseTemplate] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('sidebar_base_template') || 
+                "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 2P opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
+        }
+        return "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 2P opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
+    });
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
 
@@ -271,7 +291,9 @@ export default function DifusionPage() {
             list = list.filter(item => (item.registradoPor_id || 'unknown') === selectedOperatorFilter);
         }
 
-        return list;
+        const sortedList = [...list];
+        sortedList.sort((a, b) => String(a.APELLIDO || '').localeCompare(String(b.APELLIDO || ''), undefined, { numeric: true }));
+        return sortedList;
     }, [votosList, user, selectedSeccional, isBirthdayMode, birthdayMonth, birthdayDay, selectedOperatorFilter]);
 
     const registeredOperators = useMemo(() => {
@@ -320,6 +342,26 @@ export default function DifusionPage() {
         if (user && !isAdmin && user.seccional) { setSelectedSeccional(user.seccional); }
     }, [db, user, isAdmin, fetchAndReconstructFlyer, base64ToBlobUrl]);
 
+    useEffect(() => {
+        const loadSidebarFlyer = async () => {
+            if (sidebarFlyerId === 'NONE' || !sidebarFlyerId) {
+                setSidebarFlyer(null);
+                return;
+            }
+            setIsSidebarFlyerLoading(true);
+            try {
+                const flyer = await fetchAndReconstructFlyer(sidebarFlyerId);
+                setSidebarFlyer(flyer);
+            } catch (e) {
+                console.error("Error cargando folleto de barra lateral:", e);
+                setSidebarFlyer(null);
+            } finally {
+                setIsSidebarFlyerLoading(false);
+            }
+        };
+        loadSidebarFlyer();
+    }, [sidebarFlyerId, fetchAndReconstructFlyer]);
+
     const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
         setInvitationTemplate(EVENT_TEMPLATES[type]);
         setIsBirthdayMode(type === 'CUMPLEANOS');
@@ -360,8 +402,12 @@ export default function DifusionPage() {
                 }
             };
             await Promise.all([scanLote(selectedSeccional), scanLote(Number(selectedSeccional))]);
-            setElectores(results);
-            toast({ title: 'Escaneo Finalizado', description: `Se hallaron ${results.length} contactos.` });
+            const uniqueResultsMap = new Map<string, Elector>();
+            results.forEach(item => uniqueResultsMap.set(item.id, item));
+            const sortedResults = Array.from(uniqueResultsMap.values());
+            sortedResults.sort((a, b) => String(a.APELLIDO || '').localeCompare(String(b.APELLIDO || ''), undefined, { numeric: true }));
+            setElectores(sortedResults);
+            toast({ title: 'Escaneo Finalizado', description: `Se hallaron ${sortedResults.length} contactos.` });
         } catch (error) { toast({ title: 'Error de conexión', variant: 'destructive' }); } finally { setIsLoading(false); }
     };
 
@@ -590,6 +636,230 @@ export default function DifusionPage() {
         setIsLoading(false);
     };
 
+    // Traer el nombre de pila y el primer apellido
+    const getFormattedSidebarName = (e: Elector) => {
+        const firstName = e.NOMBRE ? e.NOMBRE.trim() : '';
+        const firstSurname = e.APELLIDO ? e.APELLIDO.trim().split(' ')[0] : '';
+        return `${firstName} ${firstSurname}`.trim();
+    };
+
+    // Generar el mensaje individual dinámico basado en la plantilla base
+    const generateSidebarMessage = (e: Elector, templateStr: string) => {
+        const displayName = getFormattedSidebarName(e);
+        return templateStr
+            .replace(/{nombre}/g, displayName)
+            .replace(/\[NOMBRE\]/g, displayName)
+            .replace(/\[LOCAL\]/g, String(e.LOCAL || '---'))
+            .replace(/\[MESA\]/g, String(e.MESA || '---'))
+            .replace(/\[ORDEN\]/g, String(e.ORDEN || '---'));
+    };
+
+    // Guardar los cambios realizados en el mensaje como la nueva plantilla base con placeholders
+    const handleSaveBaseTemplate = () => {
+        let templateToSave = sidebarMessage;
+        
+        if (selectedSidebarElector) {
+            const displayName = getFormattedSidebarName(selectedSidebarElector);
+            
+            // Reemplazar el nombre específico de vuelta al placeholder {nombre} (case-insensitive)
+            if (displayName) {
+                const escapedName = displayName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                templateToSave = templateToSave.replace(new RegExp(escapedName, 'gi'), '{nombre}');
+            }
+            if (selectedSidebarElector.LOCAL) {
+                const escapedLocal = selectedSidebarElector.LOCAL.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+                templateToSave = templateToSave.replace(new RegExp(escapedLocal, 'gi'), '[LOCAL]');
+            }
+            if (selectedSidebarElector.MESA) {
+                // Para evitar falsos positivos con dígitos solos, reemplazamos solo palabras enteras si aplica, pero aquí
+                // asumimos que el usuario edita el formato general.
+                templateToSave = templateToSave.replace(new RegExp(String(selectedSidebarElector.MESA), 'g'), '[MESA]');
+            }
+            if (selectedSidebarElector.ORDEN) {
+                templateToSave = templateToSave.replace(new RegExp(String(selectedSidebarElector.ORDEN), 'g'), '[ORDEN]');
+            }
+        }
+        
+        setSidebarBaseTemplate(templateToSave);
+        localStorage.setItem('sidebar_base_template', templateToSave);
+        toast({ title: 'Plantilla Base Guardada', description: 'Las próximas búsquedas usarán este formato.' });
+    };
+
+    // Funciones para búsqueda unitaria en Sidebar
+    const handleSidebarSearch = async () => {
+        const term = sidebarSearchTerm.trim().toUpperCase();
+        if (!term) return;
+
+        setIsSidebarSearching(true);
+        setSelectedSidebarElector(null);
+        setSidebarSearchResults([]);
+
+        try {
+            const resultsMap = new Map<string, Elector>();
+            const dataCol = collection(db!, 'sheet1');
+            const isNumericSearch = /^\d+$/.test(term);
+
+            let searchQueries = [];
+            if (isNumericSearch) {
+                searchQueries.push(getDocs(query(dataCol, where('CEDULA', '==', Number(term)), limit(20))));
+                searchQueries.push(getDocs(query(dataCol, where('CEDULA', '==', term), limit(20))));
+            } else {
+                const words = term.split(' ').filter(w => w.length >= 3);
+                if (words.length === 0) { 
+                    toast({ title: 'Ingresa al menos 3 letras' });
+                    setIsSidebarSearching(false); 
+                    return; 
+                }
+                words.forEach(w => {
+                    searchQueries.push(getDocs(query(dataCol, where('NOMBRE', '>=', w), where('NOMBRE', '<=', w + '\uf8ff'), limit(50))));
+                    searchQueries.push(getDocs(query(dataCol, where('APELLIDO', '>=', w), where('APELLIDO', '<=', w + '\uf8ff'), limit(50))));
+                });
+            }
+
+            const snapshots = await Promise.all(searchQueries);
+            snapshots.forEach(snapshot => snapshot.forEach(docSnap => {
+                if (!resultsMap.has(docSnap.id)) {
+                    resultsMap.set(docSnap.id, { id: docSnap.id, ...docSnap.data() } as Elector);
+                }
+            }));
+
+            let foundResults = Array.from(resultsMap.values());
+
+            if (!isNumericSearch) {
+                const words = term.split(' ').filter(w => w);
+                foundResults = foundResults.filter(p => {
+                    const full = `${p.NOMBRE || ''} ${p.APELLIDO || ''}`.toUpperCase();
+                    return words.every(w => full.includes(w));
+                });
+            }
+
+            foundResults.sort((a, b) => String(a.APELLIDO || '').localeCompare(String(b.APELLIDO || ''), undefined, { numeric: true }));
+            setSidebarSearchResults(foundResults);
+            
+            if (foundResults.length === 0) {
+                toast({ title: 'Sin resultados' });
+            } else {
+                toast({ title: 'Elector encontrado', description: `Se encontraron ${foundResults.length} coincidencias.` });
+                if (foundResults.length === 1) {
+                    const e = foundResults[0];
+                    setSelectedSidebarElector(e);
+                    setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
+                    setSidebarFlyerId(currentFlyer?.id || 'NONE');
+                    setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
+                }
+            }
+        } catch (error) {
+            console.error("Error en búsqueda de sidebar:", error);
+            toast({ title: 'Error de conexión', variant: 'destructive' });
+        } finally {
+            setIsSidebarSearching(false);
+        }
+    };
+
+    const handleSaveSidebarPhone = async () => {
+        if (!selectedSidebarElector || !db || !user) return;
+        setIsSavingSidebarPhone(true);
+        const data = { TELEFONO: sidebarPhone };
+        try {
+            await updateDoc(doc(db, 'sheet1', selectedSidebarElector.id), data);
+            
+            // Actualizar estado en resultados de búsqueda local
+            setSidebarSearchResults(prev => prev.map(e => e.id === selectedSidebarElector.id ? { ...e, TELEFONO: sidebarPhone } : e));
+            setSelectedSidebarElector(prev => prev ? { ...prev, TELEFONO: sidebarPhone } : null);
+            
+            // Sincronizar también con la lista principal por si acaso está el elector ahí
+            setElectores(prev => prev.map(e => e.id === selectedSidebarElector.id ? { ...e, TELEFONO: sidebarPhone } : e));
+            
+            toast({ title: 'Teléfono guardado con éxito' });
+        } catch (error) {
+            console.error("Error guardando teléfono:", error);
+            toast({ title: 'Error al actualizar teléfono', variant: 'destructive' });
+        } finally {
+            setIsSavingSidebarPhone(false);
+        }
+    };
+
+    const handleSendSidebarWhatsApp = (p: Elector, targetPhone: string) => {
+        if (!targetPhone || !user) return;
+        const finalPhone = formatParaguayPhone(targetPhone);
+        
+        // Agregar a procesados/historial
+        const nextSet = new Set(processedIds);
+        nextSet.add(p.id);
+        setProcessedIds(nextSet);
+        sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+        
+        if (db) {
+            logAction(db, {
+                userId: user.id,
+                userName: user.name,
+                module: 'DIFUSION_INDIVIDUAL',
+                action: 'ENVIÓ MENSAJE INDIVIDUAL',
+                targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})`
+            });
+        }
+        
+        window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(sidebarMessage)}`, '_blank');
+    };
+
+    const handleShareSidebarMedia = async (p: Elector, targetPhone: string) => {
+        if (!targetPhone || !user) return;
+        
+        if (sidebarFlyerId === 'NONE') {
+            handleSendSidebarWhatsApp(p, targetPhone);
+            return;
+        }
+
+        const personId = p.id;
+        setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
+
+        try {
+            const flyer = sidebarFlyer || await fetchAndReconstructFlyer(sidebarFlyerId);
+            if (!flyer) {
+                toast({ title: "No se pudo cargar la imagen", variant: "destructive" });
+                setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
+                return;
+            }
+
+            const response = await fetch(flyer.url);
+            const blob = await response.blob();
+            const extension = flyer.type === 'video' ? 'mp4' : 'jpg';
+            const file = new File([blob], `${flyer.name}.${extension}`, { type: blob.type });
+
+            if (navigator.share && navigator.canShare({ files: [file] })) {
+                await navigator.share({
+                    files: [file],
+                    text: sidebarMessage
+                });
+                
+                // Agregar a procesados/historial
+                const nextSet = new Set(processedIds);
+                nextSet.add(p.id);
+                setProcessedIds(nextSet);
+                sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+                
+                logAction(db!, { 
+                    userId: user.id, 
+                    userName: user.name, 
+                    module: 'DIFUSION_INDIVIDUAL', 
+                    action: `COMPARTIÓ INDIVIDUAL ${flyer.type.toUpperCase()}`, 
+                    targetName: `${p.NOMBRE} ${p.APELLIDO}` 
+                });
+            } else {
+                const link = document.createElement('a');
+                link.href = flyer.url;
+                link.download = `${flyer.name}.${extension}`;
+                link.click();
+                handleSendSidebarWhatsApp(p, targetPhone);
+            }
+        } catch (e) {
+            console.error(e);
+            toast({ title: "Acción cancelada o no soportada" });
+        } finally {
+            setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
+        }
+    };
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto px-1 sm:px-4 pb-24">
             
@@ -664,6 +934,205 @@ export default function DifusionPage() {
                                 >
                                     <X className="h-4 w-4" /> Desactivar Asistente
                                 </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* NUEVO: Buscador Unitario de Elector */}
+                    <Card className="border-primary/15 shadow-md overflow-hidden rounded-2xl bg-white border border-slate-100">
+                        <div className="bg-slate-50 p-4 border-b flex items-center justify-between">
+                            <h3 className="text-xs font-black uppercase flex items-center gap-2 text-primary">
+                                <Search className="h-4 w-4 text-primary" /> Enviar Datos Individuales
+                            </h3>
+                        </div>
+                        <CardContent className="space-y-4 pt-4">
+                            <div className="flex gap-1.5">
+                                <Input 
+                                    placeholder="CÉDULA O NOMBRE..." 
+                                    value={sidebarSearchTerm} 
+                                    onChange={(e) => setSidebarSearchTerm(e.target.value)} 
+                                    className="h-10 text-xs font-black uppercase"
+                                    onKeyDown={(e) => e.key === 'Enter' && handleSidebarSearch()}
+                                />
+                                <Button 
+                                    onClick={handleSidebarSearch} 
+                                    disabled={isSidebarSearching} 
+                                    className="h-10 px-3 bg-primary hover:bg-primary/90 text-white"
+                                >
+                                    {isSidebarSearching ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                                </Button>
+                            </div>
+
+                            {/* Resultados de búsqueda en el sidebar */}
+                            {sidebarSearchResults.length > 0 && (
+                                <div className="space-y-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+                                    <div className="space-y-1.5 max-h-[160px] overflow-y-auto pr-1">
+                                        {sidebarSearchResults.map(e => {
+                                            const isSelected = selectedSidebarElector?.id === e.id;
+                                            return (
+                                                <div 
+                                                    key={e.id} 
+                                                    onClick={() => {
+                                                        setSelectedSidebarElector(e);
+                                                        setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
+                                                        setSidebarFlyerId(currentFlyer?.id || 'NONE');
+                                                        setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
+                                                    }}
+                                                    className={cn(
+                                                        "p-2 rounded-lg border text-left cursor-pointer transition-all",
+                                                        isSelected 
+                                                            ? "bg-primary/5 border-primary" 
+                                                            : "bg-white border-slate-100 hover:border-slate-300"
+                                                    )}
+                                                >
+                                                    <div className="flex items-center justify-between gap-1.5">
+                                                        <p className="text-[10px] font-black uppercase leading-tight text-slate-950 truncate">
+                                                            {e.NOMBRE} {e.APELLIDO}
+                                                        </p>
+                                                        {processedIds.has(e.id) && (
+                                                            <Badge className="h-4 px-1 text-[7px] font-black uppercase bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-0.5 shrink-0">
+                                                                <CheckCircle className="h-2.5 w-2.5 text-white fill-white" /> ENVIADO
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-[8px] font-bold uppercase text-slate-500 mt-0.5">
+                                                        C.I. {e.CEDULA} • SECC {e.CODIGO_SEC}
+                                                    </p>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+
+                                    {selectedSidebarElector && (
+                                        <div className="border-t pt-3 space-y-3 animate-in fade-in slide-in-from-top-1 duration-200">
+                                            {/* Detalles del elector */}
+                                            <div className="text-left text-[9px] uppercase font-bold text-slate-700 bg-white p-2.5 rounded-lg border border-slate-100 space-y-1">
+                                                <div className="flex items-center justify-between gap-1.5">
+                                                    <p className="font-extrabold text-[10px] text-primary truncate">{selectedSidebarElector.NOMBRE} {selectedSidebarElector.APELLIDO}</p>
+                                                    {processedIds.has(selectedSidebarElector.id) && (
+                                                        <Badge className="h-4.5 px-1.5 text-[7px] font-black uppercase bg-green-600 hover:bg-green-700 text-white rounded-full flex items-center gap-0.5 shrink-0">
+                                                            <CheckCircle className="h-2.5 w-2.5 text-white fill-white animate-bounce" /> ENVIADO
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <p>🏛️ Local: <span className="font-extrabold text-slate-900">{selectedSidebarElector.LOCAL || '---'}</span></p>
+                                                <p>🗳️ Mesa: <span className="font-extrabold text-slate-900">{selectedSidebarElector.MESA || '---'}</span> / Orden: <span className="font-extrabold text-slate-900">{selectedSidebarElector.ORDEN || '---'}</span></p>
+                                            </div>
+
+                                            {/* Campo editable de teléfono */}
+                                            <div className="space-y-1 text-left">
+                                                <Label className="text-[8px] font-black uppercase text-slate-400">Número de WhatsApp</Label>
+                                                <div className="flex gap-1">
+                                                    <Input 
+                                                        value={sidebarPhone} 
+                                                        onChange={(e) => setSidebarPhone(e.target.value)} 
+                                                        placeholder="09xx-xxx-xxx" 
+                                                        className="h-9 text-xs font-black"
+                                                    />
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={handleSaveSidebarPhone} 
+                                                        disabled={isSavingSidebarPhone}
+                                                        className="h-9 px-2 bg-slate-800 hover:bg-slate-700 text-white"
+                                                    >
+                                                        {isSavingSidebarPhone ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                                    </Button>
+                                                </div>
+                                            </div>
+
+                                            {/* Selección de Flyer Individual */}
+                                            <div className="space-y-1.5 text-left">
+                                                <Label className="text-[8px] font-black uppercase text-slate-400">Folleto Multimedia</Label>
+                                                
+                                                {/* Previsualización del folleto individual */}
+                                                {sidebarFlyerId !== 'NONE' && (
+                                                    <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-primary/10 bg-slate-100 flex items-center justify-center animate-in zoom-in-95 duration-200">
+                                                        {isSidebarFlyerLoading ? (
+                                                            <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                                                        ) : sidebarFlyer ? (
+                                                            sidebarFlyer.type === 'video' ? (
+                                                                <div className="flex flex-col items-center gap-1">
+                                                                    <Film className="h-6 w-6 text-primary" />
+                                                                    <span className="text-[9px] font-black uppercase text-slate-500">Video: {sidebarFlyer.name}</span>
+                                                                </div>
+                                                            ) : (
+                                                                <img src={sidebarFlyer.url} alt="Vista previa" className="w-full h-full object-contain" />
+                                                            )
+                                                        ) : (
+                                                            <span className="text-[9px] font-bold text-red-500 uppercase">⚠️ Error al cargar recurso</span>
+                                                        )}
+                                                    </div>
+                                                )}
+
+                                                <Select value={sidebarFlyerId} onValueChange={setSidebarFlyerId}>
+                                                    <SelectTrigger className="h-9 text-[10px] font-bold rounded-xl bg-white border-primary/10">
+                                                        <SelectValue placeholder="Sin folleto (Solo Texto)" />
+                                                    </SelectTrigger>
+                                                    <SelectContent className="z-[2000]">
+                                                        <SelectItem value="NONE" className="text-xs font-bold uppercase text-slate-400">Sin folleto (Solo Texto)</SelectItem>
+                                                        {availableFlyers?.map(f => (
+                                                            <SelectItem key={f.id} value={f.id} className="text-xs font-bold uppercase">
+                                                                {f.name} ({f.type === 'video' ? '📽️' : '🖼️'})
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+
+                                            {/* Texto del mensaje personalizado */}
+                                            <div className="space-y-1 text-left">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-[8px] font-black uppercase text-slate-400">Texto Personalizado</Label>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="sm" 
+                                                        onClick={handleSaveBaseTemplate}
+                                                        className="h-5 px-1.5 text-[8px] font-black uppercase text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1"
+                                                    >
+                                                        <Save className="h-2.5 w-2.5" /> Guardar como Base
+                                                    </Button>
+                                                </div>
+                                                <Textarea 
+                                                    value={sidebarMessage} 
+                                                    onChange={(e) => setSidebarMessage(e.target.value)} 
+                                                    className="min-h-[100px] text-[11px] font-bold border-primary/10 rounded-xl bg-white" 
+                                                    placeholder="Escribe un mensaje..." 
+                                                />
+                                            </div>
+
+                                            {/* Botones de acción independiente */}
+                                            <div className="flex flex-col gap-1.5">
+                                                {sidebarFlyerId !== 'NONE' && sidebarPhone.trim().length >= 6 && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={() => handleShareSidebarMedia(selectedSidebarElector, sidebarPhone)}
+                                                        className="h-10 text-[10px] font-black uppercase rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-1.5 shadow-sm"
+                                                        disabled={isSharingMedia[selectedSidebarElector.id]}
+                                                    >
+                                                        {isSharingMedia[selectedSidebarElector.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
+                                                        {isSharingMedia[selectedSidebarElector.id] ? 'COMPARTIENDO...' : 'COMPARTIR MULTIMEDIA'}
+                                                    </Button>
+                                                )}
+
+                                                {sidebarPhone.trim().length >= 6 ? (
+                                                    <Button 
+                                                        size="sm" 
+                                                        onClick={() => handleSendSidebarWhatsApp(selectedSidebarElector, sidebarPhone)}
+                                                        className="h-10 text-[10px] font-black rounded-xl bg-green-500 hover:bg-green-600 shadow-sm uppercase flex items-center justify-center gap-1.5 text-white"
+                                                    >
+                                                        <MessageSquare className="h-4 w-4 fill-white text-green-500" /> ENVIAR DATOS
+                                                    </Button>
+                                                ) : (
+                                                    <p className="text-[8px] font-bold text-red-500 uppercase text-center py-1">⚠️ Registra un teléfono para enviar</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            {sidebarSearchTerm && sidebarSearchResults.length === 0 && !isSidebarSearching && (
+                                <p className="text-[9px] font-bold text-slate-400 uppercase text-center py-2">Sin coincidencias para la búsqueda</p>
                             )}
                         </CardContent>
                     </Card>
@@ -855,15 +1324,24 @@ export default function DifusionPage() {
                                                     <TableRow 
                                                         key={p.id} 
                                                         className={cn(
-                                                            "transition-all duration-150", 
-                                                            isSent ? "bg-green-50/40 text-slate-500" : "hover:bg-muted/20"
+                                                            "transition-all duration-150 border-l-4", 
+                                                            isSent 
+                                                                ? "bg-emerald-50/70 border-l-emerald-500 hover:bg-emerald-50 text-slate-600 shadow-sm" 
+                                                                : "border-l-transparent hover:bg-muted/20"
                                                         )}
                                                     >
                                                         <TableCell className="py-4 pl-4 sm:pl-6">
                                                             <div className="flex flex-col">
-                                                                <span className="text-xs uppercase font-black text-slate-800 flex items-center gap-1.5">
+                                                                <span className={cn(
+                                                                    "text-xs uppercase font-black flex items-center gap-1.5",
+                                                                    isSent ? "text-slate-700" : "text-slate-800"
+                                                                )}>
                                                                     {p.NOMBRE} {p.APELLIDO}
-                                                                    {isSent && <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 font-black text-[7px] py-0 px-1"><CheckCircle className="h-2 w-2 text-green-700 mr-0.5 inline-block" /> ENVIADO</Badge>}
+                                                                    {isSent && (
+                                                                        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 animate-pulse">
+                                                                            <CheckCircle className="h-2.5 w-2.5 fill-white text-emerald-600" /> ENVIADO
+                                                                        </Badge>
+                                                                    )}
                                                                 </span>
                                                                 <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
                                                                 {includeVotingData && (
