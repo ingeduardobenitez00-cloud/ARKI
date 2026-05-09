@@ -646,12 +646,19 @@ export default function DifusionPage() {
     // Generar el mensaje individual dinámico basado en la plantilla base
     const generateSidebarMessage = (e: Elector, templateStr: string) => {
         const displayName = getFormattedSidebarName(e);
-        return templateStr
+        let msg = templateStr
             .replace(/{nombre}/g, displayName)
             .replace(/\[NOMBRE\]/g, displayName)
             .replace(/\[LOCAL\]/g, String(e.LOCAL || '---'))
             .replace(/\[MESA\]/g, String(e.MESA || '---'))
             .replace(/\[ORDEN\]/g, String(e.ORDEN || '---'));
+            
+        // Autocompletar datos electorales al final si no existen placeholders en la plantilla
+        const hasVotingPlaceholders = templateStr.includes('[LOCAL]') || templateStr.includes('[MESA]') || templateStr.includes('[ORDEN]');
+        if (!hasVotingPlaceholders) {
+            msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${e.LOCAL || '---'}\n🗳️ MESA: ${e.MESA || '---'}\n🔢 ORDEN: ${e.ORDEN || '---'}`;
+        }
+        return msg;
     };
 
     // Guardar los cambios realizados en el mensaje como la nueva plantilla base con placeholders
@@ -846,6 +853,11 @@ export default function DifusionPage() {
                     targetName: `${p.NOMBRE} ${p.APELLIDO}` 
                 });
             } else {
+                toast({ 
+                    title: "📥 Folleto Descargado", 
+                    description: "Se ha descargado el folleto automáticamente. Por favor, pégalo (Ctrl+V) o adjúntalo en el chat de WhatsApp que se abrirá.",
+                    duration: 7000
+                });
                 const link = document.createElement('a');
                 link.href = flyer.url;
                 link.download = `${flyer.name}.${extension}`;
@@ -1102,25 +1114,34 @@ export default function DifusionPage() {
 
                                             {/* Botones de acción independiente */}
                                             <div className="flex flex-col gap-1.5">
-                                                {sidebarFlyerId !== 'NONE' && sidebarPhone.trim().length >= 6 && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        onClick={() => handleShareSidebarMedia(selectedSidebarElector, sidebarPhone)}
-                                                        className="h-10 text-[10px] font-black uppercase rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white flex items-center justify-center gap-1.5 shadow-sm"
-                                                        disabled={isSharingMedia[selectedSidebarElector.id]}
-                                                    >
-                                                        {isSharingMedia[selectedSidebarElector.id] ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Share2 className="h-3.5 w-3.5" />}
-                                                        {isSharingMedia[selectedSidebarElector.id] ? 'COMPARTIENDO...' : 'COMPARTIR MULTIMEDIA'}
-                                                    </Button>
-                                                )}
-
                                                 {sidebarPhone.trim().length >= 6 ? (
                                                     <Button 
                                                         size="sm" 
-                                                        onClick={() => handleSendSidebarWhatsApp(selectedSidebarElector, sidebarPhone)}
-                                                        className="h-10 text-[10px] font-black rounded-xl bg-green-500 hover:bg-green-600 shadow-sm uppercase flex items-center justify-center gap-1.5 text-white"
+                                                        onClick={() => {
+                                                            if (sidebarFlyerId !== 'NONE') {
+                                                                handleShareSidebarMedia(selectedSidebarElector, sidebarPhone);
+                                                            } else {
+                                                                handleSendSidebarWhatsApp(selectedSidebarElector, sidebarPhone);
+                                                            }
+                                                        }}
+                                                        disabled={isSharingMedia[selectedSidebarElector.id]}
+                                                        className={cn(
+                                                            "h-10 text-[10px] font-black rounded-xl shadow-sm uppercase flex items-center justify-center gap-1.5 text-white transition-all",
+                                                            sidebarFlyerId !== 'NONE' 
+                                                                ? "bg-indigo-600 hover:bg-indigo-700" 
+                                                                : "bg-green-500 hover:bg-green-600"
+                                                        )}
                                                     >
-                                                        <MessageSquare className="h-4 w-4 fill-white text-green-500" /> ENVIAR DATOS
+                                                        {isSharingMedia[selectedSidebarElector.id] ? (
+                                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                                        ) : (
+                                                            <MessageSquare className={cn("h-4 w-4 fill-white", sidebarFlyerId !== 'NONE' ? "text-indigo-600" : "text-green-500")} />
+                                                        )}
+                                                        {isSharingMedia[selectedSidebarElector.id] 
+                                                            ? 'ENVIANDO...' 
+                                                            : sidebarFlyerId !== 'NONE' 
+                                                                ? 'ENVIAR DATOS + FOLLETO' 
+                                                                : 'ENVIAR DATOS (SOLO TEXTO)'}
                                                     </Button>
                                                 ) : (
                                                     <p className="text-[8px] font-bold text-red-500 uppercase text-center py-1">⚠️ Registra un teléfono para enviar</p>
