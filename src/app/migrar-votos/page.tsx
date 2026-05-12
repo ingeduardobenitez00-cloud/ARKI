@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -316,6 +316,45 @@ export default function MigrarVotosPage() {
         });
     }, [sheetData, mapping, fetchedElectors]);
 
+    // Estadísticas calculadas dinámicamente sobre el Excel analizado
+    const statistics = useMemo(() => {
+        if (sheetData.length === 0 || !mapping.cedula) {
+            return { total: 0, valid: 0, local: 0, external: 0, omitted: 0 };
+        }
+        let valid = 0;
+        let local = 0;
+        let external = 0;
+        let omitted = 0;
+
+        sheetData.forEach(row => {
+            const rawCed = row[mapping.cedula];
+            if (rawCed === undefined || rawCed === null) {
+                omitted++;
+                return;
+            }
+            const cedulaStr = String(rawCed).replace(/\D/g, '');
+            if (!cedulaStr) {
+                omitted++;
+                return;
+            }
+
+            const elector = fetchedElectors[cedulaStr];
+            if (elector) {
+                valid++;
+                const electorSec = String(elector.CODIGO_SEC || '').trim();
+                if (userSeccionales.includes(electorSec)) {
+                    local++;
+                } else {
+                    external++;
+                }
+            } else if (elector === null) {
+                omitted++;
+            }
+        });
+
+        return { total: sheetData.length, valid, local, external, omitted };
+    }, [sheetData, mapping, fetchedElectors, userSeccionales]);
+
     const resetProcess = () => {
         setFile(null);
         setSheetData([]);
@@ -362,6 +401,9 @@ export default function MigrarVotosPage() {
         let localUpdatedPadron = 0;
         let localUpdatedCapturas = 0;
         let localSkipped = 0;
+
+        // Diccionario para contar votos delegados y crear notificaciones consolidadas
+        const delegatedCounts: Record<string, { operatorName: string; count: number; seccionales: Set<string> }> = {};
 
         let currentBatch = writeBatch(db);
         let currentBatchSize = 0;
@@ -439,6 +481,18 @@ export default function MigrarVotosPage() {
             if (isDelegated) {
                 vsObj.delegadoPor_id = user.id;
                 vsObj.delegadoPor_nombre = user.name;
+
+                if (!delegatedCounts[assignedOperatorId]) {
+                    delegatedCounts[assignedOperatorId] = {
+                        operatorName: assignedOperatorName,
+                        count: 0,
+                        seccionales: new Set<string>()
+                    };
+                }
+                delegatedCounts[assignedOperatorId].count++;
+                if (electorSec) {
+                    delegatedCounts[assignedOperatorId].seccionales.add(electorSec);
+                }
             }
 
             currentBatch.set(capturasRef, vsObj, { merge: true });
@@ -497,6 +551,32 @@ export default function MigrarVotosPage() {
             });
         } catch (auditErr) {
             console.warn("Fallo al registrar auditoría:", auditErr);
+        }
+
+        // Crear Notificaciones Consolidadas de Delegación en Firestore
+        try {
+            const notificationsColl = collection(db, 'notifications');
+            const entries = Object.entries(delegatedCounts);
+            if (entries.length > 0) {
+                addLog('info', `🔔 Generando ${entries.length} notificaciones de delegación...`);
+                for (const [targetUserId, data] of entries) {
+                    await addDoc(notificationsColl, {
+                        recipientId: targetUserId,
+                        senderId: user.id,
+                        senderName: user.name,
+                        title: "Asignación de Votos Seguros",
+                        message: `Te ha asignado ${data.count} nuevos votos seguros de la Seccional ${Array.from(data.seccionales).join(', ')}.`,
+                        type: "delegation",
+                        count: data.count,
+                        seccionales: Array.from(data.seccionales),
+                        read: false,
+                        createdAt: new Date().toISOString()
+                    });
+                }
+                addLog('success', `🔔 ¡Notificaciones enviadas en tiempo real con éxito!`);
+            }
+        } catch (notifErr) {
+            console.warn("Fallo al guardar notificaciones:", notifErr);
         }
 
         setStatus('done');
@@ -880,14 +960,34 @@ export default function MigrarVotosPage() {
                                 </div>
                             )}
 
-                            {/* Previsualización del mapeo de datos con Checking */}
                             {(status === 'mapping' && previewData.length > 0) && (
-                                <div className="space-y-4 animate-in fade-in duration-300">
-                                    <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-wider">
-                                        <Info className="h-4 w-4 text-primary" />
-                                        Checking de Seccionales (Muestra de primeros 10 registros)
+                                <div className="space-y-6 animate-in fade-in duration-300">
+                                    {/* Métrica Resumen de Resultados del Prechecking */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                        <div className="p-4 rounded-2xl bg-slate-50 border border-slate-100 flex flex-col justify-between shadow-sm">
+                                            <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Total en Excel</span>
+                                            <span className="text-2xl font-black text-slate-850 mt-1.5">{statistics.total} <span className="text-[10px] text-slate-400 font-bold uppercase tracking-normal">Filas</span></span>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-green-50/40 border border-green-100/50 flex flex-col justify-between shadow-sm">
+                                            <span className="text-[9px] font-black uppercase text-green-600 tracking-widest">Mi Seccional</span>
+                                            <span className="text-2xl font-black text-green-700 mt-1.5">{statistics.local} <span className="text-[10px] text-green-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-100/50 flex flex-col justify-between shadow-sm">
+                                            <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Otras Seccionales</span>
+                                            <span className="text-2xl font-black text-amber-700 mt-1.5">{statistics.external} <span className="text-[10px] text-amber-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                        </div>
+                                        <div className="p-4 rounded-2xl bg-red-50/40 border border-red-100/50 flex flex-col justify-between shadow-sm">
+                                            <span className="text-[9px] font-black uppercase text-red-600 tracking-widest">No en Padrón</span>
+                                            <span className="text-2xl font-black text-red-700 mt-1.5">{statistics.omitted} <span className="text-[10px] text-red-500 font-bold uppercase tracking-normal">Omitidos</span></span>
+                                        </div>
                                     </div>
-                                    <div className="overflow-hidden border border-slate-100 rounded-2xl shadow-inner bg-slate-50/30">
+
+                                    <div className="space-y-4">
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                            <Info className="h-4 w-4 text-primary" />
+                                            Checking de Seccionales (Muestra de primeros 10 registros)
+                                        </div>
+                                        <div className="overflow-hidden border border-slate-100 rounded-2xl shadow-inner bg-slate-50/30">
                                         <Table>
                                             <TableHeader>
                                                 <TableRow className="bg-muted/40 text-[9px] font-black uppercase text-slate-500 border-b border-slate-100">
@@ -939,6 +1039,7 @@ export default function MigrarVotosPage() {
                                                 })}
                                             </TableBody>
                                         </Table>
+                                    </div>
                                     </div>
                                 </div>
                             )}

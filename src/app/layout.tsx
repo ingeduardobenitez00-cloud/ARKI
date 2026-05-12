@@ -13,6 +13,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { FirebaseClientProvider } from '@/firebase';
 import { cn } from '@/lib/utils';
+import { useFirestore } from '@/firebase';
+import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, writeBatch } from 'firebase/firestore';
 import { usePresence } from '@/lib/presence';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
@@ -26,7 +28,62 @@ function AppContent({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { toast } = useToast();
-  
+  const db = useFirestore();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const unreadCount = useMemo(() => {
+    return notifications.filter(n => !n.read).length;
+  }, [notifications]);
+
+  useEffect(() => {
+    if (!db || !user?.id) return;
+
+    const notifQuery = query(
+      collection(db, 'notifications'),
+      where('recipientId', '==', user.id),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(notifQuery, (snapshot) => {
+      const items = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setNotifications(items);
+    }, (error) => {
+      console.warn("Fallo al subscribirse a notificaciones:", error);
+    });
+
+    return () => unsubscribe();
+  }, [db, user]);
+
+  const markAsRead = async (id: string) => {
+    if (!db) return;
+    try {
+      const ref = doc(db, 'notifications', id);
+      await updateDoc(ref, { read: true });
+    } catch (e) {
+      console.error("Error marcando como leída:", e);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!db || notifications.length === 0) return;
+    try {
+      const batch = writeBatch(db);
+      notifications.forEach(n => {
+        if (!n.read) {
+          const ref = doc(db, 'notifications', n.id);
+          batch.update(ref, { read: true });
+        }
+      });
+      await batch.commit();
+    } catch (e) {
+      console.error("Error marcando todas como leídas:", e);
+    }
+  };
+
   usePresence();
 
   useEffect(() => {
@@ -228,9 +285,90 @@ function AppContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="ml-auto flex items-center gap-2 sm:gap-4">
-             <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-slate-400 hidden xs:flex">
-                <Bell className="h-4 w-4" />
-             </Button>
+             <div className="relative">
+                 <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
+                    className="h-10 w-10 rounded-full text-slate-500 hover:bg-slate-100 transition-all relative shrink-0"
+                 >
+                    <Bell className="h-4.5 w-4.5" />
+                    {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-white text-[8px] font-black flex items-center justify-center border-2 border-white animate-pulse">
+                            {unreadCount}
+                        </span>
+                    )}
+                 </Button>
+
+                 {isNotificationsOpen && (
+                     <>
+                         {/* Overlay transparente para cerrar al hacer click afuera */}
+                         <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)} />
+                         
+                         <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-[2rem] shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                             <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
+                                 <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider">Notificaciones</span>
+                                 {unreadCount > 0 && (
+                                     <button 
+                                        onClick={markAllAsRead}
+                                        className="text-[9px] font-black uppercase text-primary hover:underline"
+                                     >
+                                         Marcar todas
+                                     </button>
+                                 )}
+                             </div>
+                             
+                             <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 scrollbar-thin">
+                                 {notifications.length === 0 ? (
+                                     <div className="p-8 text-center flex flex-col items-center justify-center text-slate-400">
+                                         <Bell className="h-8 w-8 mb-2 opacity-30" />
+                                         <p className="text-[10px] font-bold uppercase tracking-wider">Sin Notificaciones</p>
+                                         <p className="text-[9px] mt-1">No tienes avisos por el momento.</p>
+                                     </div>
+                                 ) : (
+                                     notifications.map((n) => {
+                                         const formatTime = (isoString: string) => {
+                                             try {
+                                                 const date = new Date(isoString);
+                                                 return date.toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) + ', ' + date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' });
+                                             } catch {
+                                                 return '';
+                                             }
+                                         };
+                                         return (
+                                             <div 
+                                                key={n.id} 
+                                                className={cn(
+                                                    "p-4 transition-colors flex items-start gap-3 text-left",
+                                                    !n.read ? "bg-primary/[0.02]" : "hover:bg-slate-50/50"
+                                                )}
+                                             >
+                                                 <div className="h-2 w-2 shrink-0 rounded-full bg-primary mt-1.5 opacity-80" style={{ visibility: !n.read ? 'visible' : 'hidden' }} />
+                                                 <div className="flex-1 space-y-1">
+                                                     <div className="flex items-center justify-between">
+                                                         <p className="text-[9px] font-black uppercase text-primary tracking-wider">{n.title}</p>
+                                                         <p className="text-[8px] text-slate-400 font-semibold">{formatTime(n.createdAt)}</p>
+                                                     </div>
+                                                     <p className="text-[10px] font-bold text-slate-700 uppercase leading-relaxed">{n.message}</p>
+                                                     <p className="text-[8px] font-medium text-slate-400 uppercase">Delegado por: {n.senderName}</p>
+                                                 </div>
+                                                 {!n.read && (
+                                                     <button 
+                                                        onClick={() => markAsRead(n.id)}
+                                                        className="h-6 px-2 text-[8px] font-black uppercase text-slate-400 hover:text-primary hover:bg-slate-50 border rounded-lg shrink-0 transition-all"
+                                                     >
+                                                         Leído
+                                                     </button>
+                                                 )}
+                                             </div>
+                                         );
+                                     })
+                                 )}
+                             </div>
+                         </div>
+                     </>
+                 )}
+             </div>
              
              <div className="flex items-center gap-2 sm:gap-3 border-l pl-2 sm:pl-4 border-slate-200">
                 <Link href="/perfil" className="flex items-center gap-3 group">
