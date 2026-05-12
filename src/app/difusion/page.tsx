@@ -11,6 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { 
     Search,
     Loader2, 
@@ -34,7 +36,9 @@ import {
     Share2,
     CheckCircle,
     X,
-    ShieldAlert
+    ShieldAlert,
+    Check,
+    ChevronsUpDown
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -128,6 +132,7 @@ export default function DifusionPage() {
     const [activeTab, setActiveTab] = useState<'padron' | 'votos'>('padron');
     const [seccionales, setSeccionales] = useState<any[]>([]);
     const [selectedSeccional, setSelectedSeccional] = useState('');
+    const [jurisdiccionOpen, setJurisdiccionOpen] = useState(false);
     const [selectedOperatorFilter, setSelectedOperatorFilter] = useState<string>('ALL');
     const [electores, setElectores] = useState<Elector[]>([]);
     const [isLoading, setIsLoading] = useState(false);
@@ -1247,17 +1252,74 @@ export default function DifusionPage() {
                                     </div>
                                 )}
 
-                                <div className="space-y-1">
+                                <div className="space-y-1 flex flex-col">
                                     <Label className="text-[10px] font-black uppercase ml-1">Jurisdicción de Búsqueda</Label>
-                                    <Select value={selectedSeccional} onValueChange={setSelectedSeccional} disabled={!isAdmin && !!user?.seccional}>
-                                        <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/10"><SelectValue placeholder="Elegir Seccional..." /></SelectTrigger>
-                                        <SelectContent>
-                                            {isAdmin && (
-                                                <SelectItem value="ALL">Todas las Seccionales</SelectItem>
-                                            )}
-                                            {seccionales.map(s => <SelectItem key={s.id} value={String(s.nombre)}>Seccional {s.nombre}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
+                                    <Popover open={jurisdiccionOpen} onOpenChange={setJurisdiccionOpen}>
+                                        <PopoverTrigger asChild disabled={!isAdmin && !!user?.seccional}>
+                                            <Button
+                                                variant="outline"
+                                                role="combobox"
+                                                aria-expanded={jurisdiccionOpen}
+                                                className="justify-between w-full font-bold text-xs h-11 rounded-xl border-primary/10 bg-white"
+                                            >
+                                                <span className="truncate">
+                                                    {selectedSeccional === "ALL"
+                                                        ? "Todas las Seccionales"
+                                                        : selectedSeccional
+                                                            ? `Seccional ${selectedSeccional}`
+                                                            : "Elegir Seccional..."}
+                                                </span>
+                                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                            <Command>
+                                                <CommandInput placeholder="Buscar Seccional..." />
+                                                <CommandList>
+                                                    <CommandEmpty>No se encontró la seccional</CommandEmpty>
+                                                    <CommandGroup>
+                                                        {isAdmin && (
+                                                            <CommandItem
+                                                                value="Todas las Seccionales"
+                                                                onSelect={() => {
+                                                                    setSelectedSeccional("ALL");
+                                                                    setJurisdiccionOpen(false);
+                                                                }}
+                                                                className="flex items-center justify-between animate-none"
+                                                            >
+                                                                <span>Todas las Seccionales</span>
+                                                                <Check
+                                                                    className={cn(
+                                                                        "h-4 w-4",
+                                                                        selectedSeccional === "ALL" ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                            </CommandItem>
+                                                        )}
+                                                        {seccionales.map((s) => (
+                                                            <CommandItem
+                                                                key={s.id}
+                                                                value={`Seccional ${s.nombre}`}
+                                                                onSelect={() => {
+                                                                    setSelectedSeccional(String(s.nombre));
+                                                                    setJurisdiccionOpen(false);
+                                                                }}
+                                                                className="flex items-center justify-between"
+                                                            >
+                                                                <span>Seccional {s.nombre}</span>
+                                                                <Check
+                                                                    className={cn(
+                                                                        "h-4 w-4",
+                                                                        selectedSeccional === String(s.nombre) ? "opacity-100" : "opacity-0"
+                                                                    )}
+                                                                />
+                                                            </CommandItem>
+                                                        ))}
+                                                    </CommandGroup>
+                                                </CommandList>
+                                            </Command>
+                                        </PopoverContent>
+                                    </Popover>
                                 </div>
 
                                 {activeTab === 'votos' && (

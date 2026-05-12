@@ -10,14 +10,19 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { ShieldCheck, Image as ImageIcon, FileText, CheckCircle2, AlertCircle, Search, ZoomIn } from 'lucide-react';
+import { ShieldCheck, Image as ImageIcon, FileText, CheckCircle2, AlertCircle, Search, ZoomIn, Check, ChevronsUpDown } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 
 export default function VerificadorActasPage() {
     const { user } = useAuth();
     const db = useFirestore();
     
     const [selectedSeccional, setSelectedSeccional] = useState<string | null>(null);
+    const [seccionalOpen, setSeccionalOpen] = useState(false);
     const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
+    const [localOpen, setLocalOpen] = useState(false);
     const [allMetadata, setAllMetadata] = useState<Record<string, any>>({});
     const [mesasStatus, setMesasStatus] = useState<any[]>([]);
     const [selectedMesaData, setSelectedMesaData] = useState<any>(null);
@@ -49,6 +54,26 @@ export default function VerificadorActasPage() {
         return allMetadata[selectedSeccional]?.locales || [];
     }, [allMetadata, selectedSeccional]);
 
+    const currentLocalMesas = useMemo(() => {
+        if (!selectedLocal || !selectedSeccional) return [];
+        const localData = allMetadata[selectedSeccional]?.mesas_por_local?.find((l: any) => l.localName === selectedLocal);
+        return localData?.mesas || [];
+    }, [allMetadata, selectedSeccional, selectedLocal]);
+
+    const mesasWithStatus = useMemo(() => {
+        return currentLocalMesas.map((mesaNo: number) => {
+            const status = mesasStatus.find(m => m.mesa === mesaNo);
+            return {
+                id: status?.id || `${selectedLocal?.replace(/\s+/g, '_')}_${mesaNo}`,
+                mesa: mesaNo,
+                local: selectedLocal,
+                intendencia_cargado: status?.intendencia_cargado || false,
+                junta_cargado: status?.junta_cargado || false,
+                hasData: !!status
+            };
+        });
+    }, [currentLocalMesas, mesasStatus, selectedLocal]);
+
     const handleViewDetails = async (mesaId: string, mode: 'intendencia' | 'junta') => {
         if (!db) return;
         setViewMode(mode);
@@ -74,40 +99,122 @@ export default function VerificadorActasPage() {
 
             <Card>
                 <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
+                    <div className="space-y-2 flex flex-col">
                         <label className="text-xs font-bold uppercase text-slate-500">Seccional</label>
-                        <Select onValueChange={setSelectedSeccional} value={selectedSeccional || ''}>
-                            <SelectTrigger><SelectValue placeholder="Selecciona Seccional" /></SelectTrigger>
-                            <SelectContent>
-                                {Object.keys(allMetadata).sort().map(s => (
-                                    <SelectItem key={s} value={s}>SECCIONAL {s}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Popover open={seccionalOpen} onOpenChange={setSeccionalOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={seccionalOpen}
+                                    className="justify-between w-full font-normal bg-white"
+                                >
+                                    {selectedSeccional
+                                        ? `SECCIONAL ${selectedSeccional}`
+                                        : "Selecciona Seccional"}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Buscar Seccional..." />
+                                    <CommandList>
+                                        <CommandEmpty>No se encontró la seccional</CommandEmpty>
+                                        <CommandGroup>
+                                            {Object.keys(allMetadata)
+                                                .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+                                                .map((s) => (
+                                                    <CommandItem
+                                                        key={s}
+                                                        value={`SECCIONAL ${s}`}
+                                                        onSelect={() => {
+                                                            setSelectedSeccional(s);
+                                                            setSelectedLocal(null);
+                                                            setSeccionalOpen(false);
+                                                        }}
+                                                        className="flex items-center justify-between"
+                                                    >
+                                                        <span>SECCIONAL {s}</span>
+                                                        <Check
+                                                            className={cn(
+                                                                "h-4 w-4",
+                                                                selectedSeccional === s ? "opacity-100" : "opacity-0"
+                                                            )}
+                                                        />
+                                                    </CommandItem>
+                                                ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
-                    <div className="space-y-2">
+
+                    <div className="space-y-2 flex flex-col">
                         <label className="text-xs font-bold uppercase text-slate-500">Local de Votación</label>
-                        <Select onValueChange={setSelectedLocal} value={selectedLocal || ''}>
-                            <SelectTrigger><SelectValue placeholder="Selecciona Local" /></SelectTrigger>
-                            <SelectContent>
-                                {locales.map((l: string) => (
-                                    <SelectItem key={l} value={l}>{l}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                        <Popover open={localOpen} onOpenChange={setLocalOpen}>
+                            <PopoverTrigger asChild>
+                                <Button
+                                    variant="outline"
+                                    role="combobox"
+                                    aria-expanded={localOpen}
+                                    className="justify-between w-full font-normal bg-white"
+                                    disabled={!selectedSeccional}
+                                >
+                                    <span className="truncate">
+                                        {selectedLocal || "Selecciona Local"}
+                                    </span>
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0">
+                                <Command>
+                                    <CommandInput placeholder="Buscar Local..." />
+                                    <CommandList>
+                                        <CommandEmpty>No se encontró el local</CommandEmpty>
+                                        <CommandGroup>
+                                            {locales.map((l: string) => (
+                                                <CommandItem
+                                                    key={l}
+                                                    value={l}
+                                                    onSelect={() => {
+                                                        setSelectedLocal(l);
+                                                        setLocalOpen(false);
+                                                    }}
+                                                    className="flex items-center justify-between"
+                                                >
+                                                    <span className="truncate pr-4">{l}</span>
+                                                    <Check
+                                                        className={cn(
+                                                            "h-4 w-4 shrink-0",
+                                                            selectedLocal === l ? "opacity-100" : "opacity-0"
+                                                        )}
+                                                    />
+                                                </CommandItem>
+                                            ))}
+                                        </CommandGroup>
+                                    </CommandList>
+                                </Command>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </CardContent>
             </Card>
 
             <div className="grid grid-cols-1 gap-4">
-                {mesasStatus.length === 0 ? (
+                {!selectedLocal ? (
                     <div className="text-center p-12 bg-slate-50 rounded-xl border-2 border-dashed">
                         <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
                         <p className="text-slate-500">Selecciona un local para auditar las actas</p>
                     </div>
+                ) : mesasWithStatus.length === 0 ? (
+                    <div className="text-center p-12 bg-slate-50 rounded-xl border-2 border-dashed">
+                        <Search className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                        <p className="text-slate-500">No se encontraron mesas configuradas para este local</p>
+                    </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {mesasStatus.sort((a,b) => a.mesa - b.mesa).map((m) => (
+                        {mesasWithStatus.sort((a,b) => a.mesa - b.mesa).map((m) => (
                             <Card key={m.id} className="overflow-hidden border-l-4 border-l-blue-500">
                                 <CardContent className="p-4">
                                     <div className="flex justify-between items-start mb-4">
@@ -115,8 +222,18 @@ export default function VerificadorActasPage() {
                                             <h3 className="font-black text-lg">Mesa {m.mesa}</h3>
                                             <p className="text-[10px] text-slate-400 uppercase">{m.local}</p>
                                         </div>
-                                        <Badge className={m.intendencia_cargado && m.junta_cargado ? 'bg-green-600' : 'bg-amber-500'}>
-                                            {m.intendencia_cargado && m.junta_cargado ? 'COMPLETA' : 'PARCIAL'}
+                                        <Badge className={
+                                            m.intendencia_cargado && m.junta_cargado 
+                                                ? 'bg-green-600' 
+                                                : (m.intendencia_cargado || m.junta_cargado) 
+                                                    ? 'bg-amber-500' 
+                                                    : 'bg-slate-400'
+                                        }>
+                                            {m.intendencia_cargado && m.junta_cargado 
+                                                ? 'COMPLETA' 
+                                                : (m.intendencia_cargado || m.junta_cargado) 
+                                                    ? 'PARCIAL' 
+                                                    : 'PENDIENTE'}
                                         </Badge>
                                     </div>
                                     

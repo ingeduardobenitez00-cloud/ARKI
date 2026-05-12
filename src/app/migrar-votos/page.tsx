@@ -518,27 +518,39 @@ export default function MigrarVotosPage() {
             currentBatchSize++;
             localUpdatedPadron++;
 
-            // 6. Commit de Lote Firestore
-            if (currentBatchSize >= 400 || i === totalRecords - 1) {
+            // 6. Commit de Lote Firestore si alcanzamos el límite de tamaño seguro (400 operaciones)
+            if (currentBatchSize >= 400) {
                 try {
                     await currentBatch.commit();
                     currentBatch = writeBatch(db);
                     currentBatchSize = 0;
 
-                    // Actualizar métricas
+                    // Actualizar métricas parciales
                     const processed = i + 1;
-                    const percent = Math.round((processed / totalRecords) * 100);
-                    setProgress(percent);
-                    setProcessedCount(processed);
-                    setUpdatedPadronCount(localUpdatedPadron);
-                    setUpdatedCapturasCount(localUpdatedCapturas);
-                    setSkippedCount(localSkipped);
+                    setProgress(Math.round((processed / totalRecords) * 100));
                 } catch (batchErr) {
-                    console.error("Error commiteando lote:", batchErr);
+                    console.error("Error commiteando lote intermedio:", batchErr);
                     addLog('error', `❌ Error al guardar lote en Firestore.`);
                 }
             }
         }
+
+        // Commit del lote final restante (fuera del bucle)
+        if (currentBatchSize > 0) {
+            try {
+                await currentBatch.commit();
+            } catch (batchErr) {
+                console.error("Error commiteando lote final:", batchErr);
+                addLog('error', `❌ Error al guardar lote final en Firestore.`);
+            }
+        }
+
+        // Actualizar métricas finales
+        setProgress(100);
+        setProcessedCount(totalRecords);
+        setUpdatedPadronCount(localUpdatedPadron);
+        setUpdatedCapturasCount(localUpdatedCapturas);
+        setSkippedCount(localSkipped);
 
         // Auditoría
         try {
@@ -647,7 +659,7 @@ export default function MigrarVotosPage() {
             currentBatchSize++;
             localUpdatedPadron++;
 
-            if (currentBatchSize >= 400 || i === totalRecords - 1) {
+            if (currentBatchSize >= 400) {
                 try {
                     await currentBatch.commit();
                     currentBatch = writeBatch(db);
@@ -655,15 +667,27 @@ export default function MigrarVotosPage() {
 
                     const processed = i + 1;
                     setProgress(Math.round((processed / totalRecords) * 100));
-                    setProcessedCount(processed);
-                    setUpdatedPadronCount(localUpdatedPadron);
-                    setUpdatedCapturasCount(localUpdatedCapturas);
-                    setSkippedCount(localSkipped);
                 } catch (err) {
                     console.error("Error al revertir lote:", err);
                 }
             }
         }
+
+        // Commit del lote final restante (fuera del bucle)
+        if (currentBatchSize > 0) {
+            try {
+                await currentBatch.commit();
+            } catch (err) {
+                console.error("Error al revertir lote final:", err);
+            }
+        }
+
+        // Actualizar métricas finales
+        setProgress(100);
+        setProcessedCount(totalRecords);
+        setUpdatedPadronCount(localUpdatedPadron);
+        setUpdatedCapturasCount(localUpdatedCapturas);
+        setSkippedCount(localSkipped);
 
         try {
             await logAction(db, {

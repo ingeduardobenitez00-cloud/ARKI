@@ -253,7 +253,12 @@ export default function ConfiguracionPage() {
   const [isOptimizing, setIsOptimizing] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  const [cardUnlockPassword, setCardUnlockPassword] = useState('');
   const { toast } = useToast();
+
+  const openResetDialog = () => {
+    setIsResetAlertOpen(true);
+  };
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
 
@@ -277,6 +282,10 @@ export default function ConfiguracionPage() {
 
   const handleResetVotes = async () => {
     if (!db || !user) return;
+    if (cardUnlockPassword !== 'ARKI2026') {
+        toast({ title: "Acceso Denegado", description: "La contraseña de seguridad es incorrecta.", variant: "destructive" });
+        return;
+    }
     setIsResetting(true);
     try {
         const q = query(
@@ -327,6 +336,7 @@ export default function ConfiguracionPage() {
     } finally {
         setIsResetting(false);
         setIsResetAlertOpen(false);
+        setCardUnlockPassword('');
     }
   };
 
@@ -421,20 +431,37 @@ export default function ConfiguracionPage() {
         <Card className="border-destructive/20 bg-destructive/5 shadow-sm rounded-3xl overflow-hidden lg:col-span-1">
             <CardHeader className="border-b border-destructive/10">
                 <CardTitle className="flex items-center gap-2 text-destructive font-black uppercase text-xs">
-                    <AlertTriangle className="h-4 w-4" /> Mantenimiento Crítico
+                    <AlertTriangle className="h-4 w-4 animate-pulse" /> Mantenimiento Crítico
                 </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-4">
                 <Button 
                     variant="outline" 
-                    onClick={() => setIsResetAlertOpen(true)}
-                    className="w-full justify-start text-destructive border-destructive/20 font-black text-[10px] uppercase h-11 rounded-xl hover:bg-destructive hover:text-white transition-all" 
-                    disabled={!isAdmin || isResetting}
+                    onClick={openResetDialog}
+                    className={cn(
+                        "w-full justify-start font-black text-[10px] uppercase h-11 rounded-xl transition-all",
+                        cardUnlockPassword === 'ARKI2026' 
+                            ? "bg-destructive text-white hover:bg-destructive/90 border-transparent shadow-md" 
+                            : "text-destructive border-destructive/20 hover:bg-destructive/10 bg-transparent cursor-not-allowed"
+                    )}
+                    disabled={!isAdmin || isResetting || cardUnlockPassword !== 'ARKI2026'}
                 >
                     {isResetting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCw className="mr-2 h-4 w-4" />} 
                     REINICIAR SEGUIMIENTO DE VOTACIÓN
                 </Button>
-                <p className="text-[9px] font-bold text-destructive/60 uppercase text-center">
+
+                <div className="space-y-1.5 pt-2 border-t border-destructive/10">
+                    <Label className="text-[8px] font-black uppercase text-destructive/70 tracking-widest block text-center">Contraseña de Habilitación</Label>
+                    <Input 
+                        type="password"
+                        value={cardUnlockPassword}
+                        onChange={(e) => setCardUnlockPassword(e.target.value)}
+                        placeholder="INGRESA CLAVE DE DESBLOQUEO"
+                        className="font-black h-10 text-center text-[10px] uppercase tracking-widest bg-white border-destructive/10 text-destructive placeholder:text-destructive/30 rounded-xl"
+                    />
+                </div>
+
+                <p className="text-[9px] font-bold text-destructive/60 uppercase text-center leading-normal">
                     ESTA ACCIÓN BORRARÁ TODAS LAS MARCAS DE "YA VOTÓ" DEL DÍA D, REESTABLECIENDO EL PADRÓN A ESTADO PENDIENTE.
                 </p>
             </CardContent>
@@ -445,22 +472,23 @@ export default function ConfiguracionPage() {
         <AlertDialogContent className="rounded-[2rem]">
             <AlertDialogHeader>
                 <AlertDialogTitle className="font-black uppercase tracking-tight text-xl flex items-center gap-3">
-                    <AlertTriangle className="h-6 w-6 text-destructive" />
+                    <AlertTriangle className="h-6 w-6 text-destructive animate-pulse" />
                     ¿Confirmar Reinicio de Seguimiento?
                 </AlertDialogTitle>
-                <AlertDialogDescription className="font-bold text-sm uppercase leading-relaxed pt-2">
+                <AlertDialogDescription className="font-bold text-sm uppercase leading-relaxed pt-2 text-slate-600">
                     Estás a punto de eliminar <strong>TODAS LAS MARCAS DE PARTICIPACIÓN</strong> registradas. 
                     <br/><br/>
                     Esto reestablecerá el control de asistencia a las mesas para una nueva jornada electoral.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
+            <AlertDialogFooter className="gap-2 pt-4 border-t border-slate-100 mt-2">
                 <AlertDialogCancel className="font-black uppercase text-[10px] h-11 rounded-xl">CANCELAR</AlertDialogCancel>
                 <AlertDialogAction 
                     onClick={handleResetVotes} 
-                    className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] h-11 px-8 rounded-xl shadow-lg"
+                    className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] h-11 px-8 rounded-xl shadow-lg flex items-center gap-2"
+                    disabled={isResetting}
                 >
-                    {isResetting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />} 
+                    {isResetting ? <Loader2 className="animate-spin h-4 w-4" /> : <Trash2 className="h-4 w-4" />} 
                     REINICIAR AHORA
                 </AlertDialogAction>
             </AlertDialogFooter>

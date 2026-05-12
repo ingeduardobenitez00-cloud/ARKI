@@ -69,11 +69,11 @@ interface Elector {
 }
 
 const EVENT_TEMPLATES = {
-    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a participar de nuestra REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a una CENA de confraternidad con el equipo. ¡No faltes!\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nEstaremos realizando una CAMINATA en tu zona. ¡Súmate al equipo del Arki!\n\n¡Contamos con tu apoyo! 🔴🚀",
-    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nGran jornada de PEGATINA. Vení a ponerle color a la ciudad.\n\n¡Contamos con tu apoyo! 🔴🚀",
-    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nDesde el equipo de la Lista 2P te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉\n\n¡Que pases un excelente día! 🔴🚀"
+    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestra gran REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🚀",
+    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a compartir una CENA de confraternidad con todo el equipo. ¡Será un gusto conversar contigo!\n\n¡Contamos con tu apoyo! 🚀",
+    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nEstaremos realizando una gran CAMINATA en tu zona. ¡Súmate a la marea roja para conocernos mejor!\n\n¡Contamos con tu apoyo! 🚀",
+    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nGran jornada de PEGATINA en la ciudad. ¡Vení a ponerle color y alegría a nuestro proyecto!\n\n¡Contamos con tu apoyo! 🚀",
+    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\n¡Hoy es un día especial! Desde el equipo de la Lista 2P te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉 Que pases un excelente día. ¡Un gran abrazo! 🚀"
 };
 
 const MESES = [
@@ -151,7 +151,7 @@ export default function DifusionMasivaPage() {
     const [phonePreference, setPhonePreference] = useState<'REGISTRADO' | 'MIGRADO' | 'INTELIGENTE'>('INTELIGENTE');
 
     const [invitationTemplate, setInvitationTemplate] = useState(
-        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe invitamos a participar de nuestras actividades políticas de la semana.\n\n¡Contamos con tu apoyo! 🔴🚀"
+        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
     );
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
