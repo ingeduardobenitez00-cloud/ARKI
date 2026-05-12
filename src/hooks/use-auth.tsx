@@ -64,9 +64,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             permissions = userRoles[userData.role]?.permissions || [];
           }
           
-          const mandatory = ['/', '/perfil'];
+           const mandatory = ['/', '/perfil'];
           if (userData.role === 'Admin' || userData.role === 'Super-Admin') {
             mandatory.push('/laboratorio-qr', '/admin/config-setup');
+          }
+          if (['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'].includes(userData.role || '')) {
+            mandatory.push('/migrar-votos');
           }
           mandatory.forEach(p => {
               if (!permissions.includes(p)) permissions.push(p);

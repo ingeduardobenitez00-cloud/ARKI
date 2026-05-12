@@ -40,6 +40,7 @@ export const allMenuItems = [
   { href: '/consulta', label: 'Registra Votos', icon: FileSearch, tooltip: 'BUSCA ELECTORES Y MARCA SU VOTO COMO SEGURO.' },
   { href: '/telefonos', label: 'Actualizar Teléfonos', icon: Phone, tooltip: 'AGREGA O ACTUALIZA LOS NÚMEROS DE TELÉFONO DE LOS EMPADRONADOS.' },
   { href: '/migrar-celulares', label: 'Migrar Celulares', icon: FileSpreadsheet, tooltip: 'MIGRA NÚMEROS DE CELULARES DESDE EXCEL AL PADRÓN NACIONAL Y COMPENDIO.' },
+  { href: '/migrar-votos', label: 'Migrar Votos Seguros', icon: FileSpreadsheet, tooltip: 'MIGRA VOTOS SEGUROS DESDE EXCEL DE FORMA MASIVA ASOCIANDO OPERADORES.' },
   { href: '/biblioteca', label: 'Biblioteca Multimedia', icon: Film, tooltip: 'GESTIONA LA BIBLIOTECA DE IMÁGENES Y VIDEOS DEL SISTEMA.' },
   { href: '/difusion', label: 'Difusión WhatsApp', icon: MessageSquare, tooltip: 'ENVÍA INVITACIONES, VIDEOS Y FLYERS PERSONALIZADOS POR WHATSAPP.' },
   { href: '/difusion-masiva', label: 'Co-Piloto Masivo', icon: Share2, tooltip: 'ENVÍA CAMPAÑAS EN AUTOMÁTICO REUTILIZANDO PESTAÑAS (ANTI-BAN).' },
@@ -85,7 +86,7 @@ export const menuCategories = [
   {
     label: 'Carga de Votos Seguros',
     icon: Database,
-    items: ['/consulta', '/voto-seguro']
+    items: ['/consulta', '/voto-seguro', '/migrar-votos']
   },
   {
     label: 'Comunicación',
@@ -120,10 +121,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']

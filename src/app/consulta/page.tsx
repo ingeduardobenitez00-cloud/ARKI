@@ -3,6 +3,7 @@
 
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -27,7 +28,8 @@ import {
     Eye,
     Share2,
     MessageSquare,
-    Users
+    Users,
+    FileSpreadsheet
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -546,7 +548,20 @@ export default function ConsultaPage() {
                         </p>
                     </div>
                 </div>
-                <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black px-4 py-2 text-xs">{registeredList.length} CAPTURAS ACTIVAS</Badge>
+                <div className="flex items-center gap-3">
+                    {['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'].includes(user?.role || '') && (
+                        <Link href="/migrar-votos">
+                            <Button 
+                                variant="outline" 
+                                className="font-black uppercase text-[10px] h-9 border-primary/20 hover:bg-primary/5 text-primary flex items-center gap-1.5"
+                            >
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Migrar desde Excel
+                            </Button>
+                        </Link>
+                    )}
+                    <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black px-4 py-2 text-xs">{registeredList.length} CAPTURAS ACTIVAS</Badge>
+                </div>
             </div>
 
             {listError && (
