@@ -1151,45 +1151,6 @@ export default function DifusionPage() {
                                                 </div>
                                             </div>
 
-                                            {/* Selección de Flyer Individual */}
-                                            <div className="space-y-1.5 text-left">
-                                                <Label className="text-[8px] font-black uppercase text-slate-400">Folleto Multimedia</Label>
-                                                
-                                                {/* Previsualización del folleto individual */}
-                                                {sidebarFlyerId !== 'NONE' && (
-                                                    <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-primary/10 bg-slate-100 flex items-center justify-center animate-in zoom-in-95 duration-200">
-                                                        {isSidebarFlyerLoading ? (
-                                                            <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                                                        ) : sidebarFlyer ? (
-                                                            sidebarFlyer.type === 'video' ? (
-                                                                <div className="flex flex-col items-center gap-1">
-                                                                    <Film className="h-6 w-6 text-primary" />
-                                                                    <span className="text-[9px] font-black uppercase text-slate-500">Video: {sidebarFlyer.name}</span>
-                                                                </div>
-                                                            ) : (
-                                                                <img src={sidebarFlyer.url} alt="Vista previa" className="w-full h-full object-contain" />
-                                                            )
-                                                        ) : (
-                                                            <span className="text-[9px] font-bold text-red-500 uppercase">⚠️ Error al cargar recurso</span>
-                                                        )}
-                                                    </div>
-                                                )}
-
-                                                <Select value={sidebarFlyerId} onValueChange={setSidebarFlyerId}>
-                                                    <SelectTrigger className="h-9 text-[10px] font-bold rounded-xl bg-white border-primary/10">
-                                                        <SelectValue placeholder="Sin folleto (Solo Texto)" />
-                                                    </SelectTrigger>
-                                                    <SelectContent className="z-[2000]">
-                                                        <SelectItem value="NONE" className="text-xs font-bold uppercase text-slate-400">Sin folleto (Solo Texto)</SelectItem>
-                                                        {availableFlyers?.map(f => (
-                                                            <SelectItem key={f.id} value={f.id} className="text-xs font-bold uppercase">
-                                                                {f.name} ({f.type === 'video' ? '📽️' : '🖼️'})
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-
                                             {/* Texto del mensaje personalizado */}
                                             <div className="space-y-1 text-left">
                                                 <div className="flex items-center justify-between">
@@ -1216,31 +1177,11 @@ export default function DifusionPage() {
                                                 {sidebarPhone.trim().length >= 6 ? (
                                                     <Button 
                                                         size="sm" 
-                                                        onClick={() => {
-                                                            if (sidebarFlyerId !== 'NONE') {
-                                                                handleShareSidebarMedia(selectedSidebarElector, sidebarPhone);
-                                                            } else {
-                                                                handleSendSidebarWhatsApp(selectedSidebarElector, sidebarPhone);
-                                                            }
-                                                        }}
-                                                        disabled={isSharingMedia[selectedSidebarElector.id]}
-                                                        className={cn(
-                                                            "h-10 text-[10px] font-black rounded-xl shadow-sm uppercase flex items-center justify-center gap-1.5 text-white transition-all",
-                                                            sidebarFlyerId !== 'NONE' 
-                                                                ? "bg-indigo-600 hover:bg-indigo-700" 
-                                                                : "bg-green-500 hover:bg-green-600"
-                                                        )}
+                                                        onClick={() => handleSendSidebarWhatsApp(selectedSidebarElector, sidebarPhone)}
+                                                        className="h-10 text-[10px] font-black rounded-xl shadow-sm uppercase flex items-center justify-center gap-1.5 text-white bg-green-500 hover:bg-green-600 transition-all"
                                                     >
-                                                        {isSharingMedia[selectedSidebarElector.id] ? (
-                                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                                        ) : (
-                                                            <MessageSquare className={cn("h-4 w-4 fill-white", sidebarFlyerId !== 'NONE' ? "text-indigo-600" : "text-green-500")} />
-                                                        )}
-                                                        {isSharingMedia[selectedSidebarElector.id] 
-                                                            ? 'ENVIANDO...' 
-                                                            : sidebarFlyerId !== 'NONE' 
-                                                                ? 'ENVIAR DATOS + FOLLETO' 
-                                                                : 'ENVIAR DATOS (SOLO TEXTO)'}
+                                                        <MessageSquare className="h-4 w-4 fill-white animate-pulse" />
+                                                        ENVIAR DATOS (SOLO TEXTO)
                                                     </Button>
                                                 ) : (
                                                     <p className="text-[8px] font-bold text-red-500 uppercase text-center py-1">⚠️ Registra un teléfono para enviar</p>
