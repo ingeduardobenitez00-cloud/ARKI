@@ -575,6 +575,7 @@ export default function DifusionPage() {
     };
 
     // Sequential batch sender trigger!
+    // Sequential batch sender trigger! Always text-only (no multimedia) as per user preference
     const handleTriggerNextAssistant = async () => {
         if (!nextElectorToProcess) {
             toast({ title: 'No hay más electores pendientes.' });
@@ -596,26 +597,13 @@ export default function DifusionPage() {
             return;
         }
 
-        // If media flyer is selected, use navigator.share trigger
-        if (currentFlyer) {
-            const shared = await handleShareMediaDirect(p, targetPhone);
-            if (shared) {
-                const nextCount = batchSentCount + 1;
-                setBatchSentCount(nextCount);
-                if (nextCount >= batchSize) {
-                    setIsBatchActive(false);
-                    setShowBatchCompletedAlert(true);
-                }
-            }
-        } else {
-            // Text only prefilled redirect trigger
-            handleSendWhatsApp(p, targetPhone);
-            const nextCount = batchSentCount + 1;
-            setBatchSentCount(nextCount);
-            if (nextCount >= batchSize) {
-                setIsBatchActive(false);
-                setShowBatchCompletedAlert(true);
-            }
+        // Text only prefilled redirect trigger (fast and direct, avoids tedious OS share sheets)
+        handleSendWhatsApp(p, targetPhone);
+        const nextCount = batchSentCount + 1;
+        setBatchSentCount(nextCount);
+        if (nextCount >= batchSize) {
+            setIsBatchActive(false);
+            setShowBatchCompletedAlert(true);
         }
     };
 
@@ -1720,8 +1708,8 @@ export default function DifusionPage() {
                         disabled={!nextElectorToProcess}
                         className="h-12 w-full font-black text-xs uppercase bg-green-600 hover:bg-green-700 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg"
                     >
-                        {currentFlyer ? <Share2 className="h-4 w-4" /> : <MessageSquare className="h-4 w-4 fill-white" />}
-                        {currentFlyer ? 'COMPARTIR MULTIMEDIA' : 'DISPARAR WHATSAPP'}
+                        <MessageSquare className="h-4 w-4 fill-white" />
+                        DISPARAR WHATSAPP (SOLO TEXTO)
                     </Button>
                 </div>
             )}
