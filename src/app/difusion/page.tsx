@@ -64,6 +64,9 @@ interface Elector {
     ORDEN?: string | number;
     CODIGO_SEC?: string | number;
     FECHA_NACI?: string | number;
+    DIFUNDIDO?: boolean;
+    difundidoAt?: string;
+    difundidoBy?: string;
 }
 
 const EVENT_TEMPLATES = {
@@ -423,12 +426,21 @@ export default function DifusionPage() {
 
     // Computed: The absolute next unprocessed contact in the queue list
     const nextElectorToProcess = useMemo(() => {
-        return activeQueue.find(e => !processedIds.has(e.id));
+        return activeQueue.find(e => !processedIds.has(e.id) && !e.DIFUNDIDO);
     }, [activeQueue, processedIds]);
 
     // Formats, records local logs, and issues native api.whatsapp.com redirect
-    const handleSendWhatsApp = (p: Elector, targetPhone: string) => {
+    const handleSendWhatsApp = (p: Elector, targetPhone: string, skipConfirm = false) => {
         if (!targetPhone || !user) return;
+
+        if (!skipConfirm) {
+            const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
+            if (isAlreadySent) {
+                const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
+                if (!confirmRes) return;
+            }
+        }
+
         let msg = resolveSpintax(invitationTemplate);
         msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
                  .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
@@ -445,6 +457,23 @@ export default function DifusionPage() {
         nextSet.add(p.id);
         setProcessedIds(nextSet);
         sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+
+        // Update local state directly so UI reacts instantly
+        const nowStr = new Date().toISOString();
+        if (activeTab === 'padron') {
+            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+        }
+        
+        // Update Firestore permanently!
+        if (db) {
+            const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+            const electorRef = doc(db, collectionName, p.id);
+            updateDoc(electorRef, {
+                DIFUNDIDO: true,
+                difundidoAt: nowStr,
+                difundidoBy: user.name
+            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+        }
         
         if (db) {
             logAction(db, {
@@ -463,6 +492,13 @@ export default function DifusionPage() {
     // Invokes native Android / iOS share sheets for media sending
     const handleShareMediaDirect = async (p: Elector, targetPhone: string): Promise<boolean> => {
         if (!targetPhone || !currentFlyer || !user) return false;
+
+        const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
+        if (isAlreadySent) {
+            const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
+            if (!confirmRes) return false;
+        }
+
         const personId = p.id;
         setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
 
@@ -495,6 +531,23 @@ export default function DifusionPage() {
                 setProcessedIds(nextSet);
                 sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
 
+                // Update local state directly so UI reacts instantly
+                const nowStr = new Date().toISOString();
+                if (activeTab === 'padron') {
+                    setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+                }
+
+                // Update Firestore permanently!
+                if (db) {
+                    const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+                    const electorRef = doc(db, collectionName, p.id);
+                    updateDoc(electorRef, {
+                        DIFUNDIDO: true,
+                        difundidoAt: nowStr,
+                        difundidoBy: user.name
+                    }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+                }
+
                 logAction(db!, { 
                     userId: user.id, 
                     userName: user.name, 
@@ -509,7 +562,7 @@ export default function DifusionPage() {
                 link.href = currentFlyer.url;
                 link.download = `${currentFlyer.name}.${extension}`;
                 link.click();
-                handleSendWhatsApp(p, targetPhone);
+                handleSendWhatsApp(p, targetPhone, true);
                 return true;
             }
         } catch (e) {
@@ -633,6 +686,10 @@ export default function DifusionPage() {
     };
 
     const handleSelectFlyer = async (id: string) => {
+        if (id === 'NONE') {
+            setCurrentFlyer(null);
+            return;
+        }
         setIsLoading(true);
         const flyer = await fetchAndReconstructFlyer(id);
         if (flyer) {
@@ -791,8 +848,17 @@ export default function DifusionPage() {
         }
     };
 
-    const handleSendSidebarWhatsApp = (p: Elector, targetPhone: string) => {
+    const handleSendSidebarWhatsApp = (p: Elector, targetPhone: string, skipConfirm = false) => {
         if (!targetPhone || !user) return;
+
+        if (!skipConfirm) {
+            const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
+            if (isAlreadySent) {
+                const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
+                if (!confirmRes) return;
+            }
+        }
+
         const finalPhone = formatParaguayPhone(targetPhone);
         
         // Agregar a procesados/historial
@@ -801,6 +867,23 @@ export default function DifusionPage() {
         setProcessedIds(nextSet);
         sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
         
+        const nowStr = new Date().toISOString();
+        if (activeTab === 'padron') {
+            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+        }
+        setSidebarSearchResults(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+        setSelectedSidebarElector(prev => prev && prev.id === p.id ? { ...prev, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : prev);
+
+        // Update Firestore permanently!
+        if (db) {
+            const electorRef = doc(db, 'sheet1', p.id);
+            updateDoc(electorRef, {
+                DIFUNDIDO: true,
+                difundidoAt: nowStr,
+                difundidoBy: user.name
+            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+        }
+
         if (db) {
             logAction(db, {
                 userId: user.id,
@@ -816,9 +899,15 @@ export default function DifusionPage() {
 
     const handleShareSidebarMedia = async (p: Elector, targetPhone: string) => {
         if (!targetPhone || !user) return;
+
+        const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
+        if (isAlreadySent) {
+            const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
+            if (!confirmRes) return;
+        }
         
         if (sidebarFlyerId === 'NONE') {
-            handleSendSidebarWhatsApp(p, targetPhone);
+            handleSendSidebarWhatsApp(p, targetPhone, true);
             return;
         }
 
@@ -850,6 +939,23 @@ export default function DifusionPage() {
                 setProcessedIds(nextSet);
                 sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
                 
+                const nowStr = new Date().toISOString();
+                if (activeTab === 'padron') {
+                    setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+                }
+                setSidebarSearchResults(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+                setSelectedSidebarElector(prev => prev && prev.id === p.id ? { ...prev, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : prev);
+
+                // Update Firestore permanently!
+                if (db) {
+                    const electorRef = doc(db, 'sheet1', p.id);
+                    updateDoc(electorRef, {
+                        DIFUNDIDO: true,
+                        difundidoAt: nowStr,
+                        difundidoBy: user.name
+                    }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+                }
+
                 logAction(db!, { 
                     userId: user.id, 
                     userName: user.name, 
@@ -867,7 +973,7 @@ export default function DifusionPage() {
                 link.href = flyer.url;
                 link.download = `${flyer.name}.${extension}`;
                 link.click();
-                handleSendSidebarWhatsApp(p, targetPhone);
+                handleSendSidebarWhatsApp(p, targetPhone, true);
             }
         } catch (e) {
             console.error(e);
@@ -1214,9 +1320,12 @@ export default function DifusionPage() {
                                         </div>
                                     </div>
                                 )}
-                                <Select value={currentFlyer?.id || ''} onValueChange={handleSelectFlyer}>
+                                <Select value={currentFlyer?.id || 'NONE'} onValueChange={handleSelectFlyer}>
                                     <SelectTrigger className="h-10 text-[10px] font-bold rounded-xl"><SelectValue placeholder="Elegir recurso..." /></SelectTrigger>
-                                    <SelectContent>{availableFlyers?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent>
+                                        <SelectItem value="NONE" className="text-xs font-bold uppercase text-slate-400">Sin folleto (Solo Texto)</SelectItem>
+                                        {availableFlyers?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
+                                    </SelectContent>
                                 </Select>
                                 <Label htmlFor="dif-upload" className="cursor-pointer block">
                                     <div className="h-10 border border-dashed border-primary/30 rounded-xl flex items-center justify-center text-[10px] font-black hover:bg-primary/5 transition-colors text-primary">
@@ -1384,6 +1493,7 @@ export default function DifusionPage() {
                                         <TableHead className="pl-4 sm:pl-6">Elector / Identidad</TableHead>
                                         <TableHead>WhatsApp Registrado</TableHead>
                                         <TableHead>WhatsApp Migrado</TableHead>
+                                        <TableHead>Difusión</TableHead>
                                         <TableHead className="text-right pr-4 sm:pr-6">Acción Individual</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -1391,7 +1501,7 @@ export default function DifusionPage() {
                                     {((activeTab === 'padron' && isLoading) || (activeTab === 'votos' && isLoadingVotos)) ? (
                                         Array.from({ length: 8 }).map((_, i) => (
                                             <TableRow key={i}>
-                                                <TableCell colSpan={4} className="px-6 py-4">
+                                                <TableCell colSpan={5} className="px-6 py-4">
                                                     <Skeleton className="h-12 w-full rounded-lg" />
                                                 </TableCell>
                                             </TableRow>
@@ -1399,7 +1509,7 @@ export default function DifusionPage() {
                                     ) : (
                                         activeQueue.length > 0 ? (
                                             activeQueue.map((p, index) => {
-                                                const isSent = processedIds.has(p.id);
+                                                const isSent = processedIds.has(p.id) || p.DIFUNDIDO;
                                                 const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
                                                 const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
 
@@ -1420,11 +1530,6 @@ export default function DifusionPage() {
                                                                     isSent ? "text-slate-700" : "text-slate-800"
                                                                 )}>
                                                                     {p.NOMBRE} {p.APELLIDO}
-                                                                    {isSent && (
-                                                                        <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 animate-pulse">
-                                                                            <CheckCircle className="h-2.5 w-2.5 fill-white text-emerald-600" /> ENVIADO
-                                                                        </Badge>
-                                                                    )}
                                                                 </span>
                                                                 <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
                                                                 {includeVotingData && (
@@ -1486,9 +1591,26 @@ export default function DifusionPage() {
                                                                 </div>
                                                             )}
                                                         </TableCell>
+                                                        <TableCell>
+                                                            {isSent ? (
+                                                                <div className="flex flex-col gap-0.5">
+                                                                    <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 w-fit animate-pulse">
+                                                                        <CheckCircle className="h-2.5 w-2.5 fill-white text-emerald-600" /> ENVIADO
+                                                                    </Badge>
+                                                                    {p.difundidoBy && (
+                                                                        <span className="text-[7px] text-muted-foreground font-black uppercase ml-1">
+                                                                            Por: {p.difundidoBy} {p.difundidoAt ? `• ${new Date(p.difundidoAt).toLocaleDateString()}` : ''}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            ) : (
+                                                                <Badge variant="secondary" className="bg-slate-200 text-slate-500 hover:bg-slate-200 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 w-fit">
+                                                                    PENDIENTE
+                                                                </Badge>
+                                                            )}
+                                                        </TableCell>
                                                         <TableCell className="text-right pr-4 sm:pr-6">
                                                             <div className="flex justify-end items-center gap-1.5 sm:gap-2">
-                                                                
                                                                 {/* Native Share button (downloads flyer & opens Android/iOS native sharing sheet) */}
                                                                 {currentFlyer && (hasPhone || hasPhoneMig) && (
                                                                     <Button
@@ -1530,7 +1652,7 @@ export default function DifusionPage() {
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={4} className="h-96 text-center opacity-20">
+                                                <TableCell colSpan={5} className="h-96 text-center opacity-20">
                                                     <Filter className="h-20 w-20 mx-auto mb-4 text-primary" />
                                                     <p className="font-black text-sm uppercase tracking-[0.3em]">
                                                         {activeTab === 'padron' ? 'Esperando Selección de Seccional' : 'Sin Votos Seguros Registrados'}

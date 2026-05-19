@@ -66,6 +66,9 @@ interface Elector {
     ORDEN?: string | number;
     CODIGO_SEC?: string | number;
     FECHA_NACI?: string | number;
+    DIFUNDIDO?: boolean;
+    difundidoAt?: string;
+    difundidoBy?: string;
 }
 
 const EVENT_TEMPLATES = {
@@ -497,8 +500,8 @@ export default function DifusionMasivaPage() {
             return;
         }
 
-        // If already processed, skip immediately to the next one
-        if (processedIds.has(p.id)) {
+        // If already processed or sent in database, skip immediately to the next one
+        if (processedIds.has(p.id) || p.DIFUNDIDO) {
             setCoPilotIndex(index + 1);
             return;
         }
@@ -535,28 +538,44 @@ export default function DifusionMasivaPage() {
         // 2. Play warning alert audio beep
         playBeep();
 
-        // 3. Load payload to clipboard (Image/Video + Caption message)
-        const copied = await copyToClipboard(msg, currentFlyer?.url);
+        // 3. Load payload to clipboard (Text message only)
+        const copied = await copyToClipboard(msg);
         if (copied) {
             toast({ 
                 title: `Portapapeles Cargado: ${p.NOMBRE}`, 
-                description: 'Presiona Ctrl + V en WhatsApp para pegar la imagen con el texto.',
+                description: 'Texto copiado al portapapeles.',
                 variant: 'default'
             });
         }
 
         // 4. Open/Refresh WhatsApp Web tab using named Window Reuse strategy (zero clutter!)
         const finalPhone = formatParaguayPhone(targetPhone);
-        const flyerUrlParam = currentFlyer?.url ? `&arki_flyer_url=${encodeURIComponent(currentFlyer.url)}` : '';
         const captionParam = msg ? `&text=${encodeURIComponent(msg)}` : '';
         const autoSendParam = '&arki_auto_send=true';
-        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}${captionParam}${flyerUrlParam}${autoSendParam}`, 'arki_co_pilot_tab');
+        window.open(`https://web.whatsapp.com/send?phone=${finalPhone}${captionParam}${autoSendParam}`, 'arki_co_pilot_tab');
 
         // 5. Mark as processed & sync local log
         const nextProcessed = new Set(processedIds);
         nextProcessed.add(p.id);
         setProcessedIds(nextProcessed);
         sessionStorage.setItem('wa_copilot_processed_ids', JSON.stringify(Array.from(nextProcessed)));
+
+        // Update local list state so it syncs immediately
+        const nowStr = new Date().toISOString();
+        if (activeTab === 'padron') {
+            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+        }
+
+        // Update Firestore permanently!
+        if (db) {
+            const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+            const electorRef = doc(db, collectionName, p.id);
+            updateDoc(electorRef, {
+                DIFUNDIDO: true,
+                difundidoAt: nowStr,
+                difundidoBy: user.name
+            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+        }
 
         // Audit log action
         if (db && user) {
@@ -596,7 +615,7 @@ export default function DifusionMasivaPage() {
             setCoPilotIndex(prev => prev + 1);
         }, actualDelay * 1000);
 
-    }, [queue, processedIds, selectedElectorIds, coPilotDelay, useVariability, phonePreference, invitationTemplate, includeVotingData, currentFlyer, playBeep, resolveSpintax, db, user]);
+    }, [queue, processedIds, selectedElectorIds, coPilotDelay, useVariability, phonePreference, invitationTemplate, includeVotingData, playBeep, resolveSpintax, db, user]);
 
     // Handle play / pause trigger
     useEffect(() => {
@@ -622,6 +641,13 @@ export default function DifusionMasivaPage() {
 
     const handleDirectSend = (p: Elector, targetPhone: string) => {
         if (!targetPhone || !user) return;
+
+        const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
+        if (isAlreadySent) {
+            const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
+            if (!confirmRes) return;
+        }
+
         let msg = resolveSpintax(invitationTemplate);
         msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
                  .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
@@ -638,6 +664,23 @@ export default function DifusionMasivaPage() {
         nextSet.add(p.id);
         setProcessedIds(nextSet);
         sessionStorage.setItem('wa_copilot_processed_ids', JSON.stringify(Array.from(nextSet)));
+
+        // Update local list state so it syncs immediately
+        const nowStr = new Date().toISOString();
+        if (activeTab === 'padron') {
+            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+        }
+
+        // Update Firestore permanently!
+        if (db) {
+            const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+            const electorRef = doc(db, collectionName, p.id);
+            updateDoc(electorRef, {
+                DIFUNDIDO: true,
+                difundidoAt: nowStr,
+                difundidoBy: user.name
+            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+        }
         
         if (db) {
             logAction(db, {
@@ -819,7 +862,7 @@ export default function DifusionMasivaPage() {
                                     <h4 className="text-[9px] font-black uppercase tracking-wider text-blue-400">Instrucciones de Uso</h4>
                                     <p className="text-[8px] font-medium leading-relaxed uppercase">
                                         1. Ten WhatsApp Web abierto a un lado.<br/>
-                                        2. Al sonar el "beep" y actualizarse el chat, haz clic en WhatsApp, presiona <strong className="text-white">Ctrl + V</strong> y <strong className="text-white">Enter</strong>.<br/>
+                                        2. El Co-Piloto cargará el texto y enviará automáticamente el mensaje usando la extensión.<br/>
                                         3. El Co-Piloto pasará automáticamente al siguiente en cola sin que debas hacer nada más.
                                     </p>
                                 </div>
@@ -902,28 +945,7 @@ export default function DifusionMasivaPage() {
                                 </Select>
                             </div>
 
-                            {/* Multimedia selection */}
-                            <div className="space-y-3 p-3 border rounded-2xl bg-muted/20">
-                                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><ImageIcon className="h-3 w-3 text-primary" /> Multimedia a Enviar</Label>
-                                {currentFlyer && (
-                                    <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-primary/10 bg-black/5 flex items-center justify-center group">
-                                        {currentFlyer.type === 'video' ? <Film className="h-8 w-8 text-primary/40" /> : <img src={currentFlyer.url} alt="Preview" className="w-full h-full object-contain" />}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <Badge variant="secondary" className="font-black text-[8px]">{currentFlyer.name}</Badge>
-                                        </div>
-                                    </div>
-                                )}
-                                <Select value={currentFlyer?.id || ''} onValueChange={handleSelectFlyer}>
-                                    <SelectTrigger className="h-9 text-[10px] font-bold rounded-lg"><SelectValue placeholder="Elegir recurso..." /></SelectTrigger>
-                                    <SelectContent>{availableFlyers?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}</SelectContent>
-                                </Select>
-                                <Label htmlFor="dif-upload" className="cursor-pointer block">
-                                    <div className="h-9 border border-dashed border-primary/30 rounded-lg flex items-center justify-center text-[10px] font-black hover:bg-primary/5 transition-colors text-primary">
-                                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1.5"/>} SUBIR ARCHIVO
-                                    </div>
-                                </Label>
-                                <input id="dif-upload" type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} disabled={isUploading} />
-                            </div>
+                            {/* Multimedia removed to ensure reliable text bulk-sending */}
 
                             {/* Search Trigger Panel */}
                             <div className="space-y-3 pt-2 border-t">
@@ -1037,7 +1059,7 @@ export default function DifusionMasivaPage() {
                                             className="border-slate-300"
                                         />
                                     </TableHead>
-                                    <TableHead className="pl-2 w-[80px]">Cola</TableHead>
+                                    <TableHead className="pl-2 w-[120px]">Difusión</TableHead>
                                     <TableHead>Elector / Identidad</TableHead>
                                     <TableHead>WhatsApp Registrado</TableHead>
                                     <TableHead>WhatsApp Migrado</TableHead>
@@ -1057,7 +1079,7 @@ export default function DifusionMasivaPage() {
                                     queue.length > 0 ? (
                                         queue.map((p, index) => {
                                             const isCurrentlyProcessing = isCoPilotRunning && coPilotIndex === index;
-                                            const isSent = processedIds.has(p.id);
+                                            const isSent = processedIds.has(p.id) || p.DIFUNDIDO;
                                             const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
                                             const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
 
@@ -1083,11 +1105,23 @@ export default function DifusionMasivaPage() {
                                                         {isCurrentlyProcessing ? (
                                                             <Badge className="bg-primary hover:bg-primary font-black text-[9px] animate-bounce">ACTIVO</Badge>
                                                         ) : isSent ? (
-                                                            <Badge variant="secondary" className="bg-green-100 text-green-800 hover:bg-green-100 font-black text-[9px] flex items-center gap-1 w-max">
-                                                                <CheckCircle className="h-3 w-3 text-green-700" /> ENVIADO
-                                                            </Badge>
+                                                            <div className="flex flex-col gap-0.5">
+                                                                <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 w-fit animate-pulse">
+                                                                    <CheckCircle className="h-2.5 w-2.5 fill-white text-emerald-600" /> ENVIADO
+                                                                </Badge>
+                                                                {p.difundidoBy && (
+                                                                    <span className="text-[7px] text-muted-foreground font-black uppercase ml-1">
+                                                                        Por: {p.difundidoBy} {p.difundidoAt ? `• ${new Date(p.difundidoAt).toLocaleDateString()}` : ''}
+                                                                    </span>
+                                                                )}
+                                                            </div>
                                                         ) : (
-                                                            <span className="text-[10px] font-black text-muted-foreground ml-2">#{index + 1}</span>
+                                                            <div className="flex items-center gap-1.5 animate-none">
+                                                                <Badge variant="secondary" className="bg-slate-200 text-slate-500 hover:bg-slate-200 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 w-fit">
+                                                                    PENDIENTE
+                                                                </Badge>
+                                                                <span className="text-[10px] font-black text-muted-foreground">#{index + 1}</span>
+                                                            </div>
                                                         )}
                                                     </TableCell>
                                                     <TableCell>
@@ -1216,26 +1250,7 @@ export default function DifusionMasivaPage() {
                 </div>
             </div>
 
-            {/* Media Upload Identifying Name Dialog */}
-            <Dialog open={isNameDialogOpen} onOpenChange={setIsNameDialogOpen}>
-                <DialogContent className="sm:max-w-md rounded-3xl">
-                    <div className="p-6">
-                        <h2 className="text-xl font-black uppercase tracking-tight flex items-center gap-3 mb-6"><Type className="h-6 w-6 text-primary" /> Identificar Multimedia</h2>
-                        <div className="space-y-5">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre del Recurso</Label>
-                                <Input value={newImageName} onChange={(e) => setNewImageName(e.target.value.toUpperCase())} className="font-bold uppercase h-12 rounded-xl" autoFocus />
-                            </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <Button variant="outline" onClick={() => setIsNameDialogOpen(false)} className="font-black uppercase text-xs h-11 rounded-xl">CANCELAR</Button>
-                                <Button onClick={confirmUpload} disabled={!newImageName.trim() || isUploading} className="font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg">
-                                    {isUploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} GUARDAR EN BIBLIOTECA
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+
 
             <div className="text-center pt-10 opacity-40">
                 <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-900">
