@@ -274,7 +274,7 @@ export default function DifusionPage() {
         if (saved) { try { setProcessedIds(new Set(JSON.parse(saved))); } catch (e) {} }
 
         if (user && !isAdmin && user.seccional) { setSelectedSeccional(user.seccional); }
-    }, [db, user, isAdmin, fetchAndReconstructFlyer, base64ToBlobUrl]);
+    }, [db, user, isAdmin]);
 
     // Fin de efectos
 
@@ -451,18 +451,7 @@ export default function DifusionPage() {
             .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); setEditingField(null); });
     };
 
-    const handleSelectFlyer = async (id: string) => {
-        if (id === 'NONE') {
-            setCurrentFlyer(null);
-            return;
-        }
-        setIsLoading(true);
-        const flyer = await fetchAndReconstructFlyer(id);
-        if (flyer) {
-            setCurrentFlyer(flyer);
-        }
-        setIsLoading(false);
-    };
+
 
     // Traer el nombre de pila y el primer apellido
     const getFormattedSidebarName = (e: Elector) => {
@@ -780,7 +769,7 @@ export default function DifusionPage() {
                                                     onClick={() => {
                                                         setSelectedSidebarElector(e);
                                                         setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
-                                                        setSidebarFlyerId(currentFlyer?.id || 'NONE');
+
                                                         setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
                                                     }}
                                                     className={cn(

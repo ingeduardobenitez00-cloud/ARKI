@@ -59,3 +59,15 @@
 ::-webkit-scrollbar-thumb:hover {
   background: #cbd5e1;
 }
+
+/* Textarea Resizer Ampliado para mejor agarre en móvil/PC */
+textarea::-webkit-resizer {
+  background-color: transparent;
+  border: 16px solid transparent;
+  border-right-color: #cbd5e1;
+  border-bottom-color: #cbd5e1;
+}
+textarea:hover::-webkit-resizer {
+  border-right-color: #94a3b8;
+  border-bottom-color: #94a3b8;
+}
