@@ -59,6 +59,7 @@ interface Elector {
     APELLIDO: string;
     TELEFONO?: string;
     TELEFONO_MIGRADO?: string;
+    TELEFONO_MIGRADO_2?: string;
     LOCAL?: string;
     MESA?: string | number;
     ORDEN?: string | number;
@@ -148,7 +149,7 @@ export default function DifusionPage() {
     const [birthdayDay, setBirthdayDay] = useState('ALL');
 
     const [editingPhoneId, setEditingPhoneId] = useState<string | null>(null);
-    const [editingField, setEditingField] = useState<'TELEFONO' | 'TELEFONO_MIGRADO' | null>(null);
+    const [editingField, setEditingField] = useState<'TELEFONO' | 'TELEFONO_MIGRADO' | 'TELEFONO_MIGRADO_2' | null>(null);
     const [tempPhone, setTempPhone] = useState('');
     const [isSavingPhone, setIsSavingPhone] = useState(false);
 
@@ -410,8 +411,8 @@ export default function DifusionPage() {
         }
 
         const p = nextElectorToProcess;
-        // Prefer manual registered phone first, fallback to Excel migrated
-        const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
+        // Prefer manual registered phone first, fallback to Excel migrated 1, then migrated 2
+        const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || p.TELEFONO_MIGRADO_2 || '';
         
         if (!targetPhone || targetPhone.trim().length < 6) {
             // No phone, skip this contact by adding to processed list automatically
@@ -433,7 +434,7 @@ export default function DifusionPage() {
         }
     };
 
-    const savePhoneEdit = (phoneType: 'TELEFONO' | 'TELEFONO_MIGRADO') => {
+    const savePhoneEdit = (phoneType: 'TELEFONO' | 'TELEFONO_MIGRADO' | 'TELEFONO_MIGRADO_2') => {
         if (!editingPhoneId || !db || !user) return;
         setIsSavingPhone(true);
         const data = { [phoneType]: tempPhone };
@@ -567,7 +568,7 @@ export default function DifusionPage() {
                 if (foundResults.length === 1) {
                     const e = foundResults[0];
                     setSelectedSidebarElector(e);
-                    setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
+                    setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || e.TELEFONO_MIGRADO_2 || '');
 
                     setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
                 }
@@ -768,7 +769,7 @@ export default function DifusionPage() {
                                                     key={e.id} 
                                                     onClick={() => {
                                                         setSelectedSidebarElector(e);
-                                                        setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
+                                                        setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || e.TELEFONO_MIGRADO_2 || '');
 
                                                         setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
                                                     }}
@@ -1080,7 +1081,8 @@ export default function DifusionPage() {
                                     <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
                                         <TableHead className="pl-4 sm:pl-6">Elector / Identidad</TableHead>
                                         <TableHead>WhatsApp Registrado</TableHead>
-                                        <TableHead>WhatsApp Migrado</TableHead>
+                                        <TableHead>WhatsApp Migrado 1</TableHead>
+                                        <TableHead>WhatsApp Migrado 2</TableHead>
                                         <TableHead>Difusión</TableHead>
                                         <TableHead className="text-right pr-4 sm:pr-6">Acción Individual</TableHead>
                                     </TableRow>
@@ -1089,7 +1091,7 @@ export default function DifusionPage() {
                                     {((activeTab === 'padron' && isLoading) || (activeTab === 'votos' && isLoadingVotos)) ? (
                                         Array.from({ length: 8 }).map((_, i) => (
                                             <TableRow key={i}>
-                                                <TableCell colSpan={5} className="px-6 py-4">
+                                                <TableCell colSpan={6} className="px-6 py-4">
                                                     <Skeleton className="h-12 w-full rounded-lg" />
                                                 </TableCell>
                                             </TableRow>
@@ -1100,6 +1102,7 @@ export default function DifusionPage() {
                                                 const isSent = processedIds.has(p.id) || p.DIFUNDIDO;
                                                 const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
                                                 const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
+                                                const hasPhoneMig2 = String(p.TELEFONO_MIGRADO_2 || '').trim().length >= 6;
 
                                                 return (
                                                     <TableRow 
@@ -1180,6 +1183,32 @@ export default function DifusionPage() {
                                                             )}
                                                         </TableCell>
                                                         <TableCell>
+                                                            {editingPhoneId === p.id && editingField === 'TELEFONO_MIGRADO_2' ? (
+                                                                <div className="flex gap-1 animate-in zoom-in-95">
+                                                                    <Input 
+                                                                        value={tempPhone} 
+                                                                        onChange={(e) => setTempPhone(e.target.value)} 
+                                                                        className="h-9 text-xs font-black w-36 sm:w-40" 
+                                                                        autoFocus 
+                                                                        onBlur={() => savePhoneEdit('TELEFONO_MIGRADO_2')} 
+                                                                        onKeyDown={(e) => e.key === 'Enter' && savePhoneEdit('TELEFONO_MIGRADO_2')} 
+                                                                    />
+                                                                    <Button size="icon" className="h-9 w-9 rounded-lg" onClick={() => savePhoneEdit('TELEFONO_MIGRADO_2')} disabled={isSavingPhone}>
+                                                                        <CheckCircle2 className="h-4 w-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center gap-2 cursor-pointer group" onClick={() => { setEditingPhoneId(p.id); setEditingField('TELEFONO_MIGRADO_2'); setTempPhone(p.TELEFONO_MIGRADO_2 || ''); }}>
+                                                                    <Smartphone className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                                                                    {hasPhoneMig2 ? (
+                                                                        <span className="text-xs font-black text-purple-700 underline decoration-dotted underline-offset-4">{p.TELEFONO_MIGRADO_2}</span>
+                                                                    ) : (
+                                                                        <span className="text-[10px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin migrar</span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </TableCell>
+                                                        <TableCell>
                                                             {isSent ? (
                                                                 <div className="flex flex-col gap-0.5">
                                                                     <Badge className="bg-emerald-600 text-white hover:bg-emerald-600 font-black text-[8px] py-0.5 px-2 rounded-full uppercase flex items-center gap-1 w-fit animate-pulse">
@@ -1219,7 +1248,18 @@ export default function DifusionPage() {
                                                                         onClick={() => handleSendWhatsApp(p, p.TELEFONO_MIGRADO!)} 
                                                                         className="h-8 px-2 text-[9px] font-black rounded-lg bg-sky-600 hover:bg-sky-700 shadow-sm uppercase flex items-center gap-1 text-white"
                                                                     >
-                                                                        <MessageSquare className="h-3 w-3 fill-white" /> MIGRAD.
+                                                                        <MessageSquare className="h-3 w-3 fill-white" /> MIGRAD. 1
+                                                                    </Button>
+                                                                )}
+
+                                                                {/* Standard deep-linked fast message to migrated Excel TELEFONO_MIGRADO_2 */}
+                                                                {hasPhoneMig2 && (
+                                                                    <Button 
+                                                                        size="sm" 
+                                                                        onClick={() => handleSendWhatsApp(p, p.TELEFONO_MIGRADO_2!)} 
+                                                                        className="h-8 px-2 text-[9px] font-black rounded-lg bg-purple-600 hover:bg-purple-700 shadow-sm uppercase flex items-center gap-1 text-white"
+                                                                    >
+                                                                        <MessageSquare className="h-3 w-3 fill-white" /> MIGRAD. 2
                                                                     </Button>
                                                                 )}
                                                             </div>
@@ -1229,7 +1269,7 @@ export default function DifusionPage() {
                                             })
                                         ) : (
                                             <TableRow>
-                                                <TableCell colSpan={5} className="h-96 text-center opacity-20">
+                                                <TableCell colSpan={6} className="h-96 text-center opacity-20">
                                                     <Filter className="h-20 w-20 mx-auto mb-4 text-primary" />
                                                     <p className="font-black text-sm uppercase tracking-[0.3em]">
                                                         {activeTab === 'padron' ? 'Esperando Selección de Seccional' : 'Sin Votos Seguros Registrados'}
@@ -1290,7 +1330,7 @@ export default function DifusionPage() {
                                 {nextElectorToProcess.NOMBRE} {nextElectorToProcess.APELLIDO}
                             </span>
                             <span className="text-[8px] font-bold text-slate-400 uppercase truncate">
-                                Tel: {nextElectorToProcess.TELEFONO || nextElectorToProcess.TELEFONO_MIGRADO || 'Sin Número'}
+                                Tel: {nextElectorToProcess.TELEFONO || nextElectorToProcess.TELEFONO_MIGRADO || nextElectorToProcess.TELEFONO_MIGRADO_2 || 'Sin Número'}
                             </span>
                         </div>
                     ) : (

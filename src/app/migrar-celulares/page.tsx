@@ -59,6 +59,7 @@ export default function MigrarCelularesPage() {
     const [sheetData, setSheetData] = useState<any[]>([]);
     const [columns, setColumns] = useState<string[]>([]);
     const [mapping, setMapping] = useState({ cedula: '', telefono: '' });
+    const [targetColumn, setTargetColumn] = useState<'TELEFONO_MIGRADO' | 'TELEFONO_MIGRADO_2'>('TELEFONO_MIGRADO_2');
     
     // Estados del procesamiento
     const [status, setStatus] = useState<'idle' | 'reading' | 'mapping' | 'migrating' | 'done' | 'error'>('idle');
@@ -309,7 +310,7 @@ export default function MigrarCelularesPage() {
             // 3. Preparación de actualización de Padrón (sheet1)
             const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
             const updateObj: any = {
-                TELEFONO_MIGRADO: telClean, // Guardar UNICAMENTE en campo migrado independiente para no pisar el original
+                [targetColumn]: telClean, // Guardar en el destino seleccionado
                 telefonoUpdatedBy_id: user.id,
                 telefonoUpdatedBy_nombre: user.name,
                 telefonoUpdatedAt: new Date().toISOString()
@@ -323,7 +324,7 @@ export default function MigrarCelularesPage() {
             if (activeCapturasSet.has(cedulaStr)) {
                 const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
                 currentBatch.set(capturasRef, {
-                    TELEFONO_MIGRADO: telClean, // Guardar en campo separado para NO sobrescribir el manual
+                    [targetColumn]: telClean, // Guardar en campo seleccionado
                     updatedAt: new Date().toISOString(),
                     updatedBy_id: user.id,
                     updatedBy_nombre: user.name
@@ -448,11 +449,8 @@ export default function MigrarCelularesPage() {
             // 2. Preparación de borrado en Padrón (sheet1)
             const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
             currentBatch.set(padronRef, {
-                TELEFONO: deleteField(),
-                TELEFONO_MIGRADO: deleteField(),
-                telefonoUpdatedBy_id: deleteField(),
-                telefonoUpdatedBy_nombre: deleteField(),
-                telefonoUpdatedAt: deleteField()
+                [targetColumn]: deleteField(),
+                // No borramos TELEFONO manual, solo la columna seleccionada
             }, { merge: true });
 
             currentBatchSize++;
@@ -462,10 +460,7 @@ export default function MigrarCelularesPage() {
             if (activeCapturasSet.has(cedulaStr)) {
                 const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
                 currentBatch.set(capturasRef, {
-                    TELEFONO_MIGRADO: deleteField(),
-                    updatedAt: deleteField(),
-                    updatedBy_id: deleteField(),
-                    updatedBy_nombre: deleteField()
+                    [targetColumn]: deleteField()
                 }, { merge: true });
                 currentBatchSize++;
                 localUpdatedCapturas++;
@@ -680,6 +675,19 @@ export default function MigrarCelularesPage() {
                                         {columns.map(col => (
                                             <option key={col} value={col}>{col}</option>
                                         ))}
+                                    </select>
+                                </div>
+
+                                <div className="space-y-2 pt-2 border-t border-slate-100">
+                                    <label className="text-[10px] font-black uppercase tracking-wider text-primary">¿Dónde se guardarán estos números?</label>
+                                    <select 
+                                        disabled={status === 'migrating'}
+                                        value={targetColumn}
+                                        onChange={(e) => setTargetColumn(e.target.value as 'TELEFONO_MIGRADO' | 'TELEFONO_MIGRADO_2')}
+                                        className="w-full h-11 px-3 rounded-xl border-2 border-primary/20 bg-primary/5 font-black text-xs uppercase text-primary focus:outline-none focus:ring-1 focus:ring-primary"
+                                    >
+                                        <option value="TELEFONO_MIGRADO">Teléfono Migrado 1 (Sobrescribir anteriores)</option>
+                                        <option value="TELEFONO_MIGRADO_2">Teléfono Migrado 2 (Lista Nueva)</option>
                                     </select>
                                 </div>
 
