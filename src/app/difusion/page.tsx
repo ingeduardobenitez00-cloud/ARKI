@@ -141,9 +141,13 @@ export default function DifusionPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
     
-    const [invitationTemplate, setInvitationTemplate] = useState(
-        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
-    );
+    const [invitationTemplate, setInvitationTemplate] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('difusion_invitation_template') || 
+                "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+        }
+        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+    });
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
     const [birthdayMonth, setBirthdayMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
@@ -372,6 +376,7 @@ export default function DifusionPage() {
 
     const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
         setInvitationTemplate(EVENT_TEMPLATES[type]);
+        localStorage.setItem('difusion_invitation_template', EVENT_TEMPLATES[type]);
         setIsBirthdayMode(type === 'CUMPLEANOS');
         toast({ title: `Plantilla de ${type} cargada` });
     };
@@ -574,36 +579,86 @@ export default function DifusionPage() {
         }
     };
 
-    // Sequential batch sender trigger!
     // Sequential batch sender trigger! Always text-only (no multimedia) as per user preference
     const handleTriggerNextAssistant = async () => {
-        if (!nextElectorToProcess) {
+        let fired = 0;
+        let skippedCount = 0;
+        const limitToFire = Math.min(3, batchSize - batchSentCount);
+        
+        const toProcess = activeQueue.filter(e => !processedIds.has(e.id) && !e.DIFUNDIDO);
+        if (toProcess.length === 0) {
             toast({ title: 'No hay más electores pendientes.' });
             setIsBatchActive(false);
             return;
         }
 
-        const p = nextElectorToProcess;
-        // Prefer manual registered phone first, fallback to Excel migrated
-        const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
-        
-        if (!targetPhone || targetPhone.trim().length < 6) {
-            // No phone, skip this contact by adding to processed list automatically
-            const nextSet = new Set(processedIds);
+        const nextSet = new Set(processedIds);
+        const nowStr = new Date().toISOString();
+
+        for (const p of toProcess) {
+            if (fired >= limitToFire) break;
+            
+            const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
+            
+            if (!targetPhone || targetPhone.trim().length < 6) {
+                nextSet.add(p.id);
+                skippedCount++;
+                continue;
+            }
+
+            // Text only prefilled redirect trigger (fast and direct, avoids tedious OS share sheets)
+            let msg = resolveSpintax(invitationTemplate);
+            msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                     .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
+                     .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
+                     .replace(/\[MESA\]/g, String(p.MESA || '---'))
+                     .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
+            
+            if (includeVotingData) {
+                msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
+            }
+
+            const finalPhone = formatParaguayPhone(targetPhone);
             nextSet.add(p.id);
-            setProcessedIds(nextSet);
-            sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
-            toast({ title: `Omitido ${p.NOMBRE} (Sin Teléfono)` });
-            return;
+
+            window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`, '_blank');
+            fired++;
+
+            if (db && user) {
+                const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+                updateDoc(doc(db, collectionName, p.id), {
+                    DIFUNDIDO: true,
+                    difundidoAt: nowStr,
+                    difundidoBy: user.name
+                }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+                
+                logAction(db, {
+                    userId: user.id,
+                    userName: user.name,
+                    module: 'DIFUSION',
+                    action: 'ENVIÓ ASISTENTE (LOTE DE 3)',
+                    targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})`
+                });
+            }
         }
 
-        // Text only prefilled redirect trigger (fast and direct, avoids tedious OS share sheets)
-        handleSendWhatsApp(p, targetPhone);
-        const nextCount = batchSentCount + 1;
+        if (fired > 0 || skippedCount > 0) {
+            setProcessedIds(nextSet);
+            sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+            
+            if (activeTab === 'padron') {
+                setElectores(prev => prev.map(e => nextSet.has(e.id) ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user?.name } : e));
+            }
+        }
+
+        const nextCount = batchSentCount + fired;
         setBatchSentCount(nextCount);
-        if (nextCount >= batchSize) {
+        
+        if (nextCount >= batchSize && fired > 0) {
             setIsBatchActive(false);
             setShowBatchCompletedAlert(true);
+        } else if (fired === 0 && skippedCount > 0) {
+            toast({ title: `Se omitieron ${skippedCount} contactos sin número.` });
         }
     };
 
@@ -1220,7 +1275,20 @@ export default function DifusionPage() {
 
                             {/* Invitation Template */}
                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={() => {
+                                            localStorage.setItem('difusion_invitation_template', invitationTemplate);
+                                            toast({ title: 'Plantilla Guardada', description: 'Tu mensaje ha sido guardado para la próxima vez.' });
+                                        }}
+                                        className="h-5 px-1.5 text-[8px] font-black uppercase text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1"
+                                    >
+                                        <Save className="h-2.5 w-2.5" /> Guardar
+                                    </Button>
+                                </div>
                                 <Textarea 
                                     value={invitationTemplate} 
                                     onChange={(e) => setInvitationTemplate(e.target.value)} 
@@ -1650,7 +1718,7 @@ export default function DifusionPage() {
                         className="h-12 w-full font-black text-xs uppercase bg-green-600 hover:bg-green-700 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg"
                     >
                         <MessageSquare className="h-4 w-4 fill-white" />
-                        DISPARAR WHATSAPP (SOLO TEXTO)
+                        DISPARAR 3 MENSAJES (SOLO TEXTO)
                     </Button>
                 </div>
             )}
