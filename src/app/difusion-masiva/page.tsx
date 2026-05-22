@@ -153,13 +153,9 @@ export default function DifusionMasivaPage() {
     const [selectedElectorIds, setSelectedElectorIds] = useState<Set<string>>(new Set());
     const [phonePreference, setPhonePreference] = useState<'REGISTRADO' | 'MIGRADO' | 'INTELIGENTE'>('INTELIGENTE');
 
-    const [invitationTemplate, setInvitationTemplate] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('difusion_invitation_template') || 
-                "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
-        }
-        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
-    });
+    const [invitationTemplate, setInvitationTemplate] = useState(
+        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
+    );
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
     const [birthdayMonth, setBirthdayMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
@@ -397,7 +393,6 @@ export default function DifusionMasivaPage() {
 
     const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
         setInvitationTemplate(EVENT_TEMPLATES[type]);
-        localStorage.setItem('difusion_invitation_template', EVENT_TEMPLATES[type]);
         setIsBirthdayMode(type === 'CUMPLEANOS');
         toast({ title: `Plantilla de ${type} cargada` });
     };
@@ -893,20 +888,7 @@ export default function DifusionMasivaPage() {
                             </div>
 
                             <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={() => {
-                                            localStorage.setItem('difusion_invitation_template', invitationTemplate);
-                                            toast({ title: 'Plantilla Guardada', description: 'Tu mensaje ha sido guardado para la próxima vez.' });
-                                        }}
-                                        className="h-5 px-1.5 text-[8px] font-black uppercase text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1"
-                                    >
-                                        <Save className="h-2.5 w-2.5" /> Guardar
-                                    </Button>
-                                </div>
+                                <Label className="text-[10px] font-black uppercase">Mensaje de Campaña (con Spintax)</Label>
                                 <Textarea 
                                     value={invitationTemplate} 
                                     onChange={(e) => setInvitationTemplate(e.target.value)} 

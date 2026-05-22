@@ -124,8 +124,6 @@ const getBirthDateParts = (fecha: any) => {
 };
 
 const SETTINGS_COLLECTION = 'system_settings';
-const FLYERS_COLLECTION = 'flyer_library';
-const CHUNK_SIZE = 800 * 1024;
 
 export default function DifusionPage() {
     const { user } = useAuth();
@@ -141,13 +139,9 @@ export default function DifusionPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
     
-    const [invitationTemplate, setInvitationTemplate] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem('difusion_invitation_template') || 
-                "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
-        }
-        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
-    });
+    const [invitationTemplate, setInvitationTemplate] = useState(
+        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
+    );
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
     const [birthdayMonth, setBirthdayMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
@@ -157,14 +151,6 @@ export default function DifusionPage() {
     const [editingField, setEditingField] = useState<'TELEFONO' | 'TELEFONO_MIGRADO' | null>(null);
     const [tempPhone, setTempPhone] = useState('');
     const [isSavingPhone, setIsSavingPhone] = useState(false);
-
-    const [currentFlyer, setCurrentFlyer] = useState<any>(null);
-    const [isUploading, setIsUploading] = useState(false);
-    const [isSharingMedia, setIsSharingMedia] = useState<Record<string, boolean>>({});
-
-    const [isNameDialogOpen, setIsNameDialogOpen] = useState(false);
-    const [pendingFile, setPendingFile] = useState<File | null>(null);
-    const [newImageName, setNewImageName] = useState('');
 
     // Mobile Batch Assistant State
     const [batchSize, setBatchSize] = useState<number>(5);
@@ -180,9 +166,6 @@ export default function DifusionPage() {
     const [sidebarPhone, setSidebarPhone] = useState('');
     const [isSavingSidebarPhone, setIsSavingSidebarPhone] = useState(false);
     const [sidebarMessage, setSidebarMessage] = useState('');
-    const [sidebarFlyerId, setSidebarFlyerId] = useState('NONE');
-    const [sidebarFlyer, setSidebarFlyer] = useState<any>(null);
-    const [isSidebarFlyerLoading, setIsSidebarFlyerLoading] = useState(false);
     const [sidebarBaseTemplate, setSidebarBaseTemplate] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('sidebar_base_template') || 
@@ -223,55 +206,7 @@ export default function DifusionPage() {
 
     const { data: votosList, isLoading: isLoadingVotos } = useCollection<any>(registeredVotosQuery);
 
-    const flyersQuery = useMemoFirebase(() => {
-        if (!db) return null;
-        return query(collection(db, FLYERS_COLLECTION), orderBy('createdAt', 'desc'));
-    }, [db]);
-
-    const { data: availableFlyers } = useCollectionOnce(flyersQuery);
-
-    const base64ToBlobUrl = useCallback((base64: string) => {
-        if (!base64 || typeof base64 !== 'string') return '';
-        try {
-            const parts = base64.split(';base64,');
-            if (parts.length !== 2) return base64;
-            const mimeType = parts[0].split(':')[1];
-            const byteCharacters = atob(parts[1]);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: mimeType });
-            return URL.createObjectURL(blob);
-        } catch (e) { 
-            console.error(e);
-            return base64; 
-        }
-    }, []);
-
-    const fetchAndReconstructFlyer = useCallback(async (flyerId: string) => {
-        if (!db) return null;
-        try {
-            const flyerRef = doc(db, FLYERS_COLLECTION, flyerId);
-            const flyerSnap = await getDoc(flyerRef);
-            if (!flyerSnap.exists()) return null;
-            const flyerData = flyerSnap.data();
-            
-            if (flyerData.isChunked) {
-                const chunksSnap = await getDocs(query(collection(db, FLYERS_COLLECTION, flyerId, 'chunks'), orderBy('__name__', 'asc')));
-                const fullBase64 = chunksSnap.docs
-                    .sort((a, b) => parseInt(a.id) - parseInt(b.id))
-                    .map(d => d.data().data)
-                    .join('');
-                return { ...flyerData, id: flyerId, url: base64ToBlobUrl(fullBase64) };
-            } else {
-                const finalUrl = flyerData.url?.startsWith('data:') ? base64ToBlobUrl(flyerData.url) : flyerData.url;
-                return { ...flyerData, id: flyerId, url: finalUrl };
-            }
-        } catch (e) {
-            console.error(e);
-            return null;
-        }
-    }, [db, base64ToBlobUrl]);
+    const [visibleCount, setVisibleCount] = useState(50);
 
     const filteredVotosList = useMemo(() => {
         if (!votosList || !user) return [];
@@ -331,19 +266,6 @@ export default function DifusionPage() {
                 const list = sSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
                 list.sort((a, b) => String(a.nombre || '').localeCompare(String(b.nombre || ''), undefined, { numeric: true }));
                 setSeccionales(list);
-
-                const settingsDoc = await getDoc(doc(db, SETTINGS_COLLECTION, 'global'));
-                if (settingsDoc.exists() && settingsDoc.data().flyer_url && !currentFlyer) {
-                    const globalVal = settingsDoc.data().flyer_url;
-                    if (globalVal.startsWith('FLYER_ID:')) {
-                        const id = globalVal.replace('FLYER_ID:', '');
-                        const flyer = await fetchAndReconstructFlyer(id);
-                        if (flyer) setCurrentFlyer(flyer);
-                    } else {
-                        const finalUrl = globalVal.startsWith('data:') ? base64ToBlobUrl(globalVal) : globalVal;
-                        setCurrentFlyer({ id: 'GLOBAL', url: finalUrl, name: 'OFICIAL', type: 'image' });
-                    }
-                }
             } catch (e) {}
         };
         fetchData();
@@ -354,29 +276,10 @@ export default function DifusionPage() {
         if (user && !isAdmin && user.seccional) { setSelectedSeccional(user.seccional); }
     }, [db, user, isAdmin, fetchAndReconstructFlyer, base64ToBlobUrl]);
 
-    useEffect(() => {
-        const loadSidebarFlyer = async () => {
-            if (sidebarFlyerId === 'NONE' || !sidebarFlyerId) {
-                setSidebarFlyer(null);
-                return;
-            }
-            setIsSidebarFlyerLoading(true);
-            try {
-                const flyer = await fetchAndReconstructFlyer(sidebarFlyerId);
-                setSidebarFlyer(flyer);
-            } catch (e) {
-                console.error("Error cargando folleto de barra lateral:", e);
-                setSidebarFlyer(null);
-            } finally {
-                setIsSidebarFlyerLoading(false);
-            }
-        };
-        loadSidebarFlyer();
-    }, [sidebarFlyerId, fetchAndReconstructFlyer]);
+    // Fin de efectos
 
     const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
         setInvitationTemplate(EVENT_TEMPLATES[type]);
-        localStorage.setItem('difusion_invitation_template', EVENT_TEMPLATES[type]);
         setIsBirthdayMode(type === 'CUMPLEANOS');
         toast({ title: `Plantilla de ${type} cargada` });
     };
@@ -420,6 +323,7 @@ export default function DifusionPage() {
             const sortedResults = Array.from(uniqueResultsMap.values());
             sortedResults.sort((a, b) => String(a.APELLIDO || '').localeCompare(String(b.APELLIDO || ''), undefined, { numeric: true }));
             setElectores(sortedResults);
+            setVisibleCount(50);
             toast({ title: 'Escaneo Finalizado', description: `Se hallaron ${sortedResults.length} contactos.` });
         } catch (error) { toast({ title: 'Error de conexión', variant: 'destructive' }); } finally { setIsLoading(false); }
     };
@@ -494,171 +398,38 @@ export default function DifusionPage() {
         window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`, '_blank');
     };
 
-    // Invokes native Android / iOS share sheets for media sending
-    const handleShareMediaDirect = async (p: Elector, targetPhone: string): Promise<boolean> => {
-        if (!targetPhone || !currentFlyer || !user) return false;
 
-        const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
-        if (isAlreadySent) {
-            const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
-            if (!confirmRes) return false;
-        }
 
-        const personId = p.id;
-        setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
-
-        let msg = resolveSpintax(invitationTemplate);
-        msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                 .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                 .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
-                 .replace(/\[MESA\]/g, String(p.MESA || '---'))
-                 .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
-        
-        if (includeVotingData) {
-            msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
-        }
-
-        try {
-            const response = await fetch(currentFlyer.url);
-            const blob = await response.blob();
-            const extension = currentFlyer.type === 'video' ? 'mp4' : 'jpg';
-            const file = new File([blob], `${currentFlyer.name}.${extension}`, { type: blob.type });
-
-            if (navigator.share && navigator.canShare({ files: [file] })) {
-                // Native mobile share popup trigger! Perfect for cellphones!
-                await navigator.share({
-                    files: [file],
-                    text: msg
-                });
-                
-                const nextSet = new Set(processedIds);
-                nextSet.add(p.id);
-                setProcessedIds(nextSet);
-                sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
-
-                // Update local state directly so UI reacts instantly
-                const nowStr = new Date().toISOString();
-                if (activeTab === 'padron') {
-                    setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
-                }
-
-                // Update Firestore permanently!
-                if (db) {
-                    const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
-                    const electorRef = doc(db, collectionName, p.id);
-                    updateDoc(electorRef, {
-                        DIFUNDIDO: true,
-                        difundidoAt: nowStr,
-                        difundidoBy: user.name
-                    }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
-                }
-
-                logAction(db!, { 
-                    userId: user.id, 
-                    userName: user.name, 
-                    module: 'DIFUSION', 
-                    action: `COMPARTIÓ NATIVO ${currentFlyer.type.toUpperCase()}`, 
-                    targetName: `${p.NOMBRE} ${p.APELLIDO}` 
-                });
-                return true;
-            } else {
-                // Fallback for PC/older systems: download media and launch WhatsApp chat
-                const link = document.createElement('a');
-                link.href = currentFlyer.url;
-                link.download = `${currentFlyer.name}.${extension}`;
-                link.click();
-                handleSendWhatsApp(p, targetPhone, true);
-                return true;
-            }
-        } catch (e) {
-            console.error(e);
-            toast({ title: "Acción cancelada o no soportada", variant: "default" });
-            return false;
-        } finally {
-            setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
-        }
-    };
-
+    // Sequential batch sender trigger!
     // Sequential batch sender trigger! Always text-only (no multimedia) as per user preference
     const handleTriggerNextAssistant = async () => {
-        let fired = 0;
-        let skippedCount = 0;
-        const limitToFire = Math.min(3, batchSize - batchSentCount);
-        
-        const toProcess = activeQueue.filter(e => !processedIds.has(e.id) && !e.DIFUNDIDO);
-        if (toProcess.length === 0) {
+        if (!nextElectorToProcess) {
             toast({ title: 'No hay más electores pendientes.' });
             setIsBatchActive(false);
             return;
         }
 
-        const nextSet = new Set(processedIds);
-        const nowStr = new Date().toISOString();
-
-        for (const p of toProcess) {
-            if (fired >= limitToFire) break;
-            
-            const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
-            
-            if (!targetPhone || targetPhone.trim().length < 6) {
-                nextSet.add(p.id);
-                skippedCount++;
-                continue;
-            }
-
-            // Text only prefilled redirect trigger (fast and direct, avoids tedious OS share sheets)
-            let msg = resolveSpintax(invitationTemplate);
-            msg = msg.replace(/{nombre}/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                     .replace(/\[NOMBRE\]/g, `${p.NOMBRE} ${p.APELLIDO}`.trim())
-                     .replace(/\[LOCAL\]/g, String(p.LOCAL || '---'))
-                     .replace(/\[MESA\]/g, String(p.MESA || '---'))
-                     .replace(/\[ORDEN\]/g, String(p.ORDEN || '---'));
-            
-            if (includeVotingData) {
-                msg += `\n\n📍 *TU LUGAR DE VOTACIÓN:*\n🏛️ LOCAL: ${p.LOCAL || '---'}\n🗳️ MESA: ${p.MESA || '---'}\n🔢 ORDEN: ${p.ORDEN || '---'}`;
-            }
-
-            const finalPhone = formatParaguayPhone(targetPhone);
+        const p = nextElectorToProcess;
+        // Prefer manual registered phone first, fallback to Excel migrated
+        const targetPhone = p.TELEFONO || p.TELEFONO_MIGRADO || '';
+        
+        if (!targetPhone || targetPhone.trim().length < 6) {
+            // No phone, skip this contact by adding to processed list automatically
+            const nextSet = new Set(processedIds);
             nextSet.add(p.id);
-
-            window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(msg)}`, '_blank');
-            fired++;
-
-            if (db && user) {
-                const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
-                updateDoc(doc(db, collectionName, p.id), {
-                    DIFUNDIDO: true,
-                    difundidoAt: nowStr,
-                    difundidoBy: user.name
-                }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
-                
-                logAction(db, {
-                    userId: user.id,
-                    userName: user.name,
-                    module: 'DIFUSION',
-                    action: 'ENVIÓ ASISTENTE (LOTE DE 3)',
-                    targetName: `${p.NOMBRE} ${p.APELLIDO} (${targetPhone})`
-                });
-            }
-        }
-
-        if (fired > 0 || skippedCount > 0) {
             setProcessedIds(nextSet);
             sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
-            
-            if (activeTab === 'padron') {
-                setElectores(prev => prev.map(e => nextSet.has(e.id) ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user?.name } : e));
-            }
+            toast({ title: `Omitido ${p.NOMBRE} (Sin Teléfono)` });
+            return;
         }
 
-        const nextCount = batchSentCount + fired;
+        // Text only prefilled redirect trigger (fast and direct, avoids tedious OS share sheets)
+        handleSendWhatsApp(p, targetPhone);
+        const nextCount = batchSentCount + 1;
         setBatchSentCount(nextCount);
-        
-        if (nextCount >= batchSize && fired > 0) {
+        if (nextCount >= batchSize) {
             setIsBatchActive(false);
             setShowBatchCompletedAlert(true);
-        } else if (fired === 0 && skippedCount > 0) {
-            toast({ title: `Se omitieron ${skippedCount} contactos sin número.` });
         }
     };
 
@@ -678,54 +449,6 @@ export default function DifusionPage() {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({ path: `${collectionName}/${editingPhoneId}`, operation: 'update', requestResourceData: data }));
             })
             .finally(() => { setIsSavingPhone(false); setEditingPhoneId(null); setEditingField(null); });
-    };
-
-    // Background files library uploads
-    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) return;
-        setPendingFile(file);
-        setNewImageName(file.name.split('.')[0].toUpperCase());
-        setIsNameDialogOpen(true);
-    };
-
-    const confirmUpload = async () => {
-        if (!pendingFile || !db || !user || !newImageName.trim()) return;
-        setIsUploading(true);
-        setIsNameDialogOpen(false);
-        const reader = new FileReader();
-        reader.onloadend = async () => {
-            const base64String = reader.result as string;
-            const fileType = pendingFile.type.startsWith('video/') ? 'video' : 'image';
-            const chunks: string[] = [];
-            for (let i = 0; i < base64String.length; i += CHUNK_SIZE) chunks.push(base64String.substring(i, i + CHUNK_SIZE));
-            const isChunked = chunks.length > 1;
-            const flyerData = {
-                name: newImageName.toUpperCase(),
-                url: isChunked ? null : base64String,
-                type: fileType,
-                isChunked: isChunked,
-                createdAt: serverTimestamp(),
-                createdBy: user.name
-            };
-            try {
-                const docRef = await addDoc(collection(db, FLYERS_COLLECTION), flyerData);
-                if (isChunked) {
-                    for (let i = 0; i < chunks.length; i++) {
-                        await setDoc(doc(db, FLYERS_COLLECTION, docRef.id, 'chunks', i.toString().padStart(3, '0')), { data: chunks[i] });
-                    }
-                }
-                toast({ title: "¡Multimedia Guardada!" });
-                const newFlyer = await fetchAndReconstructFlyer(docRef.id);
-                if (newFlyer) setCurrentFlyer(newFlyer);
-            } catch (e) {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({ path: FLYERS_COLLECTION, operation: 'create', requestResourceData: flyerData }));
-            } finally {
-                setIsUploading(false);
-                setPendingFile(null);
-            }
-        };
-        reader.readAsDataURL(pendingFile);
     };
 
     const handleSelectFlyer = async (id: string) => {
@@ -856,7 +579,7 @@ export default function DifusionPage() {
                     const e = foundResults[0];
                     setSelectedSidebarElector(e);
                     setSidebarPhone(e.TELEFONO || e.TELEFONO_MIGRADO || '');
-                    setSidebarFlyerId(currentFlyer?.id || 'NONE');
+
                     setSidebarMessage(generateSidebarMessage(e, sidebarBaseTemplate));
                 }
             }
@@ -940,91 +663,7 @@ export default function DifusionPage() {
         window.open(`https://api.whatsapp.com/send?phone=${finalPhone}&text=${encodeURIComponent(sidebarMessage)}`, '_blank');
     };
 
-    const handleShareSidebarMedia = async (p: Elector, targetPhone: string) => {
-        if (!targetPhone || !user) return;
 
-        const isAlreadySent = processedIds.has(p.id) || p.DIFUNDIDO;
-        if (isAlreadySent) {
-            const confirmRes = window.confirm(`Ya enviaste mensaje a este elector (${p.NOMBRE} ${p.APELLIDO}). ¿Deseas escribirle de vuelta?`);
-            if (!confirmRes) return;
-        }
-        
-        if (sidebarFlyerId === 'NONE') {
-            handleSendSidebarWhatsApp(p, targetPhone, true);
-            return;
-        }
-
-        const personId = p.id;
-        setIsSharingMedia(prev => ({ ...prev, [personId]: true }));
-
-        try {
-            const flyer = sidebarFlyer || await fetchAndReconstructFlyer(sidebarFlyerId);
-            if (!flyer) {
-                toast({ title: "No se pudo cargar la imagen", variant: "destructive" });
-                setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
-                return;
-            }
-
-            const response = await fetch(flyer.url);
-            const blob = await response.blob();
-            const extension = flyer.type === 'video' ? 'mp4' : 'jpg';
-            const file = new File([blob], `${flyer.name}.${extension}`, { type: blob.type });
-
-            if (navigator.share && navigator.canShare({ files: [file] })) {
-                await navigator.share({
-                    files: [file],
-                    text: sidebarMessage
-                });
-                
-                // Agregar a procesados/historial
-                const nextSet = new Set(processedIds);
-                nextSet.add(p.id);
-                setProcessedIds(nextSet);
-                sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
-                
-                const nowStr = new Date().toISOString();
-                if (activeTab === 'padron') {
-                    setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
-                }
-                setSidebarSearchResults(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
-                setSelectedSidebarElector(prev => prev && prev.id === p.id ? { ...prev, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : prev);
-
-                // Update Firestore permanently!
-                if (db) {
-                    const electorRef = doc(db, 'sheet1', p.id);
-                    updateDoc(electorRef, {
-                        DIFUNDIDO: true,
-                        difundidoAt: nowStr,
-                        difundidoBy: user.name
-                    }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
-                }
-
-                logAction(db!, { 
-                    userId: user.id, 
-                    userName: user.name, 
-                    module: 'DIFUSION_INDIVIDUAL', 
-                    action: `COMPARTIÓ INDIVIDUAL ${flyer.type.toUpperCase()}`, 
-                    targetName: `${p.NOMBRE} ${p.APELLIDO}` 
-                });
-            } else {
-                toast({ 
-                    title: "📥 Folleto Descargado", 
-                    description: "Se ha descargado el folleto automáticamente. Por favor, pégalo (Ctrl+V) o adjúntalo en el chat de WhatsApp que se abrirá.",
-                    duration: 7000
-                });
-                const link = document.createElement('a');
-                link.href = flyer.url;
-                link.download = `${flyer.name}.${extension}`;
-                link.click();
-                handleSendSidebarWhatsApp(p, targetPhone, true);
-            }
-        } catch (e) {
-            console.error(e);
-            toast({ title: "Acción cancelada o no soportada" });
-        } finally {
-            setIsSharingMedia(prev => ({ ...prev, [personId]: false }));
-        }
-    };
 
     return (
         <div className="space-y-6 max-w-7xl mx-auto px-1 sm:px-4 pb-24">
@@ -1275,20 +914,7 @@ export default function DifusionPage() {
 
                             {/* Invitation Template */}
                             <div className="space-y-1.5">
-                                <div className="flex items-center justify-between">
-                                    <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
-                                    <Button 
-                                        variant="ghost" 
-                                        size="sm" 
-                                        onClick={() => {
-                                            localStorage.setItem('difusion_invitation_template', invitationTemplate);
-                                            toast({ title: 'Plantilla Guardada', description: 'Tu mensaje ha sido guardado para la próxima vez.' });
-                                        }}
-                                        className="h-5 px-1.5 text-[8px] font-black uppercase text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1"
-                                    >
-                                        <Save className="h-2.5 w-2.5" /> Guardar
-                                    </Button>
-                                </div>
+                                <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
                                 <Textarea 
                                     value={invitationTemplate} 
                                     onChange={(e) => setInvitationTemplate(e.target.value)} 
@@ -1306,31 +932,7 @@ export default function DifusionPage() {
                                 <Switch checked={includeVotingData} onCheckedChange={setIncludeVotingData} />
                             </div>
 
-                            {/* Flyer library */}
-                            <div className="space-y-3 p-3 border rounded-2xl bg-muted/20">
-                                <Label className="text-[10px] font-black uppercase flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5 text-primary" /> Multimedia Oficial</Label>
-                                {currentFlyer && (
-                                    <div className="relative aspect-video w-full rounded-xl overflow-hidden border border-primary/10 bg-black/5 flex items-center justify-center group">
-                                        {currentFlyer.type === 'video' ? <Film className="h-8 w-8 text-primary/40" /> : <img src={currentFlyer.url} alt="Preview" className="w-full h-full object-contain" />}
-                                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                            <Badge variant="secondary" className="font-black text-[8px]">{currentFlyer.name}</Badge>
-                                        </div>
-                                    </div>
-                                )}
-                                <Select value={currentFlyer?.id || 'NONE'} onValueChange={handleSelectFlyer}>
-                                    <SelectTrigger className="h-10 text-[10px] font-bold rounded-xl"><SelectValue placeholder="Elegir recurso..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="NONE" className="text-xs font-bold uppercase text-slate-400">Sin folleto (Solo Texto)</SelectItem>
-                                        {availableFlyers?.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                                <Label htmlFor="dif-upload" className="cursor-pointer block">
-                                    <div className="h-10 border border-dashed border-primary/30 rounded-xl flex items-center justify-center text-[10px] font-black hover:bg-primary/5 transition-colors text-primary">
-                                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-1.5"/>} SUBIR ARCHIVO
-                                    </div>
-                                </Label>
-                                <input id="dif-upload" type="file" accept="image/*,video/*" className="hidden" onChange={handleFileSelect} disabled={isUploading} />
-                            </div>
+
 
                             {/* Search segment and triggers */}
                             <div className="space-y-3 pt-2 border-t border-slate-100">
@@ -1505,7 +1107,7 @@ export default function DifusionPage() {
                                         ))
                                     ) : (
                                         activeQueue.length > 0 ? (
-                                            activeQueue.map((p, index) => {
+                                            activeQueue.slice(0, visibleCount).map((p, index) => {
                                                 const isSent = processedIds.has(p.id) || p.DIFUNDIDO;
                                                 const hasPhone = String(p.TELEFONO || '').trim().length >= 6;
                                                 const hasPhoneMig = String(p.TELEFONO_MIGRADO || '').trim().length >= 6;
@@ -1608,18 +1210,7 @@ export default function DifusionPage() {
                                                         </TableCell>
                                                         <TableCell className="text-right pr-4 sm:pr-6">
                                                             <div className="flex justify-end items-center gap-1.5 sm:gap-2">
-                                                                {/* Native Share button (downloads flyer & opens Android/iOS native sharing sheet) */}
-                                                                {currentFlyer && (hasPhone || hasPhoneMig) && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() => handleShareMediaDirect(p, hasPhone ? p.TELEFONO! : p.TELEFONO_MIGRADO!)}
-                                                                        className="h-8 px-2 text-[9px] font-black rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white uppercase flex items-center gap-1 shadow-sm"
-                                                                        disabled={isSharingMedia[p.id]}
-                                                                    >
-                                                                        {isSharingMedia[p.id] ? <Loader2 className="h-3 w-3 animate-spin" /> : <Share2 className="h-3 w-3" />}
-                                                                        {isSharingMedia[p.id] ? 'COMPARTIENDO...' : 'COMPARTIR'}
-                                                                    </Button>
-                                                                )}
+
 
                                                                 {/* Standard deep-linked fast message to registered TELEFONO */}
                                                                 {hasPhone && (
@@ -1663,6 +1254,13 @@ export default function DifusionPage() {
                                     )}
                                 </TableBody>
                             </Table>
+                            {activeQueue.length > visibleCount && (
+                                <div className="p-4 flex justify-center border-t border-slate-100">
+                                    <Button variant="outline" onClick={() => setVisibleCount(v => v + 50)} className="w-full max-w-sm rounded-xl font-black uppercase text-xs bg-white text-primary border-primary/20 hover:bg-primary/5">
+                                        ⬇️ Cargar Más Resultados ({activeQueue.length - visibleCount} pendientes)
+                                    </Button>
+                                </div>
+                            )}
                         </div>
                     </Card>
                 </div>
@@ -1718,31 +1316,12 @@ export default function DifusionPage() {
                         className="h-12 w-full font-black text-xs uppercase bg-green-600 hover:bg-green-700 text-white rounded-2xl flex items-center justify-center gap-2 shadow-lg"
                     >
                         <MessageSquare className="h-4 w-4 fill-white" />
-                        DISPARAR 3 MENSAJES (SOLO TEXTO)
+                        DISPARAR WHATSAPP (SOLO TEXTO)
                     </Button>
                 </div>
             )}
 
-            {/* Media Upload Identifying Name Dialog */}
-            <Dialog open={isNameDialogOpen} onOpenChange={setIsNameDialogOpen}>
-                <DialogContent className="sm:max-w-md rounded-3xl">
-                    <div className="p-6">
-                        <h2 className="text-xl font-black uppercase tracking-tight flex items-center gap-3 mb-6"><Type className="h-6 w-6 text-primary" /> Identificar Multimedia</h2>
-                        <div className="space-y-5">
-                            <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre del Recurso</Label>
-                                <Input value={newImageName} onChange={(e) => setNewImageName(e.target.value.toUpperCase())} className="font-bold uppercase h-12 rounded-xl" autoFocus />
-                            </div>
-                            <div className="flex justify-end gap-3 pt-2">
-                                <Button variant="outline" onClick={() => setIsNameDialogOpen(false)} className="font-black uppercase text-xs h-11 rounded-xl">CANCELAR</Button>
-                                <Button onClick={confirmUpload} disabled={!newImageName.trim() || isUploading} className="font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg">
-                                    {isUploading ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Save className="mr-2 h-4 w-4" />} GUARDAR EN BIBLIOTECA
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </DialogContent>
-            </Dialog>
+
 
             {/* NEW BATCH COMPLETED ANTI-BAN PROTECTION POPUP */}
             <Dialog open={showBatchCompletedAlert} onOpenChange={setShowBatchCompletedAlert}>
