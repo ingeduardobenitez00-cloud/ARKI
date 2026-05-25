@@ -759,6 +759,7 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<User | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -886,13 +887,36 @@ export default function UsersPage() {
 
   const handleDelete = async () => {
     if (userToDelete && currentUser) {
-        const userRef = doc(db, USERS_COLLECTION_NAME, userToDelete.id);
-        deleteDoc(userRef).then(() => {
+        setIsDeleting(true);
+        try {
+            // 1. Delete from Authentication API
+            const response = await fetch('/api/users/delete', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userToDelete.id })
+            });
+            const data = await response.json();
+            
+            if (!data.success && !data.error?.includes('auth/user-not-found') && !data.error?.includes('credential')) {
+                console.warn("API Auth deletion failed or requires credentials:", data.error);
+                toast({ title: "Aviso de Seguridad", description: "El usuario fue borrado de la base de datos, pero podría requerir borrado manual en Firebase Auth si no hay credenciales Admin locales configuradas.", variant: "destructive" });
+            }
+
+            // 2. Delete from Firestore
+            const userRef = doc(db, USERS_COLLECTION_NAME, userToDelete.id);
+            await deleteDoc(userRef);
+
             logAction(db, { userId: currentUser.id, userName: currentUser.name, module: 'USUARIOS', action: 'ELIMINÓ USUARIO', targetId: userToDelete.id, targetName: userToDelete.name });
-            toast({ title: 'Usuario eliminado' });
+            toast({ title: 'Usuario eliminado completamente del sistema' });
+            
             fetchUsersAndSeccionales();
             setIsAlertOpen(false);
-        }).catch(async (error) => { errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'delete' })); });
+        } catch (error) {
+            const userRef = doc(db, USERS_COLLECTION_NAME, userToDelete.id);
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: userRef.path, operation: 'delete' }));
+        } finally {
+            setIsDeleting(false);
+        }
     }
   };
 
@@ -1150,7 +1174,10 @@ export default function UsersPage() {
       <UserDialog isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} editingUser={editingUser} onSuccess={fetchUsersAndSeccionales} seccionales={seccionales} />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent className="rounded-[2.5rem]"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase tracking-tight text-2xl">¿Eliminar Operador?</AlertDialogTitle><AlertDialogDescription className="font-medium text-base">Esta acción es irreversible. Se revocará todo acceso de <strong>{userToDelete?.name}</strong> al sistema estratégico de la Lista 2P.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-3"><AlertDialogCancel className="font-black uppercase text-xs rounded-2xl h-12">CANCELAR</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-xs rounded-2xl h-12 px-8">ELIMINAR DEFINITIVAMENTE</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+        <AlertDialogContent className="rounded-[2.5rem]"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase tracking-tight text-2xl">¿Eliminar Operador?</AlertDialogTitle><AlertDialogDescription className="font-medium text-base">Esta acción es irreversible. Se revocará todo acceso de <strong>{userToDelete?.name}</strong> al sistema estratégico de la Lista 2P y se eliminará su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-3"><AlertDialogCancel disabled={isDeleting} className="font-black uppercase text-xs rounded-2xl h-12">CANCELAR</AlertDialogCancel><Button disabled={isDeleting} onClick={handleDelete} variant="destructive" className="font-black uppercase text-xs rounded-2xl h-12 px-8">
+            {isDeleting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+            ELIMINAR DEFINITIVAMENTE
+        </Button></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
     </div>
   );

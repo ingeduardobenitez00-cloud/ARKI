@@ -29,7 +29,8 @@ import {
     QrCode,
     BarChart3,
     Image as ImageIcon,
-    FileSpreadsheet
+    FileSpreadsheet,
+    PhoneCall
 } from 'lucide-react';
 
 export const allMenuItems = [
@@ -39,6 +40,7 @@ export const allMenuItems = [
   { href: '/padron-export', label: 'Padrón Exportar', icon: FileDown, tooltip: 'GENERA REPORTES EN EXCEL Y PDF POR SECCIONAL.' },
   { href: '/consulta', label: 'Registra Votos', icon: FileSearch, tooltip: 'BUSCA ELECTORES Y MARCA SU VOTO COMO SEGURO.' },
   { href: '/telefonos', label: 'Actualizar Teléfonos', icon: Phone, tooltip: 'AGREGA O ACTUALIZA LOS NÚMEROS DE TELÉFONO DE LOS EMPADRONADOS.' },
+  { href: '/seguimiento-llamadas', label: 'Call Center', icon: PhoneCall, tooltip: 'ESCANEA EL PADRÓN Y REGISTRA EL SEGUIMIENTO DE LLAMADAS.' },
   { href: '/migrar-celulares', label: 'Migrar Celulares', icon: FileSpreadsheet, tooltip: 'MIGRA NÚMEROS DE CELULARES DESDE EXCEL AL PADRÓN NACIONAL Y COMPENDIO.' },
   { href: '/migrar-votos', label: 'Migrar Votos Seguros', icon: FileSpreadsheet, tooltip: 'MIGRA VOTOS SEGUROS DESDE EXCEL DE FORMA MASIVA ASOCIANDO OPERADORES.' },
   { href: '/biblioteca', label: 'Biblioteca Multimedia', icon: Film, tooltip: 'GESTIONA LA BIBLIOTECA DE IMÁGENES Y VIDEOS DEL SISTEMA.' },
@@ -59,6 +61,7 @@ export const allMenuItems = [
   { href: '/auditoria', label: 'Auditoría', icon: ShieldCheck, tooltip: 'MONITOREA LAS ACCIONES REALIZADAS POR LOS USUARIOS EN EL SISTEMA.' },
   { href: '/conexiones', label: 'Conexiones', icon: Wifi, tooltip: 'MONITOREA LOS USUARIOS CONECTADOS AL SISTEMA.' },
   { href: '/users', label: 'Usuarios', icon: Users, tooltip: 'GESTIONA LOS USUARIOS Y SUS PERMISOS.' },
+  { href: '/control-operadores', label: 'Rendimiento Operadores', icon: BarChart3, tooltip: 'MIDE Y CONTROLA EL RENDIMIENTO DE VOTOS SEGUROS DE CADA OPERADOR.' },
   { href: '/configuracion', label: 'Configuración', icon: Settings, tooltip: 'CONFIGURA PARÁMETROS TÉCNICOS E IDENTIDAD PWA.' },
   { href: '/perfil', label: 'Mi Perfil', icon: UserCircle, tooltip: 'GESTIONA TU INFORMACIÓN PERSONAL Y CAMBIA TU CONTRASEÑA.' },
   { href: '/laboratorio-qr', label: 'Laboratorio QR', icon: Cpu, tooltip: 'INGENIERÍA INVERSA Y VALIDACIÓN DE ACTAS.' },
@@ -91,7 +94,7 @@ export const menuCategories = [
   {
     label: 'Comunicación',
     icon: Share2,
-    items: ['/telefonos', '/migrar-celulares', '/biblioteca', '/difusion', '/difusion-masiva']
+    items: ['/telefonos', '/seguimiento-llamadas', '/migrar-celulares', '/biblioteca', '/difusion', '/difusion-masiva']
   },
   {
     label: 'Operación Día D',
@@ -106,7 +109,7 @@ export const menuCategories = [
   {
     label: 'Panel Maestro',
     icon: ShieldCheck,
-    items: ['/auditoria', '/conexiones', '/users', '/configuracion']
+    items: ['/auditoria', '/conexiones', '/users', '/control-operadores', '/configuracion']
   }
 ];
 
@@ -121,10 +124,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']
@@ -133,6 +136,6 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
   },
   'Comunicaciones': {
-    permissions: ['/', '/telefonos', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
+    permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
   }
 };
