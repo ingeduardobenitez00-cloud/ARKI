@@ -932,7 +932,7 @@ export default function DifusionPage() {
                                 </div>
 
                                 {isBirthdayMode && (
-                                    <div className="grid grid-cols-2 gap-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="grid grid-cols-2 gap-2">
                                         <div className="space-y-1">
                                             <Label className="text-[8px] font-black uppercase ml-1">Mes</Label>
                                             <Select value={birthdayMonth} onValueChange={setBirthdayMonth}>
@@ -1021,7 +1021,7 @@ export default function DifusionPage() {
                                 </div>
 
                                 {activeTab === 'votos' && (
-                                    <div className="space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                                    <div className="space-y-1">
                                         <Label className="text-[10px] font-black uppercase ml-1 text-primary">Cargado Por (Registrador)</Label>
                                         <Select value={selectedOperatorFilter} onValueChange={setSelectedOperatorFilter}>
                                             <SelectTrigger className="h-11 font-bold text-xs rounded-xl border-primary/30"><SelectValue placeholder="Todos los operadores..." /></SelectTrigger>
