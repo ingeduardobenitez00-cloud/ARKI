@@ -6,6 +6,7 @@ import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { 
     Search, 
     Loader2, 
@@ -82,6 +83,9 @@ export default function SeguimientoLlamadasPage() {
 
     const [metadata, setMetadata] = useState<any>(null);
     const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
+    
+    // Lista de personas llamadas en la sesión actual
+    const [calledPersons, setCalledPersons] = useState<PadronData[]>([]);
 
     useEffect(() => {
         if (selectedPerson) {
@@ -272,6 +276,17 @@ export default function SeguimientoLlamadasPage() {
                 const updated = { ...selectedPerson, ...dataToUpdate };
                 setSelectedPerson(updated);
                 setSearchResults(prev => prev.map(p => p.id === selectedPerson.id ? updated : p));
+                
+                // Agregar a la lista de llamadas recientes
+                setCalledPersons(prev => {
+                    const alreadyExists = prev.findIndex(p => p.id === updated.id);
+                    if (alreadyExists >= 0) {
+                        const newArray = [...prev];
+                        newArray[alreadyExists] = updated;
+                        return newArray;
+                    }
+                    return [updated, ...prev];
+                });
                 
                 toast({ title: '¡Gestión Guardada!', description: 'El seguimiento de la llamada ha sido actualizado.' });
             })
@@ -618,6 +633,57 @@ export default function SeguimientoLlamadasPage() {
                     </Card>
                 </div>
             </div>
+
+            {/* Lista de personas ya llamadas */}
+            {calledPersons.length > 0 && (
+                <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <Card className="border-primary/10 shadow-sm overflow-hidden">
+                        <CardHeader className="bg-primary/5 border-b py-4">
+                            <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
+                                <span className="flex items-center gap-2 text-primary">
+                                    <History className="h-4 w-4" /> Registro de Llamadas (Sesión Actual)
+                                </span>
+                                <Badge variant="secondary" className="bg-white">{calledPersons.length}</Badge>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow className="bg-muted/30 text-[9px] font-black uppercase border-b">
+                                        <TableHead className="pl-6 py-3">Elector</TableHead>
+                                        <TableHead>Estado</TableHead>
+                                        <TableHead>Comentario</TableHead>
+                                        <TableHead className="text-right pr-6">Hora</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {calledPersons.map(person => (
+                                        <TableRow key={person.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedPerson(person)}>
+                                            <TableCell className="pl-6 py-3">
+                                                <div className="flex flex-col">
+                                                    <span className="font-black text-[10px] uppercase text-slate-900">{person.NOMBRE} {person.APELLIDO}</span>
+                                                    <span className="text-[9px] text-slate-500 font-bold mt-0.5">C.I. {person.CEDULA} | SECC {person.CODIGO_SEC}</span>
+                                                </div>
+                                            </TableCell>
+                                            <TableCell>
+                                                {getStatusBadge(person.ESTADO_LLAMADA)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <span className="text-[10px] font-medium text-slate-600 line-clamp-2 max-w-xs">{person.COMENTARIO_LLAMADA || '-'}</span>
+                                            </TableCell>
+                                            <TableCell className="text-right pr-6">
+                                                <span className="text-[9px] text-muted-foreground font-bold">
+                                                    {person.ultimaLlamada_fecha ? new Date(person.ultimaLlamada_fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
+                                                </span>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
         </div>
     );
 }

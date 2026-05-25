@@ -196,6 +196,12 @@ export default function RendimientoOperadoresPage() {
                 tableRows.push(rowData);
             });
 
+            tableRows.push([
+                { content: 'TOTAL CARGADO', styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+                { content: '-', styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+                { content: totalVotosGlobal.toString(), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+            ]);
+
             autoTable(doc, {
                 head: [tableColumn],
                 body: tableRows,
