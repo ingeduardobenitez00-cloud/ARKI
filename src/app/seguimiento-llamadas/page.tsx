@@ -80,6 +80,8 @@ export default function SeguimientoLlamadasPage() {
     const [estadoLlamada, setEstadoLlamada] = useState<string>('');
     const [comentario, setComentario] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [editingPhone, setEditingPhone] = useState('');
+    const [isSavingPhone, setIsSavingPhone] = useState(false);
 
     const [metadata, setMetadata] = useState<any>(null);
     const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
@@ -91,9 +93,11 @@ export default function SeguimientoLlamadasPage() {
         if (selectedPerson) {
             setEstadoLlamada(selectedPerson.ESTADO_LLAMADA || '');
             setComentario(selectedPerson.COMENTARIO_LLAMADA || '');
+            setEditingPhone(selectedPerson.TELEFONO || '');
         } else {
             setEstadoLlamada('');
             setComentario('');
+            setEditingPhone('');
         }
     }, [selectedPerson]);
 
@@ -206,9 +210,6 @@ export default function SeguimientoLlamadasPage() {
             
             let foundResults = Array.from(resultsMap.values());
 
-            // 1. Filtrar SOLO los que tienen número de teléfono válido
-            foundResults = foundResults.filter(p => p.TELEFONO && p.TELEFONO.trim() !== '');
-
             // 2. Filtros en memoria adicionales si faltaron en la query
             if (sec) {
                 if (loc && !mes) {
@@ -298,6 +299,31 @@ export default function SeguimientoLlamadasPage() {
                 }));
             })
             .finally(() => setIsSaving(false));
+    };
+
+    const handleSavePhone = async () => {
+        if (!selectedPerson || !db || !user) return;
+        setIsSavingPhone(true);
+        
+        const personRef = doc(db, COLLECTION_NAME, selectedPerson.id);
+        const dataToUpdate = { TELEFONO: editingPhone };
+
+        updateDoc(personRef, dataToUpdate)
+            .then(() => {
+                const updated = { ...selectedPerson, ...dataToUpdate };
+                setSelectedPerson(updated);
+                setSearchResults(prev => prev.map(p => p.id === selectedPerson.id ? updated : p));
+                toast({ title: 'Teléfono Guardado', description: 'El número de teléfono ha sido actualizado exitosamente.' });
+            })
+            .catch(async (error) => {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: personRef.path,
+                    operation: 'update',
+                    requestResourceData: dataToUpdate
+                }));
+                toast({ title: 'Error', description: 'No se pudo guardar el teléfono.', variant: 'destructive' });
+            })
+            .finally(() => setIsSavingPhone(false));
     };
 
     const getStatusBadge = (status?: string) => {
@@ -551,7 +577,10 @@ export default function SeguimientoLlamadasPage() {
                                         </div>
                                         {selectedPerson.TELEFONO ? (
                                             <div className="md:border-l border-slate-200 md:pl-6 pt-4 md:pt-0 space-y-2 flex flex-col justify-center">
-                                                <Label className="text-[9px] font-black uppercase text-green-600 tracking-widest">Teléfono Principal</Label>
+                                                <Label className="text-[9px] font-black uppercase text-green-600 tracking-widest flex items-center justify-between w-full">
+                                                    <span>Teléfono Principal</span>
+                                                    <Button variant="ghost" size="sm" className="h-6 px-2 text-[8px] bg-slate-100 hover:bg-slate-200" onClick={() => setSelectedPerson({ ...selectedPerson, TELEFONO: '' })}>Editar</Button>
+                                                </Label>
                                                 <a href={`tel:${selectedPerson.TELEFONO.replace(/\D/g,'')}`} className="text-2xl font-black text-green-700 hover:underline">
                                                     {selectedPerson.TELEFONO}
                                                 </a>
@@ -561,9 +590,24 @@ export default function SeguimientoLlamadasPage() {
                                                 </a>
                                             </div>
                                         ) : (
-                                            <div className="md:border-l border-slate-200 md:pl-6 pt-4 md:pt-0 space-y-2 flex flex-col justify-center text-red-500 opacity-60">
-                                                <PhoneOff className="h-8 w-8" />
-                                                <p className="text-[10px] font-black uppercase">Sin contacto disponible</p>
+                                            <div className="md:border-l border-slate-200 md:pl-6 pt-4 md:pt-0 space-y-2 flex flex-col justify-center">
+                                                <Label className="text-[9px] font-black uppercase tracking-widest text-slate-500">Agregar Teléfono</Label>
+                                                <div className="flex gap-2">
+                                                    <Input 
+                                                        value={editingPhone} 
+                                                        onChange={(e) => setEditingPhone(e.target.value)} 
+                                                        placeholder="09xx-xxx-xxx" 
+                                                        className="h-10 text-xs font-black uppercase border-slate-300"
+                                                    />
+                                                    <Button 
+                                                        onClick={handleSavePhone} 
+                                                        disabled={isSavingPhone || !editingPhone.trim()}
+                                                        className="h-10 bg-slate-800 hover:bg-slate-700 text-white shadow-sm"
+                                                    >
+                                                        {isSavingPhone ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                                                    </Button>
+                                                </div>
+                                                <p className="text-[8px] font-bold text-red-500 uppercase">Sin teléfono registrado</p>
                                             </div>
                                         )}
                                     </div>
