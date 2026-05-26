@@ -333,7 +333,7 @@ export default function MigrarVotosPage() {
                 String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
                 .replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim()
             );
-            return userSecs.includes(secCode) && (u.role === 'Dirigente' || u.role === 'Coordinador');
+            return userSecs.includes(secCode) && (u.role === 'Dirigente' || u.role === 'Coordinador' || u.role === 'Presidente');
         });
     };
 

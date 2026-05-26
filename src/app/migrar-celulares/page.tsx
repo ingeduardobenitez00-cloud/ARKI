@@ -313,6 +313,11 @@ export default function MigrarCelularesPage() {
             });
 
             if (Object.keys(chunkMap).length === 0) {
+                const processed = Math.min(i + queryBatchSize, totalRecords);
+                const percent = Math.round((processed / totalRecords) * 100);
+                setProgress(percent);
+                setProcessedCount(processed);
+                setSkippedCount(localSkipped);
                 continue;
             }
 
@@ -419,6 +424,13 @@ export default function MigrarCelularesPage() {
             console.warn("Fallo al registrar auditoría:", auditErr);
         }
 
+        // Forzar actualización final de la interfaz
+        setProgress(100);
+        setProcessedCount(totalRecords);
+        setUpdatedPadronCount(localUpdatedPadron);
+        setUpdatedCapturasCount(localUpdatedCapturas);
+        setSkippedCount(localSkipped);
+
         setStatus('done');
         addLog('success', '🎉 ¡Migración finalizada con éxito!');
         addLog('success', `------------------------------------------------`);
@@ -505,6 +517,11 @@ export default function MigrarCelularesPage() {
             });
 
             if (Object.keys(chunkMap).length === 0) {
+                const processed = Math.min(i + queryBatchSize, totalRecords);
+                const percent = Math.round((processed / totalRecords) * 100);
+                setProgress(percent);
+                setProcessedCount(processed);
+                setSkippedCount(localSkipped);
                 continue;
             }
 
@@ -601,6 +618,13 @@ export default function MigrarCelularesPage() {
         } catch (auditErr) {
             console.warn("Fallo al registrar auditoría:", auditErr);
         }
+
+        // Forzar actualización final de la interfaz
+        setProgress(100);
+        setProcessedCount(totalRecords);
+        setUpdatedPadronCount(localUpdatedPadron);
+        setUpdatedCapturasCount(localUpdatedCapturas);
+        setSkippedCount(localSkipped);
 
         setStatus('done');
         addLog('success', '🔄 ¡Reversión finalizada con éxito!');
