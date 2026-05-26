@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, getDocs, doc, writeBatch, deleteField } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch, deleteField, query, where, limit } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -133,7 +133,7 @@ export default function MigrarCelularesPage() {
                 const workbook = XLSX.read(bstr, { type: 'binary', cellDates: true });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
 
                 if (jsonData.length === 0) {
                     addLog('error', 'El archivo Excel está vacío.');
@@ -265,96 +265,144 @@ export default function MigrarCelularesPage() {
         let localNotFound = 0;
         let localSkipped = 0;
 
-        // Procesamiento en lotes
+        // Procesamiento en lotes para consultas Firestore
         let currentBatch = writeBatch(db);
         let currentBatchSize = 0;
+        const queryBatchSize = 30;
 
-        for (let i = 0; i < totalRecords; i++) {
-            const row = sheetData[i];
-            const rawCed = row[mapping.cedula];
-            const rawTel = row[mapping.telefono];
+        for (let i = 0; i < totalRecords; i += queryBatchSize) {
+            const chunk = sheetData.slice(i, i + queryBatchSize);
+            
+            const chunkMap: Record<string, { telClean: string, row: any }> = {};
+            const cedulasNumericas: number[] = [];
+            const cedulasStrings: string[] = [];
 
-            // 1. Limpieza y validación de Cédula
-            if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
-                localSkipped++;
-                continue;
-            }
-
-            // Sanitizar cédula (debe ser número entero representado en string)
-            const cedulaStr = String(rawCed).replace(/\D/g, '');
-            if (cedulaStr === '') {
-                localSkipped++;
-                continue;
-            }
-
-            // 2. Limpieza de Teléfono (Fórmula matemática infalible de los últimos 9 dígitos)
-            let telRaw = rawTel !== undefined && rawTel !== null ? String(rawTel).replace(/\D/g, '') : '';
-            if (telRaw.toLowerCase() === 'null' || telRaw.toLowerCase() === 'undefined') {
-                telRaw = '';
-            }
-
-            let telClean = '';
-            if (telRaw !== '') {
-                if (telRaw.length >= 9) {
-                    telClean = '595' + telRaw.slice(-9);
-                } else {
-                    telClean = '595' + telRaw.replace(/^0+/, '');
+            chunk.forEach(row => {
+                const rawCed = row[mapping.cedula];
+                if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
+                    localSkipped++;
+                    return;
                 }
-            }
+                
+                const cedulaStr = String(rawCed).replace(/\D/g, '');
+                if (cedulaStr === '') {
+                    localSkipped++;
+                    return;
+                }
 
-            if (telClean === '595' || telClean === '') {
-                localSkipped++;
+                let telRaw = row[mapping.telefono] !== undefined && row[mapping.telefono] !== null ? String(row[mapping.telefono]).replace(/\D/g, '') : '';
+                if (telRaw.toLowerCase() === 'null' || telRaw.toLowerCase() === 'undefined') telRaw = '';
+
+                let telClean = '';
+                if (telRaw !== '') {
+                    if (telRaw.length >= 9) {
+                        telClean = '595' + telRaw.slice(-9);
+                    } else {
+                        telClean = '595' + telRaw.replace(/^0+/, '');
+                    }
+                }
+
+                if (telClean === '595' || telClean === '') {
+                    localSkipped++;
+                    return;
+                }
+
+                chunkMap[cedulaStr] = { telClean, row };
+                cedulasNumericas.push(Number(cedulaStr));
+                cedulasStrings.push(cedulaStr);
+            });
+
+            if (Object.keys(chunkMap).length === 0) {
                 continue;
             }
 
-            // 3. Preparación de actualización de Padrón (sheet1)
-            const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
-            const updateObj: any = {
-                [targetColumn]: telClean, // Guardar en el destino seleccionado
-                telefonoUpdatedBy_id: user.id,
-                telefonoUpdatedBy_nombre: user.name,
-                telefonoUpdatedAt: new Date().toISOString()
-            };
+            const fetchedDocs: Record<string, string> = {};
 
-            currentBatch.set(padronRef, updateObj, { merge: true });
-            currentBatchSize++;
-            localUpdatedPadron++;
+            try {
+                if (cedulasNumericas.length > 0) {
+                    const uniqueNum = Array.from(new Set(cedulasNumericas)).filter(n => !isNaN(n));
+                    if (uniqueNum.length > 0) {
+                        const qNum = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', uniqueNum));
+                        const snapNum = await getDocs(qNum);
+                        snapNum.forEach(docSnap => {
+                            const ced = String(docSnap.data().CEDULA).replace(/\D/g, '');
+                            fetchedDocs[ced] = docSnap.id;
+                        });
+                    }
+                }
 
-            // 4. Sincronización Doble: Actualización de Votos Seguros (votos_confirmados) si existe
-            if (activeCapturasSet.has(cedulaStr)) {
-                const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
-                currentBatch.set(capturasRef, {
-                    [targetColumn]: telClean, // Guardar en campo seleccionado
-                    updatedAt: new Date().toISOString(),
-                    updatedBy_id: user.id,
-                    updatedBy_nombre: user.name
-                }, { merge: true });
-                currentBatchSize++;
-                localUpdatedCapturas++;
+                const remaining = Array.from(new Set(cedulasStrings)).filter(c => !fetchedDocs[c]);
+                if (remaining.length > 0) {
+                    const qStr = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', remaining));
+                    const snapStr = await getDocs(qStr);
+                    snapStr.forEach(docSnap => {
+                        const ced = String(docSnap.data().CEDULA).replace(/\D/g, '');
+                        fetchedDocs[ced] = docSnap.id;
+                    });
+                }
+            } catch (err) {
+                console.error("Error querying chunk", err);
             }
 
-            // 5. Commit del lote al alcanzar el tamaño máximo de Firebase (500 operaciones de escritura)
-            if (currentBatchSize >= 450 || i === totalRecords - 1) {
-                try {
+            for (const cedulaStr of Object.keys(chunkMap)) {
+                const { telClean } = chunkMap[cedulaStr];
+                const docId = fetchedDocs[cedulaStr];
+
+                if (!docId) {
+                    localSkipped++;
+                    continue;
+                }
+
+                const padronRef = doc(db, COLLECTION_PADRON, docId);
+                const updateObj: any = {
+                    [targetColumn]: telClean,
+                    telefonoUpdatedBy_id: user.id,
+                    telefonoUpdatedBy_nombre: user.name,
+                    telefonoUpdatedAt: new Date().toISOString()
+                };
+
+                currentBatch.set(padronRef, updateObj, { merge: true });
+                currentBatchSize++;
+                localUpdatedPadron++;
+
+                if (activeCapturasSet.has(docId)) {
+                    const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
+                    currentBatch.set(capturasRef, {
+                        [targetColumn]: telClean,
+                        updatedAt: new Date().toISOString(),
+                        updatedBy_id: user.id,
+                        updatedBy_nombre: user.name
+                    }, { merge: true });
+                    currentBatchSize++;
+                    localUpdatedCapturas++;
+                }
+
+                if (currentBatchSize >= 450) {
                     await currentBatch.commit();
                     currentBatch = writeBatch(db);
                     currentBatchSize = 0;
-
-                    // Actualizar estados del progreso en la interfaz
-                    const processed = i + 1;
-                    const percent = Math.round((processed / totalRecords) * 100);
-                    
-                    setProgress(percent);
-                    setProcessedCount(processed);
-                    setUpdatedPadronCount(localUpdatedPadron);
-                    setUpdatedCapturasCount(localUpdatedCapturas);
-                    setSkippedCount(localSkipped);
-
-                    addLog('info', `Progreso: ${processed}/${totalRecords} procesados...`);
-                } catch (batchErr) {
-                    console.error("Error al commitear lote de Firebase:", batchErr);
-                    addLog('error', `❌ Error al guardar lote en Firestore. Continuando con el siguiente...`);
                 }
+            }
+
+            const processed = Math.min(i + queryBatchSize, totalRecords);
+            const percent = Math.round((processed / totalRecords) * 100);
+            
+            setProgress(percent);
+            setProcessedCount(processed);
+            setUpdatedPadronCount(localUpdatedPadron);
+            setUpdatedCapturasCount(localUpdatedCapturas);
+            setSkippedCount(localSkipped);
+            
+            if (processed % 300 === 0 || processed === totalRecords) {
+                addLog('info', `Progreso: ${processed}/${totalRecords} procesados...`);
+            }
+        }
+
+        if (currentBatchSize > 0) {
+            try {
+                await currentBatch.commit();
+            } catch (e) {
+                console.error(e);
             }
         }
 
@@ -429,64 +477,115 @@ export default function MigrarCelularesPage() {
 
         let currentBatch = writeBatch(db);
         let currentBatchSize = 0;
+        const queryBatchSize = 30;
 
-        for (let i = 0; i < totalRecords; i++) {
-            const row = sheetData[i];
-            const rawCed = row[mapping.cedula];
+        for (let i = 0; i < totalRecords; i += queryBatchSize) {
+            const chunk = sheetData.slice(i, i + queryBatchSize);
+            
+            const chunkMap: Record<string, boolean> = {};
+            const cedulasNumericas: number[] = [];
+            const cedulasStrings: string[] = [];
 
-            // 1. Limpieza y validación de Cédula
-            if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
-                localSkipped++;
+            chunk.forEach(row => {
+                const rawCed = row[mapping.cedula];
+                if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
+                    localSkipped++;
+                    return;
+                }
+                
+                const cedulaStr = String(rawCed).replace(/\D/g, '');
+                if (cedulaStr === '') {
+                    localSkipped++;
+                    return;
+                }
+
+                chunkMap[cedulaStr] = true;
+                cedulasNumericas.push(Number(cedulaStr));
+                cedulasStrings.push(cedulaStr);
+            });
+
+            if (Object.keys(chunkMap).length === 0) {
                 continue;
             }
 
-            const cedulaStr = String(rawCed).replace(/\D/g, '');
-            if (cedulaStr === '') {
-                localSkipped++;
-                continue;
+            const fetchedDocs: Record<string, string> = {};
+
+            try {
+                if (cedulasNumericas.length > 0) {
+                    const uniqueNum = Array.from(new Set(cedulasNumericas)).filter(n => !isNaN(n));
+                    if (uniqueNum.length > 0) {
+                        const qNum = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', uniqueNum));
+                        const snapNum = await getDocs(qNum);
+                        snapNum.forEach(docSnap => {
+                            const ced = String(docSnap.data().CEDULA).replace(/\D/g, '');
+                            fetchedDocs[ced] = docSnap.id;
+                        });
+                    }
+                }
+
+                const remaining = Array.from(new Set(cedulasStrings)).filter(c => !fetchedDocs[c]);
+                if (remaining.length > 0) {
+                    const qStr = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', remaining));
+                    const snapStr = await getDocs(qStr);
+                    snapStr.forEach(docSnap => {
+                        const ced = String(docSnap.data().CEDULA).replace(/\D/g, '');
+                        fetchedDocs[ced] = docSnap.id;
+                    });
+                }
+            } catch (err) {
+                console.error("Error querying chunk", err);
             }
 
-            // 2. Preparación de borrado en Padrón (sheet1)
-            const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
-            currentBatch.set(padronRef, {
-                [targetColumn]: deleteField(),
-                // No borramos TELEFONO manual, solo la columna seleccionada
-            }, { merge: true });
+            for (const cedulaStr of Object.keys(chunkMap)) {
+                const docId = fetchedDocs[cedulaStr];
 
-            currentBatchSize++;
-            localUpdatedPadron++;
+                if (!docId) {
+                    localSkipped++;
+                    continue;
+                }
 
-            // 3. Borrado en Votos Seguros (votos_confirmados) si existe
-            if (activeCapturasSet.has(cedulaStr)) {
-                const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
-                currentBatch.set(capturasRef, {
+                const padronRef = doc(db, COLLECTION_PADRON, docId);
+                currentBatch.set(padronRef, {
                     [targetColumn]: deleteField()
                 }, { merge: true });
                 currentBatchSize++;
-                localUpdatedCapturas++;
-            }
+                localUpdatedPadron++;
 
-            // Commit batch at size limits
-            if (currentBatchSize >= 450 || i === totalRecords - 1) {
-                try {
+                if (activeCapturasSet.has(docId)) {
+                    const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
+                    currentBatch.set(capturasRef, {
+                        [targetColumn]: deleteField()
+                    }, { merge: true });
+                    currentBatchSize++;
+                    localUpdatedCapturas++;
+                }
+
+                if (currentBatchSize >= 450) {
                     await currentBatch.commit();
                     currentBatch = writeBatch(db);
                     currentBatchSize = 0;
-
-                    const processed = i + 1;
-                    const percent = Math.round((processed / totalRecords) * 100);
-                    
-                    setProgress(percent);
-                    setProcessedCount(processed);
-                    setUpdatedPadronCount(localUpdatedPadron);
-                    setUpdatedCapturasCount(localUpdatedCapturas);
-                    setSkippedCount(localSkipped);
-
-                    addLog('info', `Progreso: ${processed}/${totalRecords} revertidos...`);
-                } catch (batchErr) {
-                    console.error("Error al revertir lote de Firebase:", batchErr);
-                    addLog('error', `❌ Error al revertir lote en Firestore. Continuando con el siguiente...`);
                 }
+            }
+
+            const processed = Math.min(i + queryBatchSize, totalRecords);
+            const percent = Math.round((processed / totalRecords) * 100);
+            
+            setProgress(percent);
+            setProcessedCount(processed);
+            setUpdatedPadronCount(localUpdatedPadron);
+            setUpdatedCapturasCount(localUpdatedCapturas);
+            setSkippedCount(localSkipped);
+            
+            if (processed % 300 === 0 || processed === totalRecords) {
+                addLog('info', `Progreso: ${processed}/${totalRecords} revertidos...`);
+            }
+        }
+
+        if (currentBatchSize > 0) {
+            try {
+                await currentBatch.commit();
+            } catch (e) {
+                console.error(e);
             }
         }
 
