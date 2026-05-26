@@ -28,6 +28,7 @@ import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -86,8 +87,25 @@ export default function SeguimientoLlamadasPage() {
     const [metadata, setMetadata] = useState<any>(null);
     const [isLoadingMetadata, setIsLoadingMetadata] = useState(false);
     
-    // Lista de personas llamadas en la sesión actual
-    const [calledPersons, setCalledPersons] = useState<PadronData[]>([]);
+    // Historial global reciente y filtros
+    const [recentCalls, setRecentCalls] = useState<PadronData[]>([]);
+    const [isLoadingRecent, setIsLoadingRecent] = useState(false);
+    const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CALLED'>('ALL');
+    const [visibleCount, setVisibleCount] = useState(100);
+
+    const filteredResults = useMemo(() => {
+        if (filterStatus === 'PENDING') return searchResults.filter(p => !p.ESTADO_LLAMADA);
+        if (filterStatus === 'CALLED') return searchResults.filter(p => p.ESTADO_LLAMADA);
+        return searchResults;
+    }, [searchResults, filterStatus]);
+
+    const displayedResults = useMemo(() => {
+        return filteredResults.slice(0, visibleCount);
+    }, [filteredResults, visibleCount]);
+
+    useEffect(() => {
+        setVisibleCount(100);
+    }, [searchResults, filterStatus]);
 
     useEffect(() => {
         if (selectedPerson) {
@@ -130,6 +148,35 @@ export default function SeguimientoLlamadasPage() {
         }, 500);
         return () => clearTimeout(timer);
     }, [searchSeccional, db]);
+
+    const fetchRecentCalls = async () => {
+        if (!db) return;
+        setIsLoadingRecent(true);
+        try {
+            const d = new Date();
+            d.setDate(d.getDate() - 30); // Últimos 30 días
+            const q = query(
+                collection(db, COLLECTION_NAME),
+                where('ultimaLlamada_fecha', '>=', d.toISOString()),
+                orderBy('ultimaLlamada_fecha', 'desc'),
+                limit(50)
+            );
+            const snap = await getDocs(q);
+            const calls: PadronData[] = [];
+            snap.forEach(doc => {
+                calls.push({ id: doc.id, ...doc.data() } as PadronData);
+            });
+            setRecentCalls(calls);
+        } catch (error) {
+            console.error("Error fetching recent calls", error);
+        } finally {
+            setIsLoadingRecent(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchRecentCalls();
+    }, [db]);
 
     const localesList = useMemo(() => metadata?.locales || [], [metadata]);
     const mesasList = useMemo(() => {
@@ -278,15 +325,15 @@ export default function SeguimientoLlamadasPage() {
                 setSelectedPerson(updated);
                 setSearchResults(prev => prev.map(p => p.id === selectedPerson.id ? updated : p));
                 
-                // Agregar a la lista de llamadas recientes
-                setCalledPersons(prev => {
+                // Agregar a la lista de llamadas recientes global
+                setRecentCalls(prev => {
                     const alreadyExists = prev.findIndex(p => p.id === updated.id);
                     if (alreadyExists >= 0) {
                         const newArray = [...prev];
                         newArray[alreadyExists] = updated;
                         return newArray;
                     }
-                    return [updated, ...prev];
+                    return [updated, ...prev].slice(0, 50);
                 });
                 
                 toast({ title: '¡Gestión Guardada!', description: 'El seguimiento de la llamada ha sido actualizado.' });
@@ -334,17 +381,13 @@ export default function SeguimientoLlamadasPage() {
     };
 
     const handlePrintReport = () => {
-        if (searchResults.length === 0) {
-            toast({ title: "Sin datos", description: "Realiza una búsqueda primero para generar el reporte." });
+        if (recentCalls.length === 0) {
+            toast({ title: "Sin datos", description: "No hay registros de llamadas recientes para imprimir." });
             return;
         }
         setIsPrinting(true);
         
         try {
-            // Filtramos solo los que se procesaron HOY o en general los de la lista para imprimir.
-            // Para ser útiles al usuario, imprimimos todos los de la búsqueda actual que tienen estado o todos.
-            // Imprimiremos la lista actual de searchResults.
-            
             const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             
@@ -352,34 +395,28 @@ export default function SeguimientoLlamadasPage() {
             doc.text("REPORTE DE SEGUIMIENTO DE LLAMADAS", pageWidth / 2, 15, { align: 'center' });
             
             doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-            let subtitle = [];
-            if (searchSeccional) subtitle.push(`SECCIONAL: ${searchSeccional}`);
-            if (searchLocal) subtitle.push(`LOCAL: ${searchLocal}`);
-            if (searchMesa) subtitle.push(`MESA: ${searchMesa}`);
-            
-            doc.text(subtitle.length > 0 ? subtitle.join(' | ') : "REPORTE GENERAL", pageWidth / 2, 22, { align: 'center' });
+            doc.text("HISTORIAL DE ÚLTIMAS LLAMADAS", pageWidth / 2, 22, { align: 'center' });
 
-            const tableColumn = ["CÉDULA", "ELECTOR", "TELÉFONO", "LOCAL/MESA", "ESTADO", "COMENTARIO"];
-            const tableRows = searchResults.map(p => [
-                p.CEDULA,
+            const tableColumn = ["ELECTOR", "CÉDULA / SECC", "ESTADO", "COMENTARIO", "OPERADOR / HORA"];
+            const tableRows = recentCalls.map(p => [
                 `${p.NOMBRE} ${p.APELLIDO}`,
-                p.TELEFONO || '---',
-                `${p.LOCAL || ''} (M${p.MESA || '-'})`,
+                `C.I. ${p.CEDULA}\nSECC ${p.CODIGO_SEC || '-'}`,
                 CALL_STATES.find(s => s.id === p.ESTADO_LLAMADA)?.label || 'PENDIENTE',
-                (p.COMENTARIO_LLAMADA || '').substring(0, 40)
+                (p.COMENTARIO_LLAMADA || '').substring(0, 60),
+                `${p.ultimaLlamada_por || '-'}\n${p.ultimaLlamada_fecha ? new Date(p.ultimaLlamada_fecha).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'}) : ''}`
             ]);
 
             (doc as any).autoTable({ 
                 head: [tableColumn], 
                 body: tableRows, 
                 startY: 28, 
-                styles: { fontSize: 6, cellPadding: 1, halign: 'center' }, 
+                styles: { fontSize: 7, cellPadding: 2, halign: 'center' }, 
                 headStyles: { fillColor: [239, 68, 68] }, 
                 margin: { top: 28, left: 5, right: 5 } 
             });
             
             const today = new Date().toISOString().split('T')[0];
-            doc.save(`Reporte_Llamadas_${searchSeccional || 'General'}_${today}.pdf`);
+            doc.save(`Reporte_Historial_Llamadas_${today}.pdf`);
             toast({ title: "Reporte generado", description: "El PDF se ha descargado correctamente." });
         } catch (error) {
             console.error(error);
@@ -405,7 +442,7 @@ export default function SeguimientoLlamadasPage() {
                     <Button 
                         variant="outline" 
                         onClick={handlePrintReport} 
-                        disabled={isPrinting || searchResults.length === 0}
+                        disabled={isPrinting || recentCalls.length === 0}
                         className="font-black uppercase text-[10px] border-primary/20 hover:bg-primary/5 text-primary h-10"
                     >
                         {isPrinting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Printer className="mr-2 h-4 w-4" />}
@@ -494,22 +531,31 @@ export default function SeguimientoLlamadasPage() {
                         <CardHeader className="bg-muted/30 border-b py-4">
                             <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
                                 Lista de Contactos
-                                <Badge variant="secondary" className="bg-primary/10 text-primary">{searchResults.length}</Badge>
+                                <Badge variant="secondary" className="bg-primary/10 text-primary">{filteredResults.length}</Badge>
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="pt-6 p-0 sm:p-6">
+                        <div className="px-4 pt-4 pb-2 border-b bg-slate-50/50">
+                            <Tabs value={filterStatus} onValueChange={(v) => setFilterStatus(v as any)} className="w-full">
+                                <TabsList className="w-full grid grid-cols-3 h-8">
+                                    <TabsTrigger value="ALL" className="text-[9px] font-black uppercase">Todos</TabsTrigger>
+                                    <TabsTrigger value="PENDING" className="text-[9px] font-black uppercase">Pend.</TabsTrigger>
+                                    <TabsTrigger value="CALLED" className="text-[9px] font-black uppercase">Hechos</TabsTrigger>
+                                </TabsList>
+                            </Tabs>
+                        </div>
+                        <CardContent className="pt-4 p-0 sm:p-6">
                             {isSearching ? (
                                 <div className="space-y-2 p-4 sm:p-0">
                                     <Skeleton className="h-16 w-full rounded-xl" />
                                     <Skeleton className="h-16 w-full rounded-xl" />
                                 </div>
-                            ) : searchResults.length > 0 ? (
+                            ) : filteredResults.length > 0 ? (
                                 <RadioGroup 
-                                    onValueChange={(id) => setSelectedPerson(searchResults.find(p => p.id === id) || null)} 
+                                    onValueChange={(id) => setSelectedPerson(filteredResults.find(p => p.id === id) || null)} 
                                     value={selectedPerson?.id || ''}
                                 >
                                     <div className="space-y-2 max-h-[500px] overflow-y-auto p-4 sm:p-0 pr-2 scrollbar-thin">
-                                        {searchResults.map(person => (
+                                        {displayedResults.map(person => (
                                             <div 
                                                 key={person.id} 
                                                 className={cn(
@@ -539,6 +585,19 @@ export default function SeguimientoLlamadasPage() {
                                                 </div>
                                             </div>
                                         ))}
+                                        
+                                        {visibleCount < filteredResults.length && (
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full mt-4 h-12 font-black uppercase tracking-widest text-[10px] border-dashed text-slate-500 hover:text-primary hover:border-primary/50"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    setVisibleCount(prev => prev + 100);
+                                                }}
+                                            >
+                                                Cargar más resultados ({filteredResults.length - visibleCount} restantes)
+                                            </Button>
+                                        )}
                                     </div>
                                 </RadioGroup>
                             ) : (
@@ -678,30 +737,38 @@ export default function SeguimientoLlamadasPage() {
                 </div>
             </div>
 
-            {/* Lista de personas ya llamadas */}
-            {calledPersons.length > 0 && (
-                <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Card className="border-primary/10 shadow-sm overflow-hidden">
-                        <CardHeader className="bg-primary/5 border-b py-4">
-                            <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
-                                <span className="flex items-center gap-2 text-primary">
-                                    <History className="h-4 w-4" /> Registro de Llamadas (Sesión Actual)
-                                </span>
-                                <Badge variant="secondary" className="bg-white">{calledPersons.length}</Badge>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
+            {/* Lista de personas ya llamadas - Historial Global */}
+            <div className="mt-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <Card className="border-primary/10 shadow-sm overflow-hidden">
+                    <CardHeader className="bg-primary/5 border-b py-4">
+                        <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
+                            <span className="flex items-center gap-2 text-primary">
+                                <History className="h-4 w-4" /> Historial de Seguimiento (Últimos 50)
+                            </span>
+                            <div className="flex items-center gap-3">
+                                {isLoadingRecent && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
+                                <Button variant="ghost" size="sm" onClick={fetchRecentCalls} className="h-6 px-2 text-[9px] font-black uppercase hover:bg-primary/10">Actualizar</Button>
+                                <Badge variant="secondary" className="bg-white">{recentCalls.length}</Badge>
+                            </div>
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {recentCalls.length === 0 && !isLoadingRecent ? (
+                            <div className="p-8 text-center text-muted-foreground text-[10px] uppercase font-bold tracking-widest">
+                                Aún no hay registros de llamadas en la base de datos.
+                            </div>
+                        ) : (
                             <Table>
                                 <TableHeader>
                                     <TableRow className="bg-muted/30 text-[9px] font-black uppercase border-b">
                                         <TableHead className="pl-6 py-3">Elector</TableHead>
                                         <TableHead>Estado</TableHead>
                                         <TableHead>Comentario</TableHead>
-                                        <TableHead className="text-right pr-6">Hora</TableHead>
+                                        <TableHead className="text-right pr-6">Operador / Hora</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {calledPersons.map(person => (
+                                    {recentCalls.map(person => (
                                         <TableRow key={person.id} className="border-b last:border-0 hover:bg-slate-50 transition-colors cursor-pointer" onClick={() => setSelectedPerson(person)}>
                                             <TableCell className="pl-6 py-3">
                                                 <div className="flex flex-col">
@@ -716,18 +783,21 @@ export default function SeguimientoLlamadasPage() {
                                                 <span className="text-[10px] font-medium text-slate-600 line-clamp-2 max-w-xs">{person.COMENTARIO_LLAMADA || '-'}</span>
                                             </TableCell>
                                             <TableCell className="text-right pr-6">
-                                                <span className="text-[9px] text-muted-foreground font-bold">
-                                                    {person.ultimaLlamada_fecha ? new Date(person.ultimaLlamada_fecha).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : ''}
-                                                </span>
+                                                <div className="flex flex-col items-end">
+                                                    <span className="text-[9px] font-black text-primary uppercase">{person.ultimaLlamada_por}</span>
+                                                    <span className="text-[9px] text-muted-foreground font-bold mt-0.5">
+                                                        {person.ultimaLlamada_fecha ? new Date(person.ultimaLlamada_fecha).toLocaleString([], {day: '2-digit', month: '2-digit', hour: '2-digit', minute:'2-digit'}) : ''}
+                                                    </span>
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
                             </Table>
-                        </CardContent>
-                    </Card>
-                </div>
-            )}
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
         </div>
     );
 }

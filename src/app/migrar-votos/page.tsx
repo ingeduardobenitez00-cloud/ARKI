@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc, where } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -156,7 +156,7 @@ export default function MigrarVotosPage() {
                 const workbook = XLSX.read(bstr, { type: 'binary', cellDates: true });
                 const firstSheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[firstSheetName];
-                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false });
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { raw: false, defval: "" });
 
                 if (jsonData.length === 0) {
                     addLog('error', 'El archivo Excel está vacío.');
@@ -225,31 +225,68 @@ export default function MigrarVotosPage() {
         let notFound = 0;
         const total = data.length;
         
-        // Consultamos en paralelo en lotes pequeños de 30 para no saturar al cliente
+        // Extraer y limpiar todas las cédulas
+        const allCedulas = data.map(row => {
+            const rawCed = row[cedulaColumn];
+            if (rawCed === undefined || rawCed === null) return null;
+            const cedStr = String(rawCed).replace(/\D/g, '');
+            return cedStr || null;
+        });
+
+        // Consultamos en lotes de 30 usando query 'in' para mayor rendimiento y flexibilidad (busca por campo CEDULA)
         const batchSize = 30;
         for (let i = 0; i < total; i += batchSize) {
-            const chunk = data.slice(i, i + batchSize);
-            await Promise.all(chunk.map(async (row) => {
-                const rawCed = row[cedulaColumn];
-                if (rawCed === undefined || rawCed === null) return;
-                const cedulaStr = String(rawCed).replace(/\D/g, '');
-                if (!cedulaStr) return;
-                
-                try {
-                    const docSnap = await getDoc(doc(db, COLLECTION_PADRON, cedulaStr));
-                    if (docSnap.exists()) {
-                        tempFetched[cedulaStr] = docSnap.data();
-                    } else {
-                        tempFetched[cedulaStr] = null; // Marcar como no encontrado
-                        notFound++;
-                    }
-                } catch (err) {
-                    console.error(`Error consultando cédula ${cedulaStr}:`, err);
-                }
-            }));
+            const chunkCedulas = allCedulas.slice(i, i + batchSize).filter(Boolean) as string[];
             
+            if (chunkCedulas.length > 0) {
+                const uniqueCedulas = Array.from(new Set(chunkCedulas));
+                
+                // 1. Búsqueda Numérica
+                const numCedulas = uniqueCedulas.map(c => Number(c));
+                try {
+                    const qNum = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', numCedulas));
+                    const snapNum = await getDocs(qNum);
+                    snapNum.forEach(docSnap => {
+                        const data = docSnap.data();
+                        const ced = String(data.CEDULA).replace(/\D/g, '');
+                        tempFetched[ced] = { id: docSnap.id, ...data };
+                    });
+                } catch (e) {
+                    console.error("Error en query numérica", e);
+                }
+
+                // 2. Búsqueda por String (fallback para los no encontrados)
+                const remaining = uniqueCedulas.filter(c => !tempFetched[c]);
+                if (remaining.length > 0) {
+                    try {
+                        const qStr = query(collection(db, COLLECTION_PADRON), where('CEDULA', 'in', remaining));
+                        const snapStr = await getDocs(qStr);
+                        snapStr.forEach(docSnap => {
+                            const data = docSnap.data();
+                            const ced = String(data.CEDULA).replace(/\D/g, '');
+                            tempFetched[ced] = { id: docSnap.id, ...data };
+                        });
+                    } catch (e) {
+                        console.error("Error en query string", e);
+                    }
+                }
+            }
+
             const processed = Math.min(i + batchSize, total);
             setProgress(Math.round((processed / total) * 100));
+        }
+
+        // Contar los no encontrados
+        for (let i = 0; i < total; i++) {
+            const c = allCedulas[i];
+            if (c) {
+                if (!tempFetched[c]) {
+                    tempFetched[c] = null; // Marcar como no encontrado
+                    notFound++;
+                }
+            } else {
+                notFound++;
+            }
         }
 
         setFetchedElectors(tempFetched);
@@ -426,11 +463,13 @@ export default function MigrarVotosPage() {
 
             // Validar si existe en Padrón pre-analizado
             const electorData = fetchedElectors[cedulaStr];
-            if (!electorData) {
+            if (!electorData || !electorData.id) {
                 // Si no existe en el padrón, lo omitimos para no contaminar votos_confirmados con CI fantasmas
                 localSkipped++;
                 continue;
             }
+            
+            const docId = electorData.id;
 
             // 2. Limpieza de Teléfono
             let telRaw = rawTel !== undefined && rawTel !== null ? String(rawTel).replace(/\D/g, '') : '';
@@ -465,7 +504,7 @@ export default function MigrarVotosPage() {
             }
 
             // 4. Preparación de guardado en Votos Seguros (votos_confirmados)
-            const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
+            const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
             const vsObj: any = {
                 ...electorData,
                 observacion: "VOTO SEGURO",
@@ -500,7 +539,7 @@ export default function MigrarVotosPage() {
             localUpdatedCapturas++;
 
             // 5. Actualización en Padrón (sheet1)
-            const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
+            const padronRef = doc(db, COLLECTION_PADRON, docId);
             const padronObj: any = {
                 observacion: "VOTO SEGURO",
                 votoSeguroUpdatedBy_id: user.id,
@@ -640,14 +679,17 @@ export default function MigrarVotosPage() {
                 continue;
             }
 
+            const electorData = fetchedElectors[cedulaStr];
+            const docId = electorData?.id || cedulaStr;
+
             // Eliminar de votos_confirmados
-            const capturasRef = doc(db, COLLECTION_CAPTURAS, cedulaStr);
+            const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
             currentBatch.delete(capturasRef);
             currentBatchSize++;
             localUpdatedCapturas++;
 
             // Remover marca de sheet1
-            const padronRef = doc(db, COLLECTION_PADRON, cedulaStr);
+            const padronRef = doc(db, COLLECTION_PADRON, docId);
             currentBatch.update(padronRef, {
                 observacion: deleteField(),
                 TELEFONO_MIGRADO: deleteField(),
