@@ -140,9 +140,12 @@ export default function DifusionPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [processedIds, setProcessedIds] = useState<Set<string>>(new Set());
     
-    const [invitationTemplate, setInvitationTemplate] = useState(
-        "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀"
-    );
+    const [invitationTemplate, setInvitationTemplate] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem('wa_custom_template') || "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+        }
+        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+    });
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
     const [birthdayMonth, setBirthdayMonth] = useState((new Date().getMonth() + 1).toString().padStart(2, '0'));
@@ -271,7 +274,7 @@ export default function DifusionPage() {
         };
         fetchData();
         
-        const saved = sessionStorage.getItem('wa_processed_ids');
+        const saved = localStorage.getItem('wa_processed_ids');
         if (saved) { try { setProcessedIds(new Set(JSON.parse(saved))); } catch (e) {} }
 
         if (user && !isAdmin && user.seccional) { setSelectedSeccional(user.seccional); }
@@ -279,10 +282,26 @@ export default function DifusionPage() {
 
     // Fin de efectos
 
-    const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES) => {
-        setInvitationTemplate(EVENT_TEMPLATES[type]);
-        setIsBirthdayMode(type === 'CUMPLEANOS');
-        toast({ title: `Plantilla de ${type} cargada` });
+    const handleApplyTemplate = (type: keyof typeof EVENT_TEMPLATES | 'CUSTOM') => {
+        if (type === 'CUSTOM') {
+            const saved = localStorage.getItem('wa_custom_template');
+            if (saved) {
+                setInvitationTemplate(saved);
+                setIsBirthdayMode(false);
+                toast({ title: 'Tu plantilla fue cargada' });
+            } else {
+                toast({ title: 'Aún no guardaste ninguna plantilla', description: 'Escribe tu mensaje y haz clic en Guardar como Mi Plantilla' });
+            }
+        } else {
+            setInvitationTemplate(EVENT_TEMPLATES[type]);
+            setIsBirthdayMode(type === 'CUMPLEANOS');
+            toast({ title: `Plantilla de ${type} cargada` });
+        }
+    };
+
+    const handleSaveCustomTemplate = () => {
+        localStorage.setItem('wa_custom_template', invitationTemplate);
+        toast({ title: 'Plantilla Guardada', description: 'Este mensaje se mantendrá fijo para tus próximas sesiones.' });
     };
 
     const handleSearch = async () => {
@@ -366,7 +385,7 @@ export default function DifusionPage() {
         const nextSet = new Set(processedIds);
         nextSet.add(p.id);
         setProcessedIds(nextSet);
-        sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+        localStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
 
         // Update local state directly so UI reacts instantly
         const nowStr = new Date().toISOString();
@@ -382,7 +401,10 @@ export default function DifusionPage() {
                 DIFUNDIDO: true,
                 difundidoAt: nowStr,
                 difundidoBy: user.name
-            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+            }).catch(e => {
+                console.error("Error updating DIFUNDIDO in Firestore:", e);
+                toast({ title: 'Error al Guardar Permanentemente', description: 'El mensaje se envió pero no se guardó el registro fijo por un error de permisos o conexión.', variant: 'destructive' });
+            });
         }
         
         if (db) {
@@ -419,7 +441,7 @@ export default function DifusionPage() {
             const nextSet = new Set(processedIds);
             nextSet.add(p.id);
             setProcessedIds(nextSet);
-            sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+            localStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
             toast({ title: `Omitido ${p.NOMBRE} (Sin Teléfono)` });
             return;
         }
@@ -621,7 +643,7 @@ export default function DifusionPage() {
         const nextSet = new Set(processedIds);
         nextSet.add(p.id);
         setProcessedIds(nextSet);
-        sessionStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
+        localStorage.setItem('wa_processed_ids', JSON.stringify(Array.from(nextSet)));
         
         const nowStr = new Date().toISOString();
         if (activeTab === 'padron') {
@@ -637,7 +659,10 @@ export default function DifusionPage() {
                 DIFUNDIDO: true,
                 difundidoAt: nowStr,
                 difundidoBy: user.name
-            }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
+            }).catch(e => {
+                console.error("Error updating DIFUNDIDO in Firestore:", e);
+                toast({ title: 'Error al Guardar Permanentemente', description: 'El mensaje se envió pero no se guardó en la nube.', variant: 'destructive' });
+            });
         }
 
         if (db) {
@@ -893,18 +918,29 @@ export default function DifusionPage() {
                             {/* Fast template buttons */}
                             <div className="space-y-2">
                                 <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Plantillas Rápidas</Label>
-                                <div className="grid grid-cols-2 gap-2">
+                                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CUSTOM')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2 border-primary/40 text-primary bg-primary/5 hover:bg-primary/10"><Save className="h-4 w-4" /> MI PLANTILLA</Button>
                                     <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('REUNION')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Users className="h-4 w-4 text-slate-500" /> REUNIÓN</Button>
                                     <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CENA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Utensils className="h-4 w-4 text-slate-500" /> CENA</Button>
                                     <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CAMINATA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Footprints className="h-4 w-4 text-slate-500" /> CAMINATA</Button>
                                     <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('PEGATINA')} className="h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2"><Flag className="h-4 w-4 text-slate-500" /> PEGATINA</Button>
-                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CUMPLEANOS')} className={cn("h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2 col-span-2", isBirthdayMode && "bg-primary/10 border-primary text-primary")}><Cake className={cn("h-4 w-4", isBirthdayMode ? "text-primary" : "text-slate-500")} /> MODO CUMPLEAÑOS</Button>
+                                    <Button variant="outline" size="sm" onClick={() => handleApplyTemplate('CUMPLEANOS')} className={cn("h-10 text-[9px] font-black uppercase flex items-center gap-1.5 justify-start px-2", isBirthdayMode && "bg-primary/10 border-primary text-primary")}><Cake className={cn("h-4 w-4", isBirthdayMode ? "text-primary" : "text-slate-500")} /> CUMPLE</Button>
                                 </div>
                             </div>
 
                             {/* Invitation Template */}
                             <div className="space-y-1.5">
-                                <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-[10px] font-black uppercase">Mensaje Personalizado (con Spintax)</Label>
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleSaveCustomTemplate}
+                                        className="h-6 px-2 text-[9px] font-black uppercase text-primary hover:text-primary hover:bg-primary/5 flex items-center gap-1"
+                                    >
+                                        <Save className="h-3 w-3" /> GUARDAR COMO MI PLANTILLA
+                                    </Button>
+                                </div>
                                 <Textarea 
                                     value={invitationTemplate} 
                                     onChange={(e) => setInvitationTemplate(e.target.value)} 
