@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { allMenuItems, userRoles, menuCategories } from '@/lib/menu-data';
-import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where, orderBy, addDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, deleteDoc, setDoc, getDoc, query, limit, where, orderBy, addDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import { useFirestore, useStorage } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
@@ -680,6 +680,72 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
                 targetId: uid,
                 targetName: data.name
             });
+
+            // CASCADING UPDATE: Si el nombre cambió, actualizar todos los registros históricos asociados
+            if (editingUser && data.name !== editingUser.name) {
+                const newName = data.name;
+                const updateCascadingNames = async () => {
+                    if (!db || !uid) return;
+                    try {
+                        console.log(`Iniciando propagación de cambio de nombre para usuario ${uid} a "${newName}"`);
+                        
+                        // 1. votos_confirmados (registradoPor_nombre)
+                        const vcRegQuery = query(collection(db, 'votos_confirmados'), where('registradoPor_id', '==', uid));
+                        const vcRegSnap = await getDocs(vcRegQuery);
+                        let batch = writeBatch(db);
+                        let count = 0;
+                        vcRegSnap.forEach(docSnap => {
+                            batch.update(docSnap.ref, { registradoPor_nombre: newName });
+                            count++;
+                            if (count % 400 === 0) { batch.commit(); batch = writeBatch(db); }
+                        });
+                        if (count > 0) await batch.commit();
+
+                        // 2. votos_confirmados (delegadoPor_nombre)
+                        const vcDelQuery = query(collection(db, 'votos_confirmados'), where('delegadoPor_id', '==', uid));
+                        const vcDelSnap = await getDocs(vcDelQuery);
+                        batch = writeBatch(db);
+                        count = 0;
+                        vcDelSnap.forEach(docSnap => {
+                            batch.update(docSnap.ref, { delegadoPor_nombre: newName });
+                            count++;
+                            if (count % 400 === 0) { batch.commit(); batch = writeBatch(db); }
+                        });
+                        if (count > 0) await batch.commit();
+
+                        // 3. sheet1 (votoSeguroUpdatedBy_nombre)
+                        const sheetVotoQuery = query(collection(db, 'sheet1'), where('votoSeguroUpdatedBy_id', '==', uid));
+                        const sheetVotoSnap = await getDocs(sheetVotoQuery);
+                        batch = writeBatch(db);
+                        count = 0;
+                        sheetVotoSnap.forEach(docSnap => {
+                            batch.update(docSnap.ref, { votoSeguroUpdatedBy_nombre: newName });
+                            count++;
+                            if (count % 400 === 0) { batch.commit(); batch = writeBatch(db); }
+                        });
+                        if (count > 0) await batch.commit();
+
+                        // 4. sheet1 (telefonoUpdatedBy_nombre)
+                        const sheetTelQuery = query(collection(db, 'sheet1'), where('telefonoUpdatedBy_id', '==', uid));
+                        const sheetTelSnap = await getDocs(sheetTelQuery);
+                        batch = writeBatch(db);
+                        count = 0;
+                        sheetTelSnap.forEach(docSnap => {
+                            batch.update(docSnap.ref, { telefonoUpdatedBy_nombre: newName });
+                            count++;
+                            if (count % 400 === 0) { batch.commit(); batch = writeBatch(db); }
+                        });
+                        if (count > 0) await batch.commit();
+
+                        console.log(`Propagación completada con éxito.`);
+                    } catch(e) {
+                        console.error("Error al propagar el cambio de nombre en los registros:", e);
+                    }
+                };
+                
+                // Ejecutamos en segundo plano sin bloquear el cierre de la ventana
+                updateCascadingNames();
+            }
 
             toast({ 
                 title: editingUser ? '¡Actualización Exitosa!' : '¡Usuario Creado!', 
