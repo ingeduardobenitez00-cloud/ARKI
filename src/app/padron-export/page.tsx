@@ -149,7 +149,7 @@ export default function PadronExportPage() {
 
   const executeExportCSV = async (filename: string) => {
     if (!canExportExcel) {
-        toast({ title: "Acceso Denegado", description: "No tienes permiso para exportar Excel.", variant: "destructive" });
+        toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
         return;
     }
     if (filteredData.length === 0) return;
@@ -195,7 +195,7 @@ export default function PadronExportPage() {
 
   const handleExportPDF = async () => {
     if (!canExportPDF) {
-        toast({ title: "Acceso Denegado", description: "No tienes permiso para exportar PDF.", variant: "destructive" });
+        toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
         return;
     }
     if (filteredData.length === 0) return;
@@ -231,7 +231,7 @@ export default function PadronExportPage() {
 
   const openFilenameDialog = () => {
     if (!canExportExcel) {
-        toast({ title: "Acceso Denegado", description: "No tienes permiso para exportar Excel.", variant: "destructive" });
+        toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
         return;
     }
     setCustomFilename(`PADRON_SECC_${selectedSeccional}_${new Date().getTime()}`);

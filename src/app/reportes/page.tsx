@@ -84,18 +84,18 @@ export default function ReportesPage() {
 
   const { data: allUsers } = useCollection<any>(usersQuery);
 
-  const seccionalUserIds = useMemo(() => {
-    if (!allUsers || !userSeccionales.length) return new Set<string>();
-    const ids = new Set<string>();
-    allUsers.forEach(u => {
+  const userSeccionalesMap = useMemo(() => {
+    if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
+    const map = new Map<string, string[]>();
+    allUsers.forEach((u: any) => {
       const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
       const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
       const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
       if (hasOverlap) {
-        ids.add(u.id);
+        map.set(u.id, userSecs);
       }
     });
-    return ids;
+    return map;
   }, [allUsers, userSeccionales]);
 
   // CONTEO GLOBAL DESDE EL SERVIDOR
@@ -133,8 +133,19 @@ export default function ReportesPage() {
         return rawList.filter((item: VotoSeguroData) => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
-            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
-            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
+            
+            if (isFromMySeccional) return true;
+            if (isMyRegistration(item)) return true;
+
+            const registrarSecs = item.registradoPor_id ? userSeccionalesMap.get(item.registradoPor_id) : null;
+            if (registrarSecs) {
+                // Si el usuario es exclusivo de mi seccional (no es multiseccional), veo sus votos foráneos.
+                // Si es multiseccional, solo veo sus votos si cayeron en mi seccional (lo cual ya se filtró arriba con isFromMySeccional).
+                if (registrarSecs.length === 1) {
+                    return true;
+                }
+            }
+            return false;
         });
     }
 
@@ -143,7 +154,7 @@ export default function ReportesPage() {
     }
 
     return [];
-  }, [rawList, user, isAdmin, isCoordinador, isPresidente, isDirigente, userSeccionales, seccionalUserIds]);
+  }, [rawList, user, isAdmin, isCoordinador, isPresidente, isDirigente, userSeccionales, userSeccionalesMap]);
 
   // 3. AGRUPAMIENTO POR USUARIO CON CÁLCULO DE PARTICIPACIÓN
   const groupedData = useMemo(() => {

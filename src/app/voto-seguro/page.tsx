@@ -70,6 +70,9 @@ export default function VotoSeguroPage() {
   const isDirigente = user?.role === 'Dirigente';
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
 
+  const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false);
+  const canDelete = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
+
   /**
    * QUERY OPTIMIZADA POR ROL:
    * - Dirigentes (~650 usuarios): filtro server-side por su propio ID → ~30-50 docs c/u
@@ -107,18 +110,18 @@ export default function VotoSeguroPage() {
 
   const { data: allUsers } = useCollection<any>(usersQuery);
 
-  const seccionalUserIds = useMemo(() => {
-    if (!allUsers || !userSeccionales.length) return new Set<string>();
-    const ids = new Set<string>();
-    allUsers.forEach(u => {
+  const userSeccionalesMap = useMemo(() => {
+    if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
+    const map = new Map<string, string[]>();
+    allUsers.forEach((u: any) => {
       const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
       const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
       const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
       if (hasOverlap) {
-        ids.add(u.id);
+        map.set(u.id, userSecs);
       }
     });
-    return ids;
+    return map;
   }, [allUsers, userSeccionales]);
 
   // FILTRADO POR ROLES Y JURISDICCIÓN
@@ -144,8 +147,19 @@ export default function VotoSeguroPage() {
         return rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
-            const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
-            return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
+            
+            if (isFromMySeccional) return true;
+            if (isMyRegistration(item)) return true;
+
+            const registrarSecs = item.registradoPor_id ? userSeccionalesMap.get(item.registradoPor_id) : null;
+            if (registrarSecs) {
+                // Si el usuario es exclusivo de mi seccional (no es multiseccional), veo sus votos foráneos.
+                // Si es multiseccional, solo veo sus votos si cayeron en mi seccional (lo cual ya se filtró arriba con isFromMySeccional).
+                if (registrarSecs.length === 1) {
+                    return true;
+                }
+            }
+            return false;
         });
     }
 
@@ -153,7 +167,7 @@ export default function VotoSeguroPage() {
     if (isDirigente) return rawList;
 
     return [];
-  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales, seccionalUserIds]);
+  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales, userSeccionalesMap]);
 
   // AGRUPAMIENTO POR USUARIO CON CÍRCULO DE SECCIONAL
   const groupedData = useMemo(() => {
@@ -287,7 +301,7 @@ export default function VotoSeguroPage() {
                               </TableCell>
                           )}
                           <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { setVotoToDelete(p); setIsAlertOpen(true); }}>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
                                   <Trash2 className="h-4 w-4" />
                               </Button>
                           </TableCell>
@@ -327,7 +341,7 @@ export default function VotoSeguroPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookHeart className="h-8 w-8 text-primary" /> Listado de Voto Seguro</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control optimizado de captación por operador.</p></div>
         <div className="flex gap-2">
-            <Button onClick={() => setIsFilenameDialogOpen(true)} disabled={filteredList.length === 0 || isExporting} variant="default" className="font-black uppercase text-[10px] h-9 shadow-lg"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
+            <Button onClick={() => { if(canExportExcel) setIsFilenameDialogOpen(true); else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={filteredList.length === 0 || isExporting || !canExportExcel} variant="default" className="font-black uppercase text-[10px] h-9 shadow-lg"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
         </div>
       </div>
 

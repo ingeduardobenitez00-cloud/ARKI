@@ -85,16 +85,19 @@ export default function ConsultaPage() {
     const [isDeleting, setIsDeleting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
 
+    const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
+    const canDelete = isAdmin || user?.moduleActions?.['/consulta']?.includes('delete');
+
     const userSeccionales = useMemo(() => {
         if (!user) return [];
         return user.seccionales || (user.seccional ? [user.seccional] : []);
     }, [user]);
 
     const [telefono, setTelefono] = useState('');
-    const [institucion, setInstitucion] = useState('');
     const [manualLat, setManualLat] = useState('');
     const [manualLon, setManualLon] = useState('');
     const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+    const [showGps, setShowGps] = useState(false);
     
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const [isRestrictedAlertOpen, setIsRestrictedAlertOpen] = useState(false);
@@ -138,18 +141,18 @@ export default function ConsultaPage() {
 
     const { data: allUsers } = useCollection<any>(usersQuery);
 
-    const seccionalUserIds = useMemo(() => {
-        if (!allUsers || !userSeccionales.length) return new Set<string>();
-        const ids = new Set<string>();
-        allUsers.forEach(u => {
+    const userSeccionalesMap = useMemo(() => {
+        if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
+        const map = new Map<string, string[]>();
+        allUsers.forEach((u: any) => {
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
             const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
             const hasOverlap = userSecs.some((s: string) => userSeccionales.includes(s));
             if (hasOverlap) {
-                ids.add(u.id);
+                map.set(u.id, userSecs);
             }
         });
-        return ids;
+        return map;
     }, [allUsers, userSeccionales]);
 
     const operatorsInElectorSeccional = useMemo(() => {
@@ -189,8 +192,19 @@ export default function ConsultaPage() {
             return rawList.filter(item => {
                 const itemSec = String(item.CODIGO_SEC || '');
                 const isFromMySeccional = userSeccionales.includes(itemSec);
-                const isRegisteredByMySeccionalUser = item.registradoPor_id && seccionalUserIds.has(item.registradoPor_id);
-                return isFromMySeccional || isRegisteredByMySeccionalUser || isMyRegistration(item);
+                
+                if (isFromMySeccional) return true;
+                if (isMyRegistration(item)) return true;
+
+                const registrarSecs = item.registradoPor_id ? userSeccionalesMap.get(item.registradoPor_id) : null;
+                if (registrarSecs) {
+                    // Si el usuario es exclusivo de mi seccional (no es multiseccional), veo sus votos foráneos.
+                    // Si es multiseccional, solo veo sus votos si cayeron en mi seccional (lo cual ya se filtró arriba con isFromMySeccional).
+                    if (registrarSecs.length === 1) {
+                        return true;
+                    }
+                }
+                return false;
             });
         }
 
@@ -199,7 +213,7 @@ export default function ConsultaPage() {
         }
 
         return [];
-    }, [rawList, user, userSeccionales, seccionalUserIds]);
+    }, [rawList, user, userSeccionales, userSeccionalesMap]);
 
     const groupedCaptures = useMemo(() => {
         const groups: Record<string, { seccional: string, votos: PadronData[] }> = {};
@@ -248,9 +262,9 @@ export default function ConsultaPage() {
     useEffect(() => {
         if (selectedPerson) {
             setTelefono(applyPhoneMask(selectedPerson.TELEFONO || ''));
-            setInstitucion(selectedPerson.INSTITUCION || '');
             setManualLat(selectedPerson.LATITUD?.toString() || '');
             setManualLon(selectedPerson.LONGITUD?.toString() || '');
+            setShowGps(false);
         }
     }, [selectedPerson]);
 
@@ -338,7 +352,6 @@ export default function ConsultaPage() {
             ...selectedPerson,
             observacion: "VOTO SEGURO",
             TELEFONO: telefono,
-            INSTITUCION: institucion,
             registradoPor_id: user.id,
             registradoPor_nombre: user.name,
             updatedAt: new Date().toISOString()
@@ -356,7 +369,7 @@ export default function ConsultaPage() {
 
         Promise.all([
             setDoc(capturaRef, dataToSave),
-            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono, INSTITUCION: institucion })
+            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono })
         ]).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'REGISTRÓ VOTO SEGURO', targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}` });
             toast({ title: '¡Registro Exitoso!' });
@@ -369,9 +382,9 @@ export default function ConsultaPage() {
             setSearchResults([]); 
             setSelectedPerson(null); 
             setTelefono(''); 
-            setInstitucion(''); 
             setManualLat(''); 
             setManualLon('');
+            setShowGps(false);
         }).catch(async (err) => {
             errorEmitter.emit('permission-error', new FirestorePermissionError({ path: capturaRef.path, operation: 'create', requestResourceData: dataToSave }));
         }).finally(() => setIsSaving(false));
@@ -386,7 +399,6 @@ export default function ConsultaPage() {
                 ...selectedPerson,
                 observacion: "VOTO SEGURO",
                 TELEFONO: telefono || '',
-                INSTITUCION: institucion || '',
                 registradoPor_id: selectedOperator.id,
                 registradoPor_nombre: selectedOperator.name,
                 delegadoPor_id: user.id,
@@ -406,7 +418,7 @@ export default function ConsultaPage() {
 
             await Promise.all([
                 setDoc(capturaRef, dataToSave),
-                updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono || '', INSTITUCION: institucion || '' })
+                updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono || '' })
             ]);
 
             logAction(db, { 
@@ -439,9 +451,9 @@ export default function ConsultaPage() {
             setSearchResults([]);
             setSelectedPerson(null);
             setTelefono('');
-            setInstitucion('');
             setManualLat('');
             setManualLon('');
+            setShowGps(false);
         } catch (error: any) {
             console.error("Error delegando voto:", error);
             toast({ title: 'Error al delegar voto', variant: 'destructive' });
@@ -493,7 +505,7 @@ export default function ConsultaPage() {
                                     >
                                         <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { setVotoToDelete(p); setIsDeleteAlertOpen(true); }}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsDeleteAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
                                         <Trash2 className="h-4 w-4" />
                                     </Button>
                                 </div>
@@ -598,12 +610,27 @@ export default function ConsultaPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-5">
                                         <div className="space-y-2"><Label className="font-black text-[10px] uppercase">WhatsApp</Label><Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black text-lg" inputMode="numeric"/></div>
-                                        <div className="space-y-2"><Label className="font-black text-[10px] uppercase">Institución</Label><Input value={institucion} onChange={(e) => setInstitucion(e.target.value.toUpperCase())} placeholder="COLEGIO, IPS..." className="h-11 font-black uppercase"/></div>
                                         <Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase text-base bg-primary shadow-xl rounded-2xl">{isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR VOTO SEGURO</Button>
                                     </div>
                                     <div className="space-y-4">
-                                        <div className="h-[280px] border-2 rounded-3xl overflow-hidden shadow-inner"><MapPicker key={`picker-${selectedPerson.id}-${manualLat}-${manualLon}`} lat={manualLat ? parseFloat(manualLat) : null} lon={manualLon ? parseFloat(manualLon) : null} onLocationPick={handleLocationPick} /></div>
-                                        <Button variant="secondary" className="w-full bg-red-600 text-white h-11 font-black rounded-xl text-xs uppercase" onClick={handleCaptureLocation} disabled={isCapturingLocation}><Navigation className="mr-2 h-4 w-4" /> CAPTURAR GPS</Button>
+                                        {!showGps ? (
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full h-full min-h-[330px] border-dashed border-2 border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300 font-black uppercase rounded-3xl flex flex-col items-center justify-center gap-2 transition-all"
+                                                onClick={() => setShowGps(true)}
+                                            >
+                                                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                                    <MapPin className="h-7 w-7 text-slate-400" />
+                                                </div>
+                                                <span className="text-sm">TOQUE AQUÍ PARA FIJAR LA UBICACIÓN DEL VOTANTE</span>
+                                                <span className="text-[10px] font-bold opacity-50 tracking-widest bg-slate-200 text-slate-600 px-3 py-1 rounded-full mt-1">OPCIONAL</span>
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <div className="h-[280px] border-2 rounded-3xl overflow-hidden shadow-inner"><MapPicker key={`picker-${selectedPerson.id}-${manualLat}-${manualLon}`} lat={manualLat ? parseFloat(manualLat) : null} lon={manualLon ? parseFloat(manualLon) : null} onLocationPick={handleLocationPick} /></div>
+                                                <Button variant="secondary" className="w-full bg-red-600 text-white h-11 font-black rounded-xl text-xs uppercase" onClick={handleCaptureLocation} disabled={isCapturingLocation}><Navigation className="mr-2 h-4 w-4" /> CAPTURAR GPS</Button>
+                                            </>
+                                        )}
                                     </div>
                                 </div></div>) : <div className="text-center text-muted-foreground py-32 border-2 border-dashed rounded-3xl opacity-30"><p className="font-black uppercase text-xs">Selecciona un ciudadano para iniciar captura</p></div>}</CardContent>
                     </Card>
