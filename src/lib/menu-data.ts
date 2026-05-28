@@ -38,6 +38,7 @@ export const allMenuItems = [
   { href: '/mapa-tecnico', label: 'Mapa Técnico', icon: MapIcon, tooltip: 'GESTIÓN TERRITORIAL TÉCNICA Y POLÍTICA POR DISTRITOS.' },
   { href: '/padron', label: 'Consulta Padrón', icon: LayoutGrid, tooltip: 'EXPLORA Y BUSCA EN EL PADRÓN ELECTORAL COMPLETO.' },
   { href: '/padron-export', label: 'Padrón Exportar', icon: FileDown, tooltip: 'GENERA REPORTES EN EXCEL Y PDF POR SECCIONAL.' },
+  { href: '/comparar-padron', label: 'Comparar Padrón', icon: FileSpreadsheet, tooltip: 'COMPARA UN EXCEL CON EL PADRÓN Y DESCARGA EL RESULTADO.' },
   { href: '/consulta', label: 'Registra Votos', icon: FileSearch, tooltip: 'BUSCA ELECTORES Y MARCA SU VOTO COMO SEGURO.' },
   { href: '/telefonos', label: 'Actualizar Teléfonos', icon: Phone, tooltip: 'AGREGA O ACTUALIZA LOS NÚMEROS DE TELÉFONO DE LOS EMPADRONADOS.' },
   { href: '/seguimiento-llamadas', label: 'Call Center', icon: PhoneCall, tooltip: 'ESCANEA EL PADRÓN Y REGISTRA EL SEGUIMIENTO DE LLAMADAS.' },
@@ -84,7 +85,7 @@ export const menuCategories = [
   {
     label: 'Padrón Electoral',
     icon: Database,
-    items: ['/padron', '/padron-export']
+    items: ['/padron', '/padron-export', '/comparar-padron']
   },
   {
     label: 'Carga de Votos Seguros',
@@ -124,10 +125,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']
