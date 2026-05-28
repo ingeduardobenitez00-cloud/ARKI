@@ -75,8 +75,10 @@ export default function MigrarVotosPage() {
     const [operatorMapping, setOperatorMapping] = useState<Record<string, string>>({});
     
     // Estados del procesamiento
-    const [status, setStatus] = useState<'idle' | 'reading' | 'checking' | 'mapping' | 'migrating' | 'done' | 'error'>('idle');
+    const [status, setStatus] = useState<'idle' | 'reading' | 'checking' | 'mapping' | 'confirming_overwrite' | 'migrating' | 'done' | 'error'>('idle');
     const [isDragging, setIsDragging] = useState(false);
+    const [alreadyMigratedCount, setAlreadyMigratedCount] = useState(0);
+    const [alreadyMigratedUsers, setAlreadyMigratedUsers] = useState<string[]>([]);
     
     // Métricas del progreso
     const [progress, setProgress] = useState(0);
@@ -412,7 +414,7 @@ export default function MigrarVotosPage() {
         }
     };
 
-    const runMigration = async () => {
+    const handleStartMigration = () => {
         if (!db || !user || sheetData.length === 0) return;
         if (!mapping.cedula || !mapping.telefono) {
             toast({
@@ -422,6 +424,38 @@ export default function MigrarVotosPage() {
             });
             return;
         }
+
+        let count = 0;
+        const users = new Set<string>();
+
+        for (const row of sheetData) {
+            const rawCed = row[mapping.cedula];
+            if (!rawCed) continue;
+            const cedulaStr = String(rawCed).replace(/\D/g, '');
+            if (!cedulaStr) continue;
+
+            const electorData = fetchedElectors[cedulaStr];
+            if (electorData && electorData.observacion === "VOTO SEGURO") {
+                count++;
+                if (electorData.votoSeguroUpdatedBy_nombre) {
+                    users.add(electorData.votoSeguroUpdatedBy_nombre);
+                } else if (electorData.registradoPor_nombre) {
+                    users.add(electorData.registradoPor_nombre);
+                }
+            }
+        }
+
+        if (count > 0) {
+            setAlreadyMigratedCount(count);
+            setAlreadyMigratedUsers(Array.from(users));
+            setStatus('confirming_overwrite');
+        } else {
+            runMigration(true);
+        }
+    };
+
+    const runMigration = async (overwrite: boolean) => {
+        if (!db || !user || sheetData.length === 0) return;
 
         setStatus('migrating');
         setProgress(0);
@@ -465,6 +499,12 @@ export default function MigrarVotosPage() {
             const electorData = fetchedElectors[cedulaStr];
             if (!electorData || !electorData.id) {
                 // Si no existe en el padrón, lo omitimos para no contaminar votos_confirmados con CI fantasmas
+                localSkipped++;
+                continue;
+            }
+
+            if (!overwrite && electorData.observacion === "VOTO SEGURO") {
+                // Si no queremos sobrescribir y ya es voto seguro, lo omitimos
                 localSkipped++;
                 continue;
             }
@@ -986,7 +1026,7 @@ export default function MigrarVotosPage() {
                             {status === 'mapping' && mapping.cedula && mapping.telefono && (
                                 <div className="flex gap-2">
                                     <Button 
-                                        onClick={runMigration} 
+                                        onClick={handleStartMigration} 
                                         className="bg-primary hover:bg-primary/95 text-white font-black text-xs uppercase h-10 px-5 rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
                                     >
                                         <Play className="h-3.5 w-3.5 fill-white/20" />
@@ -1004,6 +1044,55 @@ export default function MigrarVotosPage() {
                                         Espera de Archivo Excel<br/>
                                         <span className="text-[10px] text-muted-foreground font-bold tracking-normal mt-1 block">Sube un listado para comenzar el análisis automático de seccionales.</span>
                                     </p>
+                                </div>
+                            )}
+                            
+                            {status === 'confirming_overwrite' && (
+                                <div className="p-6 bg-amber-50 border border-amber-200 rounded-3xl animate-in slide-in-from-top-2">
+                                    <div className="flex items-start gap-4">
+                                        <AlertTriangle className="h-8 w-8 text-amber-600 shrink-0 mt-1" />
+                                        <div className="space-y-4">
+                                            <div>
+                                                <h3 className="text-sm font-black uppercase text-amber-900 tracking-wide">¡Atención! Votos ya registrados</h3>
+                                                <p className="text-xs font-bold text-amber-700 uppercase mt-1">
+                                                    Se han detectado {alreadyMigratedCount} registros en tu Excel que ya fueron migrados previamente como Voto Seguro.
+                                                </p>
+                                                {alreadyMigratedUsers.length > 0 && (
+                                                    <p className="text-[10px] font-bold text-amber-600 uppercase mt-2">
+                                                        Registrados previamente por: <span className="font-black">{alreadyMigratedUsers.slice(0, 5).join(', ')}{alreadyMigratedUsers.length > 5 ? ' y otros' : ''}</span>
+                                                    </p>
+                                                )}
+                                                <p className="text-[11px] font-black text-amber-800 uppercase mt-4 bg-amber-200/50 p-2 rounded-lg border border-amber-300">
+                                                    ¿Deseas de igual manera incluir a estos usuarios en tu listado (sobrescribiéndolos)?
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row flex-wrap gap-3">
+                                                <Button 
+                                                    onClick={() => runMigration(true)} 
+                                                    className="bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase h-10 rounded-xl px-4"
+                                                >
+                                                    <CheckCircle2 className="h-4 w-4 mr-2" />
+                                                    Sí, Sobrescribir Todos
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => runMigration(false)} 
+                                                    variant="outline"
+                                                    className="border-amber-300 text-amber-800 hover:bg-amber-100 font-black text-[10px] uppercase h-10 rounded-xl bg-white px-4"
+                                                >
+                                                    <ArrowRight className="h-4 w-4 mr-2" />
+                                                    Migrar Solo Nuevos
+                                                </Button>
+                                                <Button 
+                                                    onClick={() => setStatus('mapping')} 
+                                                    variant="ghost"
+                                                    className="text-slate-500 hover:bg-slate-100 font-black text-[10px] uppercase h-10 rounded-xl px-4"
+                                                >
+                                                    <XCircle className="h-4 w-4 mr-2" />
+                                                    Cancelar
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 

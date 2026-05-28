@@ -47,6 +47,7 @@ export default function CompararPadronPage() {
     const [columns, setColumns] = useState<string[]>([]);
     const [mapping, setMapping] = useState({ cedula: '' });
     const [dirigenteNombre, setDirigenteNombre] = useState('');
+    const [nameFormat, setNameFormat] = useState<'none' | 'together' | 'separated'>('separated');
     
     const [fetchedElectors, setFetchedElectors] = useState<Record<string, any>>({});
     
@@ -260,6 +261,10 @@ export default function CompararPadronPage() {
             const rawCed = row[mapping.cedula];
             let estado = "Válido";
             let seccional = "";
+            let nombres = "";
+            let apellidos = "";
+            let nombreCompleto = "";
+            
             const cedulaStr = rawCed ? String(rawCed).replace(/\D/g, '') : '';
             
             if (!cedulaStr) {
@@ -276,20 +281,31 @@ export default function CompararPadronPage() {
                     countNoPadron++;
                 } else {
                     seccional = elector.CODIGO_SEC || "";
+                    nombres = elector.NOMBRE || "";
+                    apellidos = elector.APELLIDO || "";
+                    nombreCompleto = `${nombres} ${apellidos}`.trim();
                     countValidos++;
                 }
             }
 
-            newData.push({
-                ...row,
-                "Estado": estado,
-                "Seccional": seccional,
-                "Dirigente": dirigenteNombre || ""
-            });
+            const rowData: any = { ...row };
+
+            if (nameFormat === 'together') {
+                rowData["Nombre Completo (Padrón)"] = nombreCompleto;
+            } else if (nameFormat === 'separated') {
+                rowData["Nombres (Padrón)"] = nombres;
+                rowData["Apellidos (Padrón)"] = apellidos;
+            }
+
+            rowData["Estado"] = estado;
+            rowData["Seccional"] = seccional;
+            rowData["Dirigente"] = dirigenteNombre || "";
+
+            newData.push(rowData);
         }
         
         return newData;
-    }, [sheetData, mapping, fetchedElectors, dirigenteNombre]);
+    }, [sheetData, mapping, fetchedElectors, dirigenteNombre, nameFormat]);
 
     const generateExcel = () => {
         if (!mapping.cedula) {
@@ -428,7 +444,7 @@ export default function CompararPadronPage() {
                                             Mapeo de Columnas y Configuración
                                         </h3>
                                         
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                             <div className="space-y-2">
                                                 <label className="text-xs font-bold text-slate-500 uppercase">Columna Cédula</label>
                                                 <Select value={mapping.cedula} onValueChange={(val) => handleMappingChange(val)}>
@@ -439,6 +455,19 @@ export default function CompararPadronPage() {
                                                         {columns.map(col => (
                                                             <SelectItem key={col} value={col}>{col}</SelectItem>
                                                         ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-xs font-bold text-slate-500 uppercase">Nombres del Padrón</label>
+                                                <Select value={nameFormat} onValueChange={(val: any) => setNameFormat(val)}>
+                                                    <SelectTrigger className="bg-white">
+                                                        <SelectValue placeholder="Selecciona formato" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="none">No incluir nombres</SelectItem>
+                                                        <SelectItem value="together">Juntos (Nombre Completo)</SelectItem>
+                                                        <SelectItem value="separated">Separados (Nombres | Apellidos)</SelectItem>
                                                     </SelectContent>
                                                 </Select>
                                             </div>
