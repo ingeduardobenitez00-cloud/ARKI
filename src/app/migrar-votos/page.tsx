@@ -79,6 +79,7 @@ export default function MigrarVotosPage() {
     const [isDragging, setIsDragging] = useState(false);
     const [alreadyMigratedCount, setAlreadyMigratedCount] = useState(0);
     const [alreadyMigratedUsers, setAlreadyMigratedUsers] = useState<string[]>([]);
+    const [conflictedVoters, setConflictedVoters] = useState<{cedula: string, nombre: string, registradoPor: string}[]>([]);
     
     // Métricas del progreso
     const [progress, setProgress] = useState(0);
@@ -426,6 +427,7 @@ export default function MigrarVotosPage() {
 
         let count = 0;
         const users = new Set<string>();
+        const conflicts: {cedula: string, nombre: string, registradoPor: string}[] = [];
 
         for (const row of sheetData) {
             const rawCed = row[mapping.cedula];
@@ -436,17 +438,20 @@ export default function MigrarVotosPage() {
             const electorData = fetchedElectors[cedulaStr];
             if (electorData && electorData.observacion === "VOTO SEGURO") {
                 count++;
-                if (electorData.votoSeguroUpdatedBy_nombre) {
-                    users.add(electorData.votoSeguroUpdatedBy_nombre);
-                } else if (electorData.registradoPor_nombre) {
-                    users.add(electorData.registradoPor_nombre);
-                }
+                const registeredBy = electorData.votoSeguroUpdatedBy_nombre || electorData.registradoPor_nombre || 'DESCONOCIDO';
+                users.add(registeredBy);
+                conflicts.push({
+                    cedula: cedulaStr,
+                    nombre: electorData.NOMBRE_COMPLETO || `${electorData.NOMBRES || ''} ${electorData.APELLIDOS || ''}`.trim(),
+                    registradoPor: registeredBy
+                });
             }
         }
 
         if (count > 0) {
             setAlreadyMigratedCount(count);
             setAlreadyMigratedUsers(Array.from(users));
+            setConflictedVoters(conflicts);
             setStatus('confirming_overwrite');
         } else {
             runMigration(true);
@@ -1061,6 +1066,27 @@ export default function MigrarVotosPage() {
                                                         Registrados previamente por: <span className="font-black">{alreadyMigratedUsers.slice(0, 5).join(', ')}{alreadyMigratedUsers.length > 5 ? ' y otros' : ''}</span>
                                                     </p>
                                                 )}
+
+                                                <div className="mt-4 bg-white/50 border border-amber-200 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
+                                                    <table className="w-full text-left text-[10px] uppercase">
+                                                        <thead className="bg-amber-100/80 text-amber-800 font-black sticky top-0">
+                                                            <tr>
+                                                                <th className="py-2 px-3">Cédula</th>
+                                                                <th className="py-2 px-3">Nombre</th>
+                                                                <th className="py-2 px-3">Registrado Por</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-amber-100 text-amber-900 font-semibold">
+                                                            {conflictedVoters.map((v, idx) => (
+                                                                <tr key={idx} className="hover:bg-amber-50/50">
+                                                                    <td className="py-2 px-3">{v.cedula}</td>
+                                                                    <td className="py-2 px-3">{v.nombre}</td>
+                                                                    <td className="py-2 px-3">{v.registradoPor}</td>
+                                                                </tr>
+                                                            ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                                 <p className="text-[11px] font-black text-amber-800 uppercase mt-4 bg-amber-200/50 p-2 rounded-lg border border-amber-300">
                                                     ¿Deseas de igual manera incluir a estos usuarios en tu listado (sobrescribiéndolos)?
                                                 </p>
