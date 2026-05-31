@@ -75,7 +75,7 @@ export default function VotoSeguroPage() {
   const isDirigente = user?.role === 'Dirigente';
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
 
-  const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false);
+  const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false) || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false);
   const canDelete = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
 
   /**
@@ -239,10 +239,11 @@ export default function VotoSeguroPage() {
     if (filteredList.length === 0) return;
     setIsExporting(true);
     try {
-        const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO', 'TELEFONO_MIGRADO'].join(';');
+        const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO', 'TELEFONO_MIGRADO', 'USUARIO'].join(';');
         let csvContent = "\uFEFF" + headers + "\n";
         filteredList.forEach(row => {
-            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO]
+            const userName = row.registradoPor_nombre || 'DESCONOCIDO';
+            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
                 .map(v => `"${String(v || '').replace(/;/g, ' ').toUpperCase()}"`).join(';');
             csvContent += line + "\n";
         });
@@ -255,6 +256,30 @@ export default function VotoSeguroPage() {
         toast({ title: "Exportación exitosa" });
         setIsFilenameDialogOpen(false);
     } finally { setIsExporting(false); }
+  };
+
+  const executeExportUserCSV = async (userName: string, userVotos: VotoSeguroData[]) => {
+    if (userVotos.length === 0) return;
+    try {
+        const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO', 'TELEFONO_MIGRADO', 'USUARIO'].join(';');
+        let csvContent = "\uFEFF" + headers + "\n";
+        userVotos.forEach(row => {
+            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
+                .map(v => `"${String(v || '').replace(/;/g, ' ').toUpperCase()}"`).join(';');
+            csvContent += line + "\n";
+        });
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.body.appendChild(document.createElement('a'));
+        link.href = URL.createObjectURL(blob);
+        const filename = `VOTOS_${userName.replace(/[^a-zA-Z0-9]/g, '_').trim() || 'USUARIO'}.csv`;
+        link.download = filename;
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: `Planilla de ${userName} exportada` });
+    } catch (err) {
+        console.error(err);
+        toast({ title: "Error en la exportación", variant: "destructive" });
+    }
   };
 
   const handleDelete = async () => {
@@ -407,14 +432,25 @@ export default function VotoSeguroPage() {
                                         <div className="space-y-3 pl-2 pr-1 border-l-2 border-primary/10 ml-5">
                                             <Accordion type="multiple" className="w-full space-y-2">
                                                 {Object.entries(seccionalData.dirigentes).map(([userName, userData]) => (
-                                                    <AccordionItem key={`dir-${userName}-${seccional}`} value={`dir-${userName}-${seccional}`} className="border rounded-xl px-4 bg-white shadow-sm">
+                                                    <AccordionItem key={`dir-${userName}-${seccional}`} value={`dir-${userName}-${seccional}`} className="border rounded-xl px-4 bg-white shadow-sm relative group">
                                                         <AccordionTrigger className="hover:no-underline py-4">
-                                                            <div className="flex items-center gap-3 w-full">
+                                                            <div className="flex items-center gap-3 w-full pr-4">
                                                                 <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/5"><UserIcon className="h-4 w-4 text-primary" /></div>
                                                                 <div className="flex items-center gap-2 flex-1 text-left">
                                                                     <span className="font-black text-xs uppercase text-slate-900">{userName}</span>
                                                                 </div>
-                                                                <Badge variant="secondary" className="text-[10px] font-black bg-slate-100 shrink-0">{userData.votos.length} Votos</Badge>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Badge variant="secondary" className="text-[10px] font-black bg-slate-100 shrink-0 border border-slate-200">{userData.votos.length} Votos</Badge>
+                                                                    {canExportExcel && (
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full hover:bg-emerald-100 hover:border-emerald-300 transition-all cursor-pointer shadow-sm"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); executeExportUserCSV(userName, userData.votos); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserCSV(userName, userData.votos); }}
+                                                                        >
+                                                                            <FileDown className="h-3.5 w-3.5 mr-1 text-emerald-600" /> EXCEL
+                                                                        </div>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </AccordionTrigger>
                                                         <AccordionContent className="pt-2 pb-4">

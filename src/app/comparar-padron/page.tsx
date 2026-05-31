@@ -264,6 +264,7 @@ export default function CompararPadronPage() {
             let nombres = "";
             let apellidos = "";
             let nombreCompleto = "";
+            let telefono = "";
             
             const cedulaStr = rawCed ? String(rawCed).replace(/\D/g, '') : '';
             
@@ -284,6 +285,7 @@ export default function CompararPadronPage() {
                     nombres = elector.NOMBRE || "";
                     apellidos = elector.APELLIDO || "";
                     nombreCompleto = `${nombres} ${apellidos}`.trim();
+                    telefono = elector.TELEFONO || elector.TELEFONO_MIGRADO || "";
                     countValidos++;
                 }
             }
@@ -299,6 +301,7 @@ export default function CompararPadronPage() {
 
             rowData["Estado"] = estado;
             rowData["Seccional"] = seccional;
+            rowData["Teléfono (Padrón)"] = telefono;
             rowData["Dirigente"] = dirigenteNombre || "";
 
             newData.push(rowData);
@@ -486,8 +489,9 @@ export default function CompararPadronPage() {
                                 
                                 {(status === 'mapping' || status === 'done') && processedData.length > 0 && (
                                     <div className="border border-slate-200 rounded-xl overflow-hidden mt-4">
-                                        <div className="bg-slate-50 p-3 border-b border-slate-200">
-                                            <h3 className="font-bold text-sm uppercase text-slate-700">Listado Completo ({processedData.length} registros)</h3>
+                                        <div className="bg-slate-50 p-3 border-b border-slate-200 flex justify-between items-center">
+                                            <h3 className="font-bold text-sm uppercase text-slate-700">Vista Previa ({Math.min(processedData.length, 50)} de {processedData.length} registros)</h3>
+                                            <span className="text-[10px] text-slate-500 font-bold uppercase">Columnas Exactas del Excel a Descargar</span>
                                         </div>
                                         <div className="overflow-x-auto max-h-[300px]">
                                             <Table>
@@ -499,7 +503,7 @@ export default function CompararPadronPage() {
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {processedData.map((row, i) => (
+                                                    {processedData.slice(0, 50).map((row, i) => (
                                                         <TableRow key={i}>
                                                             {Object.values(row).map((val: any, j) => (
                                                                 <TableCell key={j} className="text-xs whitespace-nowrap py-2">

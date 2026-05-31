@@ -339,16 +339,15 @@ export default function MigrarVotosPage() {
         });
     };
 
-    // Previsualización de los primeros 10 registros
     const previewData = useMemo(() => {
-        if (sheetData.length === 0 || !mapping.cedula || !mapping.telefono) return [];
+        if (sheetData.length === 0 || !mapping.cedula) return [];
         return sheetData.slice(0, 10).map(row => {
             const rawCed = row[mapping.cedula];
             const cedulaStr = rawCed ? String(rawCed).replace(/\D/g, '') : '';
             const elector = fetchedElectors[cedulaStr];
             return {
                 cedulaRaw: rawCed || 'N/A',
-                telefonoRaw: row[mapping.telefono] || 'N/A',
+                telefonoRaw: mapping.telefono ? (row[mapping.telefono] || 'N/A') : 'N/A',
                 elector: elector || null,
                 exists: elector !== undefined && elector !== null
             };
@@ -416,10 +415,10 @@ export default function MigrarVotosPage() {
 
     const handleStartMigration = () => {
         if (!db || !user || sheetData.length === 0) return;
-        if (!mapping.cedula || !mapping.telefono) {
+        if (!mapping.cedula) {
             toast({
                 title: "Asignación incompleta",
-                description: "Debes elegir qué columnas corresponden a Cédula y Teléfono.",
+                description: "Debes elegir qué columna corresponde a Cédula.",
                 variant: "destructive"
             });
             return;
@@ -482,7 +481,7 @@ export default function MigrarVotosPage() {
         for (let i = 0; i < totalRecords; i++) {
             const row = sheetData[i];
             const rawCed = row[mapping.cedula];
-            const rawTel = row[mapping.telefono];
+            const rawTel = mapping.telefono ? row[mapping.telefono] : undefined;
 
             // 1. Limpieza de Cédula
             if (rawCed === undefined || rawCed === null || String(rawCed).trim() === '') {
@@ -1023,7 +1022,7 @@ export default function MigrarVotosPage() {
                                 <BookHeart className="h-4 w-4 text-primary" />
                                 Paso 3: Previsualización e Inicio
                             </CardTitle>
-                            {status === 'mapping' && mapping.cedula && mapping.telefono && (
+                            {status === 'mapping' && mapping.cedula && (
                                 <div className="flex gap-2">
                                     <Button 
                                         onClick={handleStartMigration} 
