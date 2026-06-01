@@ -117,7 +117,7 @@ export default function ReportesPage() {
     // PC Central ve TODO
     if (isAdmin) return rawList;
 
-    const normalize = (nameStr: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const normalize = (nameStr?: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
     const myNormalizedName = normalize(user.name);
     const isGuillermoMe = myNormalizedName.includes("GUILLERMO") && myNormalizedName.includes("FERNANDEZ");
 

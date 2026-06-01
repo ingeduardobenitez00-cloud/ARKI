@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy, increment } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy, increment, writeBatch } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft } from 'lucide-react';
+import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -147,7 +147,7 @@ export default function VotoSeguroPage() {
     // Admins (PC Central) ven TODO
     if (isAdmin) return rawList;
 
-    const normalize = (nameStr: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
+    const normalize = (nameStr?: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
     const myNormalizedName = normalize(user.name);
     const isGuillermoMe = myNormalizedName.includes("GUILLERMO") && myNormalizedName.includes("FERNANDEZ");
 

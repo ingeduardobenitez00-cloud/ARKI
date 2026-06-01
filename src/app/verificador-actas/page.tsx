@@ -214,7 +214,7 @@ export default function VerificadorActasPage() {
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {mesasWithStatus.sort((a,b) => a.mesa - b.mesa).map((m) => (
+                        {mesasWithStatus.sort((a: any, b: any) => a.mesa - b.mesa).map((m: any) => (
                             <Card key={m.id} className="overflow-hidden border-l-4 border-l-blue-500">
                                 <CardContent className="p-4">
                                     <div className="flex justify-between items-start mb-4">

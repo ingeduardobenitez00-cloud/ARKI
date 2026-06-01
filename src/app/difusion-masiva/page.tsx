@@ -563,7 +563,7 @@ export default function DifusionMasivaPage() {
         // Update local list state so it syncs immediately
         const nowStr = new Date().toISOString();
         if (activeTab === 'padron') {
-            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user.name } : e));
+            setElectores(prev => prev.map(e => e.id === p.id ? { ...e, DIFUNDIDO: true, difundidoAt: nowStr, difundidoBy: user?.name || 'Desconocido' } : e));
         }
 
         // Update Firestore permanently!
@@ -573,7 +573,7 @@ export default function DifusionMasivaPage() {
             updateDoc(electorRef, {
                 DIFUNDIDO: true,
                 difundidoAt: nowStr,
-                difundidoBy: user.name
+                difundidoBy: user?.name || 'Desconocido'
             }).catch(e => console.error("Error updating DIFUNDIDO in Firestore:", e));
         }
 
