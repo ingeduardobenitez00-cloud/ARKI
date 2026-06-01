@@ -331,6 +331,8 @@ export default function MigrarVotosPage() {
     const getOperatorsForSeccional = (secCode: string) => {
         if (!allUsers) return [];
         return allUsers.filter(u => {
+            if (u.role === 'Admin' || u.role === 'Super-Admin') return true;
+            
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
             const userSecs = rawSecc.map((s: any) => 
                 String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")

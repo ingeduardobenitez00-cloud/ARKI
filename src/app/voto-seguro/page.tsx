@@ -325,9 +325,11 @@ export default function VotoSeguroPage() {
           const newOperatorName = destinationUser.name || destinationUser.email || 'Desconocido';
 
           const promises = [
-              updateDoc(docRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName }),
-              updateDoc(padronRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName })
+              updateDoc(docRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName })
           ];
+
+          // Opcional: actualizar en el padrón base si existe
+          promises.push(updateDoc(padronRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName }).catch(() => {}) as any);
 
           // Restar al operador anterior
           if (votoToMove.registradoPor_id) {
@@ -567,7 +569,11 @@ export default function VotoSeguroPage() {
                           className="flex h-12 w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-2 text-xs font-black uppercase ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                       >
                           <option value="">-- Seleccionar Operador --</option>
-                          {allUsers?.map((u: any) => {
+                          {allUsers?.filter((u: any) => {
+                              if (!votoToMove?.CODIGO_SEC) return true;
+                              const userSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
+                              return userSecs.some((sec: any) => String(sec) === String(votoToMove.CODIGO_SEC));
+                          }).map((u: any) => {
                               const uName = (u.name || u.email || 'Desconocido').toUpperCase();
                               return (
                                   <option key={u.id} value={u.id}>
