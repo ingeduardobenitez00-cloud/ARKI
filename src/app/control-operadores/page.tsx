@@ -154,8 +154,8 @@ export default function RendimientoOperadoresPage() {
         const totalOps = users.length;
         const inactiveOps = totalOps - activeOperators;
 
-        // Top 3 best operators
-        const topOperators = [...users].sort((a, b) => b.votosCargados - a.votosCargados).slice(0, 3).filter(u => u.votosCargados > 0);
+        // Top 10 best operators
+        const topOperators = [...users].sort((a, b) => b.votosCargados - a.votosCargados).slice(0, 10).filter(u => u.votosCargados > 0);
 
         return { activeOperators, totalOps, inactiveOps, topOperators };
     }, [users]);
@@ -294,7 +294,7 @@ export default function RendimientoOperadoresPage() {
                                         <div className="flex items-center gap-2 overflow-hidden">
                                             <span className={cn(
                                                 "font-black text-xs w-4 text-center",
-                                                i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : "text-amber-700"
+                                                i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-600"
                                             )}>{i + 1}</span>
                                             <Avatar className="h-6 w-6">
                                                 <AvatarImage src={u.photoUrl} />
