@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2 } from 'lucide-react';
+import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -69,6 +69,12 @@ export default function VotoSeguroPage() {
   const [votoToDelete, setVotoToDelete] = useState<VotoSeguroData | null>(null);
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
+  
+  const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
+  const [votoToMove, setVotoToMove] = useState<VotoSeguroData | null>(null);
+  const [destinationUserId, setDestinationUserId] = useState('');
+  const [isMoving, setIsMoving] = useState(false);
+
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
@@ -76,7 +82,7 @@ export default function VotoSeguroPage() {
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
 
   const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false) || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false);
-  const canDelete = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
+  const canDelete = isAdmin || isPresidente || isCoordinador || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
 
   /**
    * QUERY OPTIMIZADA POR ROL:
@@ -303,6 +309,49 @@ export default function VotoSeguroPage() {
     }).finally(() => { setIsDeleting(false); setIsAlertOpen(false); setVotoToDelete(null); });
   };
 
+  const handleMoveVoto = async () => {
+      if (!votoToMove || !db || !user || !destinationUserId) return;
+      
+      const destinationUser = allUsers?.find(u => u.id === destinationUserId);
+      if (!destinationUser) {
+          toast({ title: 'Usuario destino no encontrado', variant: 'destructive' });
+          return;
+      }
+
+      setIsMoving(true);
+      try {
+          const docRef = doc(db, 'votos_confirmados', votoToMove.id);
+          const padronRef = doc(db, 'sheet1', votoToMove.id);
+          const newOperatorName = destinationUser.name || destinationUser.email || 'Desconocido';
+
+          const promises = [
+              updateDoc(docRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName }),
+              updateDoc(padronRef, { registradoPor_id: destinationUser.id, registradoPor_nombre: newOperatorName })
+          ];
+
+          // Restar al operador anterior
+          if (votoToMove.registradoPor_id) {
+              promises.push(updateDoc(doc(db, 'users', votoToMove.registradoPor_id), { votosCargados: increment(-1) }).catch(() => {}) as any);
+          }
+
+          // Sumar al nuevo operador
+          promises.push(updateDoc(doc(db, 'users', destinationUser.id), { votosCargados: increment(1) }).catch(() => {}) as any);
+
+          await Promise.all(promises);
+          
+          logAction(db, { userId: user.id, userName: user.name, module: 'VOTO SEGURO', action: 'REASIGNÓ VOTO SEGURO', targetName: `${votoToMove.NOMBRE} a ${newOperatorName}` });
+          toast({ title: 'Voto reasignado correctamente' });
+          setIsMoveDialogOpen(false);
+          setVotoToMove(null);
+          setDestinationUserId('');
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'Error al reasignar', variant: 'destructive' });
+      } finally {
+          setIsMoving(false);
+      }
+  };
+
   const renderTable = (items: VotoSeguroData[]) => {
     const hasAnyMigrated = items.some(p => String(p.TELEFONO_MIGRADO || '').trim().length >= 6);
 
@@ -353,9 +402,21 @@ export default function VotoSeguroPage() {
                               </TableCell>
                           )}
                           <TableCell className="text-right">
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
-                                  <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center justify-end gap-1">
+                                  {isAdmin && (
+                                      <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50" 
+                                          onClick={() => { setVotoToMove(p); setIsMoveDialogOpen(true); }}
+                                      >
+                                          <ArrowRightLeft className="h-4 w-4" />
+                                      </Button>
+                                  )}
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
+                                      <Trash2 className="h-4 w-4" />
+                                  </Button>
+                              </div>
                           </TableCell>
                       </TableRow>
                   ))}
@@ -487,6 +548,45 @@ export default function VotoSeguroPage() {
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
         <AlertDialogContent className="rounded-3xl"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase text-xl">¿ELIMINAR MARCA?</AlertDialogTitle></AlertDialogHeader><AlertDialogFooter className="gap-2"><AlertDialogCancel className="font-black uppercase text-xs h-11 rounded-xl">CANCELAR</AlertDialogCancel><AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-xs h-11 px-6 rounded-xl">{isDeleting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Trash2 className="mr-2 h-4 w-4" />} ELIMINAR</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isMoveDialogOpen} onOpenChange={(open) => { setIsMoveDialogOpen(open); if(!open){ setDestinationUserId(''); setVotoToMove(null); } }}>
+          <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle className="font-black uppercase text-xl text-primary">Mover Voto Seguro</DialogTitle>
+                  <DialogDescription className="font-bold text-xs uppercase">
+                      Reasignar el registro de <strong className="text-slate-900">{votoToMove?.NOMBRE} {votoToMove?.APELLIDO}</strong> a otro operador.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                  <div className="flex flex-col gap-2">
+                      <Label htmlFor="destinationUser" className="text-xs font-black uppercase text-slate-700">Seleccionar Operador de Destino</Label>
+                      <select 
+                          id="destinationUser"
+                          value={destinationUserId}
+                          onChange={(e) => setDestinationUserId(e.target.value)}
+                          className="flex h-12 w-full rounded-xl border-2 border-primary/20 bg-background px-4 py-2 text-xs font-black uppercase ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                      >
+                          <option value="">-- Seleccionar Operador --</option>
+                          {allUsers?.map((u: any) => {
+                              const uName = (u.name || u.email || 'Desconocido').toUpperCase();
+                              return (
+                                  <option key={u.id} value={u.id}>
+                                      {uName} {u.clasificacion ? `(${u.clasificacion})` : ''}
+                                  </option>
+                              );
+                          }).sort((a: any, b: any) => a.props.children[0].localeCompare(b.props.children[0]))}
+                      </select>
+                  </div>
+              </div>
+              <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setIsMoveDialogOpen(false)} className="font-black uppercase text-xs h-11 rounded-xl">Cancelar</Button>
+                  <Button onClick={handleMoveVoto} disabled={!destinationUserId || isMoving} className="font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg">
+                      {isMoving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                      Reasignar Voto
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }

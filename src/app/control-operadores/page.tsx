@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
-import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, limit, orderBy, getCountFromServer, doc, writeBatch } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 
@@ -36,9 +36,11 @@ export default function RendimientoOperadoresPage() {
     const [seccionales, setSeccionales] = useState<Seccional[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [totalVotosGlobal, setTotalVotosGlobal] = useState(0);
+
     const usersQuery = useMemoFirebase(() => {
         if (!db) return null;
-        return query(collection(db, USERS_COLLECTION), limit(300));
+        return query(collection(db, USERS_COLLECTION));
     }, [db]);
 
     const { data: liveUsersData, isLoading: usersLoading } = useCollection<User>(usersQuery);
@@ -53,21 +55,76 @@ export default function RendimientoOperadoresPage() {
         return mapped;
     }, [liveUsersData]);
 
-    const totalVotosGlobal = useMemo(() => {
-        return users.reduce((acc, user) => acc + (user.votosCargados || 0), 0);
-    }, [users]);
-
-    const fetchSeccionales = useCallback(async () => {
+    const fetchInitialData = useCallback(async () => {
         try {
             const seccSnap = await getDocs(collection(db, 'seccionales'));
             const seccList = seccSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Seccional));
             setSeccionales(seccList.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true })));
+
+            // Fetch the REAL total count of votes globally, which is very cheap (1 read per 1000 index hits)
+            const countSnap = await getCountFromServer(collection(db, VOTOS_COLLECTION));
+            setTotalVotosGlobal(countSnap.data().count);
         } catch (error) {
             console.error(error);
         }
     }, [db]);
 
-    useEffect(() => { fetchSeccionales(); }, [fetchSeccionales]);
+    useEffect(() => { fetchInitialData(); }, [fetchInitialData]);
+
+    const sumUsersVotos = useMemo(() => users.reduce((acc, user) => acc + (user.votosCargados || 0), 0), [users]);
+    const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+
+    useEffect(() => {
+        if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Super-Admin')) return;
+        
+        // Si hay una discrepancia mayor a 50 votos entre el total real y la suma de perfiles,
+        // forzamos una sincronización automática silenciosa para arreglar el TOP histórico.
+        if (totalVotosGlobal > 0 && sumUsersVotos > 0 && (totalVotosGlobal - sumUsersVotos > 50) && !isAutoSyncing) {
+            const doAutoSync = async () => {
+                setIsAutoSyncing(true);
+                try {
+                    toast({ title: 'Sincronizando Histórico...', description: 'Estamos actualizando el TOP de operadores automáticamente.' });
+                    
+                    const capturesSnap = await getDocs(collection(db, VOTOS_COLLECTION));
+                    const operatorCounts: Record<string, number> = {};
+
+                    capturesSnap.forEach(docSnap => {
+                        const data = docSnap.data();
+                        if (data.registradoPor_id) {
+                            operatorCounts[data.registradoPor_id] = (operatorCounts[data.registradoPor_id] || 0) + 1;
+                        }
+                    });
+
+                    const usersSnap = await getDocs(collection(db, USERS_COLLECTION));
+                    const usersList = usersSnap.docs.map(d => d.id);
+
+                    let batch = writeBatch(db);
+                    let count = 0;
+
+                    for (const userId of usersList) {
+                        const totalVotos = operatorCounts[userId] || 0;
+                        batch.update(doc(db, USERS_COLLECTION, userId), { votosCargados: totalVotos });
+                        count++;
+
+                        if (count >= 400) {
+                            await batch.commit();
+                            batch = writeBatch(db);
+                            count = 0;
+                        }
+                    }
+                    if (count > 0) {
+                        await batch.commit();
+                    }
+                    toast({ title: '¡Sincronización Completada!', description: 'El panel histórico ahora está 100% al día.' });
+                } catch(err) {
+                    console.error("Error en auto-sync:", err);
+                } finally {
+                    setIsAutoSyncing(false);
+                }
+            };
+            doAutoSync();
+        }
+    }, [totalVotosGlobal, sumUsersVotos, currentUser, db, isAutoSyncing, toast]);
 
     const isLoading = usersLoading || seccionales.length === 0;
 

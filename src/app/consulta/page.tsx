@@ -86,7 +86,9 @@ export default function ConsultaPage() {
     const [refreshKey, setRefreshKey] = useState(0);
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
-    const canDelete = isAdmin || user?.moduleActions?.['/consulta']?.includes('delete');
+    const isPresidente = user?.role === 'Presidente';
+    const isCoordinador = user?.role === 'Coordinador';
+    const canDelete = isAdmin || isPresidente || isCoordinador || user?.moduleActions?.['/consulta']?.includes('delete');
 
     const userSeccionales = useMemo(() => {
         if (!user) return [];
