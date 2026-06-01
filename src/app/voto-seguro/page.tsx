@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy } from 'firebase/firestore';
+import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -288,10 +288,16 @@ export default function VotoSeguroPage() {
     const docRef = doc(db, 'votos_confirmados', votoToDelete.id);
     const padronRef = doc(db, 'sheet1', votoToDelete.id);
 
-    Promise.all([
+    const promises = [
         deleteDoc(docRef),
         updateDoc(padronRef, { observacion: null })
-    ]).then(() => { 
+    ];
+
+    if (votoToDelete.registradoPor_id) {
+        promises.push(updateDoc(doc(db, 'users', votoToDelete.registradoPor_id), { votosCargados: increment(-1) }).catch(() => {}) as any);
+    }
+
+    Promise.all(promises).then(() => { 
         logAction(db, { userId: user.id, userName: user.name, module: 'VOTO SEGURO', action: 'ELIMINÓ VOTO SEGURO', targetName: `${votoToDelete.NOMBRE}` });
         toast({ title: 'Registro eliminado' }); 
     }).finally(() => { setIsDeleting(false); setIsAlertOpen(false); setVotoToDelete(null); });

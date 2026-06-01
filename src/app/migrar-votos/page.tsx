@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc, where } from 'firebase/firestore';
+import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc, where, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -580,7 +580,8 @@ export default function MigrarVotosPage() {
             }
 
             currentBatch.set(capturasRef, vsObj, { merge: true });
-            currentBatchSize++;
+            currentBatch.set(doc(db, 'users', assignedOperatorId), { votosCargados: increment(1) }, { merge: true });
+            currentBatchSize += 2;
             localUpdatedCapturas++;
 
             // 5. Actualización en Padrón (sheet1)
@@ -753,6 +754,13 @@ export default function MigrarVotosPage() {
             // Eliminar de votos_confirmados
             const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
             currentBatch.delete(capturasRef);
+            
+            // Revertir el contador del operador si sabemos quién lo registró
+            if (electorData?.registradoPor_id) {
+                currentBatch.set(doc(db, 'users', electorData.registradoPor_id), { votosCargados: increment(-1) }, { merge: true });
+                currentBatchSize++;
+            }
+
             currentBatchSize++;
             localUpdatedCapturas++;
 

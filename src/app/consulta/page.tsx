@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
@@ -394,10 +394,12 @@ export default function ConsultaPage() {
 
         const capturaRef = doc(db, COLLECTION_CAPTURAS, selectedPerson.id);
         const padronRef = doc(db, COLLECTION_PADRON, selectedPerson.id);
+        const userRef = doc(db, 'users', user.id);
 
         Promise.all([
             setDoc(capturaRef, dataToSave),
-            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono })
+            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono }),
+            updateDoc(userRef, { votosCargados: increment(1) }).catch(() => {}) // Ignore if field doesn't exist yet
         ]).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'REGISTRÓ VOTO SEGURO', targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}` });
             toast({ title: '¡Registro Exitoso!' });
@@ -443,10 +445,12 @@ export default function ConsultaPage() {
 
             const capturaRef = doc(db, COLLECTION_CAPTURAS, selectedPerson.id);
             const padronRef = doc(db, COLLECTION_PADRON, selectedPerson.id);
+            const opRef = doc(db, 'users', selectedOperator.id);
 
             await Promise.all([
                 setDoc(capturaRef, dataToSave),
-                updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono || '' })
+                updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono || '' }),
+                updateDoc(opRef, { votosCargados: increment(1) }).catch(() => {})
             ]);
 
             logAction(db, { 
@@ -495,11 +499,18 @@ export default function ConsultaPage() {
         setIsDeleting(true);
         const capturaRef = doc(db, COLLECTION_CAPTURAS, votoToDelete.id);
         const padronRef = doc(db, COLLECTION_PADRON, votoToDelete.id);
+        const userRef = votoToDelete.registradoPor_id ? doc(db, 'users', votoToDelete.registradoPor_id) : null;
 
-        Promise.all([
+        const promises = [
             deleteDoc(capturaRef),
             updateDoc(padronRef, { observacion: null })
-        ]).then(() => {
+        ];
+        
+        if (userRef) {
+            promises.push(updateDoc(userRef, { votosCargados: increment(-1) }).catch(() => {}) as any);
+        }
+
+        Promise.all(promises).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'ELIMINÓ VOTO SEGURO', targetName: `${votoToDelete.NOMBRE}` });
             toast({ title: 'Marca eliminada' });
         }).finally(() => { setIsDeleting(false); setIsDeleteAlertOpen(false); setVotoToDelete(null); });

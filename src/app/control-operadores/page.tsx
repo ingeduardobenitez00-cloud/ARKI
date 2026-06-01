@@ -4,7 +4,8 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
 import { useAuth } from '@/hooks/use-auth';
 import { collection, getDocs, query, limit, orderBy } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection } from '@/firebase/firestore/use-collection';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,59 +33,43 @@ export default function RendimientoOperadoresPage() {
     const { user: currentUser } = useAuth();
     const { toast } = useToast();
     
-    const [users, setUsers] = useState<UserPerformance[]>([]);
     const [seccionales, setSeccionales] = useState<Seccional[]>([]);
-    const [isLoading, setIsLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
-    const [totalVotosGlobal, setTotalVotosGlobal] = useState(0);
 
-    const fetchData = useCallback(async () => {
-        setIsLoading(true);
+    const usersQuery = useMemoFirebase(() => {
+        if (!db) return null;
+        return query(collection(db, USERS_COLLECTION), limit(300));
+    }, [db]);
+
+    const { data: liveUsersData, isLoading: usersLoading } = useCollection<User>(usersQuery);
+
+    const users = useMemo(() => {
+        if (!liveUsersData) return [];
+        const mapped = liveUsersData.map(u => ({
+            ...u,
+            votosCargados: (u as any).votosCargados || 0
+        })) as UserPerformance[];
+        mapped.sort((a, b) => b.votosCargados - a.votosCargados);
+        return mapped;
+    }, [liveUsersData]);
+
+    const totalVotosGlobal = useMemo(() => {
+        return users.reduce((acc, user) => acc + (user.votosCargados || 0), 0);
+    }, [users]);
+
+    const fetchSeccionales = useCallback(async () => {
         try {
-            // Fetch users
-            const usersSnap = await getDocs(query(collection(db, USERS_COLLECTION), limit(300)));
-            const usersList = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), votosCargados: 0 } as UserPerformance));
-            
-            // Fetch seccionales
             const seccSnap = await getDocs(collection(db, 'seccionales'));
             const seccList = seccSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Seccional));
             setSeccionales(seccList.sort((a, b) => a.nombre.localeCompare(b.nombre, undefined, { numeric: true })));
-
-            // Fetch votos confirmados
-            const votosSnap = await getDocs(query(collection(db, VOTOS_COLLECTION)));
-            
-            let globalVotosCount = 0;
-            const operatorVotosCount: Record<string, number> = {};
-
-            votosSnap.docs.forEach(docSnap => {
-                const data = docSnap.data();
-                globalVotosCount++;
-                if (data.registradoPor_id) {
-                    operatorVotosCount[data.registradoPor_id] = (operatorVotosCount[data.registradoPor_id] || 0) + 1;
-                }
-            });
-
-            setTotalVotosGlobal(globalVotosCount);
-
-            // Merge counts
-            const usersWithStats = usersList.map(u => ({
-                ...u,
-                votosCargados: operatorVotosCount[u.id] || 0
-            }));
-
-            // Sort generally by votes descending
-            usersWithStats.sort((a, b) => b.votosCargados - a.votosCargados);
-            setUsers(usersWithStats);
-
         } catch (error) {
-            toast({ title: 'Error al cargar datos de rendimiento', variant: 'destructive' });
             console.error(error);
-        } finally {
-            setIsLoading(false);
         }
-    }, [toast, db]);
+    }, [db]);
 
-    useEffect(() => { fetchData(); }, [fetchData]);
+    useEffect(() => { fetchSeccionales(); }, [fetchSeccionales]);
+
+    const isLoading = usersLoading || seccionales.length === 0;
 
     const visibleUsers = useMemo(() => {
         if (!currentUser) return users;

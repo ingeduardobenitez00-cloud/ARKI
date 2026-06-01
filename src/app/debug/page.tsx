@@ -1,13 +1,64 @@
 "use client";
 
 import { useEffect, useState } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, writeBatch } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 
 export default function DebugPage() {
     const db = useFirestore();
     const [status, setStatus] = useState<string>("Iniciando diagnóstico...");
     const [results, setResults] = useState<any>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+
+    const handleMasterSync = async () => {
+        if (!db) return;
+        setIsSyncing(true);
+        setStatus("Iniciando Sincronización Maestra...");
+        try {
+            // 1. Download all votes
+            const capturesSnap = await getDocs(collection(db, 'votos_confirmados'));
+            const operatorCounts: Record<string, number> = {};
+
+            capturesSnap.forEach(docSnap => {
+                const data = docSnap.data();
+                if (data.registradoPor_id) {
+                    operatorCounts[data.registradoPor_id] = (operatorCounts[data.registradoPor_id] || 0) + 1;
+                }
+            });
+
+            // 2. Download all users
+            const usersSnap = await getDocs(collection(db, 'users'));
+            const users = usersSnap.docs.map(d => d.id);
+
+            // 3. Prepare Batch
+            let batch = writeBatch(db);
+            let count = 0;
+
+            for (const userId of users) {
+                const totalVotos = operatorCounts[userId] || 0;
+                batch.update(doc(db, 'users', userId), { votosCargados: totalVotos });
+                count++;
+
+                if (count >= 400) {
+                    await batch.commit();
+                    batch = writeBatch(db);
+                    count = 0;
+                }
+            }
+            if (count > 0) {
+                await batch.commit();
+            }
+
+            setStatus(`Sincronización Maestra Completada. Se actualizaron ${users.length} usuarios.`);
+            alert("¡Sincronización Maestra Exitosa!");
+        } catch (err: any) {
+            console.error(err);
+            setStatus("Error en Sincronización: " + err.message);
+            alert("Error en Sincronización: " + err.message);
+        } finally {
+            setIsSyncing(false);
+        }
+    };
 
     useEffect(() => {
         if (!db) return;
@@ -81,7 +132,16 @@ export default function DebugPage() {
 
     return (
         <div className="p-8 bg-slate-900 text-white min-h-screen font-mono">
-            <h1 className="text-2xl font-bold mb-4">Soporte Técnico - Diagnóstico de Votos</h1>
+            <div className="flex justify-between items-center mb-4">
+                <h1 className="text-2xl font-bold">Soporte Técnico - Diagnóstico de Votos</h1>
+                <button 
+                    onClick={handleMasterSync} 
+                    disabled={isSyncing}
+                    className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50"
+                >
+                    {isSyncing ? "Sincronizando..." : "Sincronización Maestra de Contadores"}
+                </button>
+            </div>
             <p className="text-yellow-400 mb-6">Estado: {status}</p>
 
             {results && (
