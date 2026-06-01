@@ -438,7 +438,7 @@ export default function MigrarVotosPage() {
             const electorData = fetchedElectors[cedulaStr];
             if (electorData && electorData.observacion === "VOTO SEGURO") {
                 count++;
-                const registeredBy = electorData.votoSeguroUpdatedBy_nombre || electorData.registradoPor_nombre || 'DESCONOCIDO';
+                const registeredBy = electorData.registradoPor_nombre || electorData.votoSeguroUpdatedBy_nombre || 'DESCONOCIDO';
                 users.add(registeredBy);
                 conflicts.push({
                     cedula: cedulaStr,
@@ -588,6 +588,8 @@ export default function MigrarVotosPage() {
                 observacion: "VOTO SEGURO",
                 votoSeguroUpdatedBy_id: user.id,
                 votoSeguroUpdatedBy_nombre: user.name,
+                registradoPor_id: assignedOperatorId,
+                registradoPor_nombre: assignedOperatorName,
                 votoSeguroUpdatedAt: new Date().toISOString(),
                 migradoDesdeExcel: file?.name || 'MIGRACION_EXCEL'
             };
@@ -634,6 +636,27 @@ export default function MigrarVotosPage() {
         setUpdatedPadronCount(localUpdatedPadron);
         setUpdatedCapturasCount(localUpdatedCapturas);
         setSkippedCount(localSkipped);
+
+        if (Object.keys(delegatedCounts).length > 0) {
+            try {
+                const notifBatch = writeBatch(db);
+                for (const [opId, data] of Object.entries(delegatedCounts)) {
+                    const notifRef = doc(collection(db, 'notifications'));
+                    notifBatch.set(notifRef, {
+                        recipientId: opId,
+                        title: "Nuevos Votos Asignados",
+                        message: `Se te han asignado ${data.count} votos seguros desde una importación masiva.`,
+                        senderName: user.name,
+                        createdAt: new Date().toISOString(),
+                        read: false,
+                        type: 'system_migration'
+                    });
+                }
+                await notifBatch.commit();
+            } catch (err) {
+                console.error("Error enviando notificaciones:", err);
+            }
+        }
 
         // Auditoría
         try {
