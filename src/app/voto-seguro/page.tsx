@@ -75,6 +75,11 @@ export default function VotoSeguroPage() {
   const [destinationUserId, setDestinationUserId] = useState('');
   const [isMoving, setIsMoving] = useState(false);
 
+  const [isMoveAllDialogOpen, setIsMoveAllDialogOpen] = useState(false);
+  const [userToMoveAll, setUserToMoveAll] = useState<{userName: string, userId: string, votos: VotoSeguroData[]} | null>(null);
+  const [destinationUserAllId, setDestinationUserAllId] = useState('');
+  const [isMovingAll, setIsMovingAll] = useState(false);
+
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
@@ -354,6 +359,67 @@ export default function VotoSeguroPage() {
       }
   };
 
+  const handleMoveAllVotos = async () => {
+      if (!userToMoveAll || !db || !user || !destinationUserAllId) return;
+      
+      const destinationUser = allUsers?.find(u => u.id === destinationUserAllId);
+      if (!destinationUser) {
+          toast({ title: 'Usuario destino no encontrado', variant: 'destructive' });
+          return;
+      }
+
+      setIsMovingAll(true);
+      try {
+          const newOperatorName = destinationUser.name || destinationUser.email || 'Desconocido';
+          const { votos, userId: oldUserId } = userToMoveAll;
+          
+          if (votos.length === 0) return;
+
+          // Dividir en bloques de 200 (para no exceder 500 escrituras por batch, ya que son 2 docs por voto)
+          const chunkSize = 200;
+          for (let i = 0; i < votos.length; i += chunkSize) {
+              const chunk = votos.slice(i, i + chunkSize);
+              const batch = writeBatch(db);
+
+              chunk.forEach(voto => {
+                  const docRef = doc(db, 'votos_confirmados', voto.id);
+                  const padronRef = doc(db, 'sheet1', voto.id);
+
+                  batch.update(docRef, { 
+                      registradoPor_id: destinationUser.id, 
+                      registradoPor_nombre: newOperatorName 
+                  });
+                  batch.set(padronRef, { 
+                      registradoPor_id: destinationUser.id, 
+                      registradoPor_nombre: newOperatorName 
+                  }, { merge: true });
+              });
+
+              await batch.commit();
+          }
+
+          // Actualizar los contadores de los usuarios
+          const promises = [];
+          if (oldUserId && oldUserId !== 'unknown') {
+              promises.push(updateDoc(doc(db, 'users', oldUserId), { votosCargados: increment(-votos.length) }).catch(() => {}) as any);
+          }
+          promises.push(updateDoc(doc(db, 'users', destinationUser.id), { votosCargados: increment(votos.length) }).catch(() => {}) as any);
+          
+          await Promise.all(promises);
+
+          logAction(db, { userId: user.id, userName: user.name, module: 'VOTO SEGURO', action: 'REASIGNÓ TODOS LOS VOTOS', targetName: `De ${userToMoveAll.userName} a ${newOperatorName} (${votos.length} votos)` });
+          toast({ title: 'Todos los votos reasignados correctamente' });
+          setIsMoveAllDialogOpen(false);
+          setUserToMoveAll(null);
+          setDestinationUserAllId('');
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'Error al reasignar masivamente', variant: 'destructive' });
+      } finally {
+          setIsMovingAll(false);
+      }
+  };
+
   const renderTable = (items: VotoSeguroData[]) => {
     const hasAnyMigrated = items.some(p => String(p.TELEFONO_MIGRADO || '').trim().length >= 6);
 
@@ -519,6 +585,15 @@ export default function VotoSeguroPage() {
                                                                             <FileDown className="h-3.5 w-3.5 mr-1 text-emerald-600" /> EXCEL
                                                                         </div>
                                                                     )}
+                                                                    {isAdmin && userData.votos.length > 0 && (
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 hover:border-blue-300 transition-all cursor-pointer shadow-sm ml-2"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); setUserToMoveAll({userName, userId: userData.userId, votos: userData.votos}); setIsMoveAllDialogOpen(true); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToMoveAll({userName, userId: userData.userId, votos: userData.votos}); setIsMoveAllDialogOpen(true); }}
+                                                                        >
+                                                                            <ArrowRightLeft className="h-3.5 w-3.5 mr-1 text-blue-600" /> MOVER TODO
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </AccordionTrigger>
@@ -589,6 +664,45 @@ export default function VotoSeguroPage() {
                   <Button onClick={handleMoveVoto} disabled={!destinationUserId || isMoving} className="font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg">
                       {isMoving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
                       Reasignar Voto
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
+      <Dialog open={isMoveAllDialogOpen} onOpenChange={(open) => { setIsMoveAllDialogOpen(open); if(!open){ setDestinationUserAllId(''); setUserToMoveAll(null); } }}>
+          <DialogContent className="sm:max-w-[425px]">
+              <DialogHeader>
+                  <DialogTitle className="font-black uppercase text-xl text-blue-600">Mover Todos Los Votos</DialogTitle>
+                  <DialogDescription className="font-bold text-xs uppercase">
+                      Estás a punto de reasignar <strong className="text-slate-900">{userToMoveAll?.votos?.length || 0} votos</strong> registrados por <strong className="text-slate-900">{userToMoveAll?.userName}</strong> a un nuevo operador.
+                  </DialogDescription>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                  <div className="flex flex-col gap-2">
+                      <Label htmlFor="destinationUserAll" className="text-xs font-black uppercase text-slate-700">Seleccionar Operador de Destino</Label>
+                      <select 
+                          id="destinationUserAll"
+                          value={destinationUserAllId}
+                          onChange={(e) => setDestinationUserAllId(e.target.value)}
+                          className="flex h-12 w-full rounded-xl border-2 border-blue-200 bg-background px-4 py-2 text-xs font-black uppercase ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+                      >
+                          <option value="">-- Seleccionar Operador --</option>
+                          {allUsers?.map((u: any) => {
+                              const uName = (u.name || u.email || 'Desconocido').toUpperCase();
+                              return (
+                                  <option key={u.id} value={u.id}>
+                                      {uName} {u.clasificacion ? `(${u.clasificacion})` : ''}
+                                  </option>
+                              );
+                          }).sort((a: any, b: any) => a.props.children[0].localeCompare(b.props.children[0]))}
+                      </select>
+                  </div>
+              </div>
+              <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setIsMoveAllDialogOpen(false)} disabled={isMovingAll} className="font-black uppercase text-xs h-11 rounded-xl">Cancelar</Button>
+                  <Button onClick={handleMoveAllVotos} disabled={!destinationUserAllId || isMovingAll} className="bg-blue-600 hover:bg-blue-700 font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg">
+                      {isMovingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ArrowRightLeft className="mr-2 h-4 w-4" />}
+                      {isMovingAll ? 'Procesando...' : 'Mover Todo'}
                   </Button>
               </DialogFooter>
           </DialogContent>
