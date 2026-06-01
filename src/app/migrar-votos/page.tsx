@@ -442,7 +442,7 @@ export default function MigrarVotosPage() {
                 users.add(registeredBy);
                 conflicts.push({
                     cedula: cedulaStr,
-                    nombre: electorData.NOMBRE_COMPLETO || `${electorData.NOMBRES || ''} ${electorData.APELLIDOS || ''}`.trim(),
+                    nombre: electorData.NOMBRE_COMPLETO || `${electorData.NOMBRE || ''} ${electorData.APELLIDO || ''}`.trim(),
                     registradoPor: registeredBy
                 });
             }

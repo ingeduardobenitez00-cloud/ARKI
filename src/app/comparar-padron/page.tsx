@@ -265,6 +265,7 @@ export default function CompararPadronPage() {
             let apellidos = "";
             let nombreCompleto = "";
             let telefono = "";
+            let yaRegistradoPor = "";
             
             const cedulaStr = rawCed ? String(rawCed).replace(/\D/g, '') : '';
             
@@ -286,6 +287,14 @@ export default function CompararPadronPage() {
                     apellidos = elector.APELLIDO || "";
                     nombreCompleto = `${nombres} ${apellidos}`.trim();
                     telefono = elector.TELEFONO || elector.TELEFONO_MIGRADO || "";
+                    
+                    if (elector.observacion === "VOTO SEGURO") {
+                        estado = "YA ES VOTO SEGURO";
+                        yaRegistradoPor = elector.registradoPor_nombre || elector.votoSeguroUpdatedBy_nombre || "DESCONOCIDO";
+                    } else {
+                        estado = "Válido (Libre)";
+                    }
+                    
                     countValidos++;
                 }
             }
@@ -302,6 +311,7 @@ export default function CompararPadronPage() {
             rowData["Estado"] = estado;
             rowData["Seccional"] = seccional;
             rowData["Teléfono (Padrón)"] = telefono;
+            rowData["Ya Registrado Por"] = yaRegistradoPor;
             rowData["Dirigente"] = dirigenteNombre || "";
 
             newData.push(rowData);
