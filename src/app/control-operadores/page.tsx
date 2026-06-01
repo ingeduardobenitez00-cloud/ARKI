@@ -86,15 +86,29 @@ export default function RendimientoOperadoresPage() {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    const visibleUsers = useMemo(() => {
+        if (!currentUser) return users;
+        const userSeccionales = currentUser.seccionales || (currentUser.seccional ? [currentUser.seccional] : []);
+        const isGlobal = currentUser.role === 'Super-Admin' || currentUser.role === 'Admin' || currentUser.role === 'Presidente';
+        
+        if (!isGlobal && userSeccionales.length > 0) {
+            return users.filter(u => {
+                const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
+                return uSecs.some(sec => userSeccionales.includes(String(sec)) || userSeccionales.includes(Number(sec)));
+            });
+        }
+        return users;
+    }, [users, currentUser]);
+
     const filteredUsers = useMemo(() => {
         const s = searchTerm.toLowerCase();
-        return users.filter(u => {
+        return visibleUsers.filter(u => {
             const normalize = (str: string) => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
             const searchTerms = normalize(s).split(' ').filter(Boolean);
             const userIdentity = normalize(`${u.name || ''} ${u.email || ''} ${u.clasificacion || ''} ${u.role || ''}`);
             return searchTerms.every(term => userIdentity.includes(term));
         });
-    }, [users, searchTerm]);
+    }, [visibleUsers, searchTerm]);
 
     const groupedUsers = useMemo(() => {
         const groups: Record<string, UserPerformance[]> = {};
@@ -150,15 +164,26 @@ export default function RendimientoOperadoresPage() {
     }, [filteredUsers, seccionales, searchTerm]);
 
     const stats = useMemo(() => {
-        const activeOperators = users.filter(u => u.votosCargados > 0).length;
-        const totalOps = users.length;
+        const activeOperators = visibleUsers.filter(u => u.votosCargados > 0).length;
+        const totalOps = visibleUsers.length;
         const inactiveOps = totalOps - activeOperators;
 
         // Top 10 best operators
-        const topOperators = [...users].sort((a, b) => b.votosCargados - a.votosCargados).slice(0, 10).filter(u => u.votosCargados > 0);
+        const topOperators = [...visibleUsers].sort((a, b) => b.votosCargados - a.votosCargados).slice(0, 10).filter(u => u.votosCargados > 0);
 
-        return { activeOperators, totalOps, inactiveOps, topOperators };
-    }, [users]);
+        let isGlobalView = true;
+        let seccionalName = '';
+        if (currentUser) {
+            const userSeccionales = currentUser.seccionales || (currentUser.seccional ? [currentUser.seccional] : []);
+            const isGlobal = currentUser.role === 'Super-Admin' || currentUser.role === 'Admin' || currentUser.role === 'Presidente';
+            if (!isGlobal && userSeccionales.length > 0) {
+                isGlobalView = false;
+                seccionalName = userSeccionales.join(', ');
+            }
+        }
+
+        return { activeOperators, totalOps, inactiveOps, topOperators, isGlobalView, seccionalName };
+    }, [visibleUsers, currentUser]);
 
     const handlePrintReport = () => {
         try {
@@ -284,7 +309,7 @@ export default function RendimientoOperadoresPage() {
                     <Card className="border-primary/10 bg-gradient-to-br from-primary/5 to-transparent rounded-[1.5rem] shadow-sm">
                         <CardHeader className="py-4 border-b border-primary/5 bg-white/50">
                             <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2">
-                                <Award className="h-4 w-4 text-primary" /> Top Operadores
+                                <Award className="h-4 w-4 text-primary" /> Top Operadores {stats.isGlobalView ? '' : `(Seccional ${stats.seccionalName})`}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4 px-4 pb-4">
