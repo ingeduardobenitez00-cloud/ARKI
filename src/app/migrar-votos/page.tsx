@@ -79,7 +79,7 @@ export default function MigrarVotosPage() {
     const [isDragging, setIsDragging] = useState(false);
     const [alreadyMigratedCount, setAlreadyMigratedCount] = useState(0);
     const [alreadyMigratedUsers, setAlreadyMigratedUsers] = useState<string[]>([]);
-    const [conflictedVoters, setConflictedVoters] = useState<{cedula: string, nombre: string, registradoPor: string}[]>([]);
+    const [conflictedVoters, setConflictedVoters] = useState<{cedula: string, nombre: string, registradoPor: string, seccional: string}[]>([]);
     
     // Métricas del progreso
     const [progress, setProgress] = useState(0);
@@ -427,7 +427,7 @@ export default function MigrarVotosPage() {
 
         let count = 0;
         const users = new Set<string>();
-        const conflicts: {cedula: string, nombre: string, registradoPor: string}[] = [];
+        const conflicts: {cedula: string, nombre: string, registradoPor: string, seccional: string}[] = [];
 
         for (const row of sheetData) {
             const rawCed = row[mapping.cedula];
@@ -443,7 +443,8 @@ export default function MigrarVotosPage() {
                 conflicts.push({
                     cedula: cedulaStr,
                     nombre: electorData.NOMBRE_COMPLETO || `${electorData.NOMBRE || ''} ${electorData.APELLIDO || ''}`.trim(),
-                    registradoPor: registeredBy
+                    registradoPor: registeredBy,
+                    seccional: electorData.CODIGO_SEC || ''
                 });
             }
         }
@@ -1090,20 +1091,22 @@ export default function MigrarVotosPage() {
                                                     </p>
                                                 )}
 
-                                                <div className="mt-4 bg-white/50 border border-amber-200 rounded-xl overflow-hidden max-h-40 overflow-y-auto">
-                                                    <table className="w-full text-left text-[10px] uppercase">
-                                                        <thead className="bg-amber-100/80 text-amber-800 font-black sticky top-0">
+                                                <div className="mt-4 bg-white border border-amber-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto">
+                                                    <table className="w-full text-left text-[10px] uppercase relative">
+                                                        <thead className="bg-amber-100 text-amber-900 font-black sticky top-0 z-10 shadow-sm">
                                                             <tr>
                                                                 <th className="py-2 px-3">Cédula</th>
                                                                 <th className="py-2 px-3">Nombre</th>
-                                                                <th className="py-2 px-3">Registrado Por</th>
+                                                                <th className="py-2 px-3 text-center">Sec.</th>
+                                                                <th className="py-2 px-3">Asignado A / Registrado Por</th>
                                                             </tr>
                                                         </thead>
-                                                        <tbody className="divide-y divide-amber-100 text-amber-900 font-semibold">
+                                                        <tbody className="divide-y divide-amber-50 text-amber-900 font-semibold bg-white">
                                                             {conflictedVoters.map((v, idx) => (
                                                                 <tr key={idx} className="hover:bg-amber-50/50">
                                                                     <td className="py-2 px-3">{v.cedula}</td>
                                                                     <td className="py-2 px-3">{v.nombre}</td>
+                                                                    <td className="py-2 px-3 text-center">{v.seccional}</td>
                                                                     <td className="py-2 px-3">{v.registradoPor}</td>
                                                                 </tr>
                                                             ))}
