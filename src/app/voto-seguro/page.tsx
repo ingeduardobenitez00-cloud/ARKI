@@ -29,6 +29,7 @@ import {
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
 import { logAction } from '@/lib/audit';
+import { CredentialDownloadButton } from '@/components/voto-seguro/CredentialDownloadButton';
 
 interface VotoSeguroData {
   id: string;
@@ -471,6 +472,7 @@ export default function VotoSeguroPage() {
                           )}
                           <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
+                                  <CredentialDownloadButton voto={p} />
                                   {isAdmin && (
                                       <Button 
                                           variant="ghost" 
