@@ -59,6 +59,7 @@ function RolePresetsManager() {
   const [role, setRole] = useState('Recepcionista');
   const [permissions, setPermissions] = useState<string[]>([]);
   const [moduleActions, setModuleActions] = useState<Record<string, string[]>>({});
+  const [syncToUsers, setSyncToUsers] = useState(true);
 
   const fetchPresets = async () => {
     if (!db) return;
@@ -89,6 +90,7 @@ function RolePresetsManager() {
       setPermissions([]);
       setModuleActions({});
     }
+    setSyncToUsers(true); // Default to true when opening
     setIsDialogOpen(true);
   };
 
@@ -117,11 +119,40 @@ function RolePresetsManager() {
     try {
       if (editingPreset) {
         await updateDoc(doc(db, PRESETS_COLLECTION, editingPreset.id), data);
-        toast({ title: "Perfil actualizado" });
       } else {
         await addDoc(collection(db, PRESETS_COLLECTION), data);
-        toast({ title: "Perfil creado exitosamente" });
       }
+
+      if (syncToUsers) {
+        const usersSnap = await getDocs(query(collection(db, 'users'), where('role', '==', role)));
+        if (!usersSnap.empty) {
+          let batch = writeBatch(db);
+          let count = 0;
+          
+          usersSnap.forEach(userDoc => {
+            batch.update(userDoc.ref, {
+              permissions: data.permissions,
+              moduleActions: data.moduleActions,
+              updatedAt: new Date().toISOString()
+            });
+            count++;
+            if (count % 400 === 0) {
+              batch.commit();
+              batch = writeBatch(db);
+            }
+          });
+          
+          if (count > 0) {
+            await batch.commit();
+          }
+          toast({ title: "¡Perfil Sincronizado!", description: `Se guardó el perfil y se actualizaron ${usersSnap.size} usuarios con el rol ${role}.` });
+        } else {
+          toast({ title: "Perfil guardado", description: `No se encontraron usuarios con el rol ${role} para sincronizar.` });
+        }
+      } else {
+        toast({ title: "Perfil guardado", description: "Se guardó el perfil sin afectar a usuarios existentes." });
+      }
+
       setIsDialogOpen(false);
       fetchPresets();
     } catch (e) {
@@ -228,6 +259,23 @@ function RolePresetsManager() {
                     </AccordionItem>
                   ))}
                 </Accordion>
+              </div>
+
+              <div className="flex flex-row items-start space-x-3 space-y-0 rounded-2xl border p-4 shadow-sm bg-blue-50/50 border-blue-100">
+                <Checkbox 
+                  id="syncToUsers" 
+                  checked={syncToUsers} 
+                  onCheckedChange={(checked) => setSyncToUsers(!!checked)} 
+                  className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600 mt-1"
+                />
+                <div className="space-y-1 leading-none">
+                  <Label htmlFor="syncToUsers" className="text-xs font-black uppercase text-blue-900 cursor-pointer">
+                    Sincronizar permisos en cascada
+                  </Label>
+                  <p className="text-[10px] text-blue-700/80 font-bold uppercase leading-relaxed">
+                    Al guardar, todos los usuarios que tengan el rol base <strong>{role}</strong> se actualizarán automáticamente con estos nuevos permisos y módulos.
+                  </p>
+                </div>
               </div>
             </div>
             <DialogFooter className="p-8 border-t bg-muted/10 shrink-0">
