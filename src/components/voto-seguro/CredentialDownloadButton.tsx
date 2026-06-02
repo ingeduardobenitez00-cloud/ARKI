@@ -29,10 +29,34 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
             containerRef.current.style.display = 'none';
 
             const dataUrl = canvas.toDataURL('image/png');
-            const link = document.createElement('a');
-            link.href = dataUrl;
-            link.download = `Credencial_${voto.CEDULA}_${voto.NOMBRE}.png`;
-            link.click();
+            
+            // Dynamically import jsPDF
+            const { jsPDF } = await import('jspdf');
+            
+            // Create an A4 PDF
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+            
+            // Standard ID card size (Credit Card / Credential) is ~85.6mm x 54mm
+            // Since our aspect ratio is 800x500 (1.6), we use 86.4mm x 54mm
+            const cardWidth = 86.4;
+            const cardHeight = 54;
+            
+            // Place it at the top-left to save paper (10mm margins)
+            const xPos = 10;
+            const yPos = 10;
+            
+            pdf.addImage(dataUrl, 'PNG', xPos, yPos, cardWidth, cardHeight);
+            
+            // Draw a subtle border around it as a cutting guide
+            pdf.setDrawColor(200, 200, 200);
+            pdf.setLineWidth(0.1);
+            pdf.rect(xPos, yPos, cardWidth, cardHeight);
+            
+            pdf.save(`Credencial_${voto.CEDULA}_${voto.NOMBRE}.pdf`);
         } catch (error) {
             console.error('Error generating credential:', error);
         } finally {
@@ -93,28 +117,28 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
                 {/* Overlay text */}
                 <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                     {/* NOMBRES */}
-                    <div style={{ position: 'absolute', top: '232px', left: '255px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '236px', left: '285px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
                         {voto.NOMBRE?.trim()}
                     </div>
                     
                     {/* APELLIDOS */}
-                    <div style={{ position: 'absolute', top: '294px', left: '255px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '296px', left: '285px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
                         {voto.APELLIDO?.trim()}
                     </div>
                     
                     {/* LOCAL DE VOTACIÓN */}
-                    <div style={{ position: 'absolute', top: '354px', left: '410px', fontSize: '20px', fontWeight: 'bold', textTransform: 'uppercase', width: '370px', whiteSpace: 'nowrap', color: '#000', lineHeight: '1.2' }}>
+                    <div style={{ position: 'absolute', top: '354px', left: '360px', fontSize: '16px', fontWeight: 'bold', textTransform: 'uppercase', width: '400px', whiteSpace: 'nowrap', color: '#000', lineHeight: '1.2' }}>
                         {voto.LOCAL?.trim()}
                     </div>
                     
                     {/* MESA N° */}
-                    <div style={{ position: 'absolute', top: '408px', left: '265px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
-                        {voto.MESA}
+                    <div style={{ position: 'absolute', top: '418px', left: '275px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+                        {String(voto.MESA || '').trim()}
                     </div>
                     
                     {/* ORDEN */}
-                    <div style={{ position: 'absolute', top: '408px', left: '710px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
-                        {voto.ORDEN}
+                    <div style={{ position: 'absolute', top: '418px', left: '640px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+                        {String(voto.ORDEN || '').trim()}
                     </div>
                 </div>
             </div>
