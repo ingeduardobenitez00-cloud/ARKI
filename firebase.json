@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "arki-concejal",
     "source": ".",
     "ignore": [
       "firebase.json",
