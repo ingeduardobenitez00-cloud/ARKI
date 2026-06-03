@@ -24,7 +24,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle, X } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle, X, Award } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -47,6 +47,7 @@ const userSchema = z.object({
   photoUrl: z.string().optional(),
   role: z.enum(['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente', 'Mesario', 'Recepcionista', 'Comunicaciones']),
   seccionales: z.array(z.string()).optional(),
+  preferredSeccional: z.string().optional(),
   local: z.string().optional(),
   mesas: z.array(z.coerce.number()).optional(),
   permissions: z.array(z.string()).min(1, 'Debes seleccionar al menos un permiso.'),
@@ -448,6 +449,31 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                                 })}
                             </div>
                         </ScrollArea>
+
+                        {assignedSeccionales.length > 1 && (
+                            <div className="mt-4 p-4 border border-blue-100 bg-blue-50/30 rounded-xl space-y-2 animate-in fade-in slide-in-from-top-2">
+                                <Label className="text-[10px] font-black uppercase tracking-widest text-blue-700 flex items-center gap-2">
+                                    <Award className="h-3.5 w-3.5" />
+                                    Seccional Principal (Preferida)
+                                </Label>
+                                <p className="text-[9px] text-blue-600/80 font-bold mb-2">Para reportes de rendimiento y distribución prioritaria de votos.</p>
+                                <Controller name="preferredSeccional" control={control} render={({ field }) => (
+                                    <Select 
+                                        onValueChange={field.onChange} 
+                                        value={assignedSeccionales.includes(field.value || '') ? field.value : assignedSeccionales[0]}
+                                    >
+                                        <SelectTrigger className="font-bold bg-white border-blue-200">
+                                            <SelectValue placeholder="Selecciona Seccional Principal" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {assignedSeccionales.map((secId: string) => (
+                                                <SelectItem key={secId} value={secId}>SECCIONAL {secId}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )} />
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -611,8 +637,8 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
 
     const defaultValues = useMemo(() => {
         const base = editingUser 
-            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role as any || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), local: editingUser.local || '', mesas: editingUser.mesas || [], clasificacion: editingUser.clasificacion || 'SIN CLASIFICAR' } 
-            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista' as any, seccionales: [], local: '', mesas: [], permissions: [], moduleActions: {}, clasificacion: 'SIN CLASIFICAR' };
+            ? { ...editingUser, photoUrl: editingUser.photoUrl || '', telefono: editingUser.telefono || '', permissions: editingUser.permissions || [], moduleActions: editingUser.moduleActions || {}, role: editingUser.role as any || 'Recepcionista', seccionales: editingUser.seccionales || (editingUser.seccional ? [editingUser.seccional] : []), preferredSeccional: editingUser.preferredSeccional || '', local: editingUser.local || '', mesas: editingUser.mesas || [], clasificacion: editingUser.clasificacion || 'SIN CLASIFICAR' } 
+            : { name: '', email: '', username: '', password: '', telefono: '', photoUrl: '', role: 'Recepcionista' as any, seccionales: [], preferredSeccional: '', local: '', mesas: [], permissions: [], moduleActions: {}, clasificacion: 'SIN CLASIFICAR' };
         return base;
     }, [editingUser]);
 
@@ -655,6 +681,7 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
                 telefono: data.telefono || '',
                 photoUrl: data.photoUrl || '',
                 seccionales: data.seccionales || [],
+                preferredSeccional: data.preferredSeccional || (data.seccionales && data.seccionales.length > 0 ? data.seccionales[0] : ''),
                 local: data.local || '',
                 mesas: data.mesas || [],
                 permissions: data.permissions || [],
@@ -898,7 +925,9 @@ export default function UsersPage() {
         const isAutomatic = !groupKey || groupKey === 'SIN CLASIFICAR';
 
         if (isAutomatic) {
-            if (uSecs.length > 1) {
+            if (u.preferredSeccional && uSecs.includes(u.preferredSeccional)) {
+                groupKey = String(u.preferredSeccional);
+            } else if (uSecs.length > 1) {
                 groupKey = 'MULTI';
             } else if (uSecs.length === 1) {
                 groupKey = String(uSecs[0]);

@@ -169,7 +169,9 @@ export default function RendimientoOperadoresPage() {
             const isAutomatic = !groupKey || groupKey === 'SIN CLASIFICAR';
 
             if (isAutomatic) {
-                if (uSecs.length > 1) {
+                if (u.preferredSeccional && uSecs.includes(u.preferredSeccional)) {
+                    groupKey = String(u.preferredSeccional);
+                } else if (uSecs.length > 1) {
                     groupKey = 'MULTI';
                 } else if (uSecs.length === 1) {
                     groupKey = String(uSecs[0]);
@@ -210,8 +212,35 @@ export default function RendimientoOperadoresPage() {
         const totalOps = visibleUsers.length;
         const inactiveOps = totalOps - activeOperators;
 
-        // Top 10 best operators
-        const topOperators = [...visibleUsers].sort((a, b) => b.votosCargados - a.votosCargados).slice(0, 10).filter(u => u.votosCargados > 0);
+        // Top 10 best seccionales
+        const seccionalVotes: Record<string, number> = {};
+        visibleUsers.forEach(u => {
+            const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
+            
+            if (uSecs.length > 0 && u.votosCargados > 0) {
+                if (u.preferredSeccional && uSecs.includes(u.preferredSeccional)) {
+                    // Si tiene una seccional principal preferida, todos sus votos van allí
+                    const key = String(u.preferredSeccional);
+                    seccionalVotes[key] = (seccionalVotes[key] || 0) + u.votosCargados;
+                } else {
+                    // Distribuir equitativamente los votos entre todas las seccionales del usuario
+                    const votesPerSec = Math.floor(u.votosCargados / uSecs.length);
+                    const remainder = u.votosCargados % uSecs.length;
+
+                    uSecs.forEach((sec, index) => {
+                        const key = String(sec);
+                        const votesToAdd = index === 0 ? votesPerSec + remainder : votesPerSec;
+                        seccionalVotes[key] = (seccionalVotes[key] || 0) + votesToAdd;
+                    });
+                }
+            }
+        });
+
+        const topSeccionales = Object.entries(seccionalVotes)
+            .filter(([k, v]) => v > 0)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10)
+            .map(([name, votes]) => ({ name, votes }));
 
         let isGlobalView = true;
         let seccionalName = '';
@@ -224,7 +253,7 @@ export default function RendimientoOperadoresPage() {
             }
         }
 
-        return { activeOperators, totalOps, inactiveOps, topOperators, isGlobalView, seccionalName };
+        return { activeOperators, totalOps, inactiveOps, topSeccionales, isGlobalView, seccionalName };
     }, [visibleUsers, currentUser]);
 
     const handlePrintReport = () => {
@@ -351,27 +380,30 @@ export default function RendimientoOperadoresPage() {
                     <Card className="border-primary/10 bg-gradient-to-br from-primary/5 to-transparent rounded-[1.5rem] shadow-sm">
                         <CardHeader className="py-4 border-b border-primary/5 bg-white/50">
                             <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2">
-                                <Award className="h-4 w-4 text-primary" /> Top Operadores {stats.isGlobalView ? '' : `(Seccional ${stats.seccionalName})`}
+                                <Award className="h-4 w-4 text-primary" /> Top Seccionales {stats.isGlobalView ? '' : `(Filtro: ${stats.seccionalName})`}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4 px-4 pb-4">
                             <div className="space-y-3">
-                                {stats.topOperators.length > 0 ? stats.topOperators.map((u, i) => (
-                                    <div key={u.id} className="flex items-center justify-between">
-                                        <div className="flex items-center gap-2 overflow-hidden">
-                                            <span className={cn(
-                                                "font-black text-xs w-4 text-center",
-                                                i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-600"
-                                            )}>{i + 1}</span>
-                                            <Avatar className="h-6 w-6">
-                                                <AvatarImage src={u.photoUrl} />
-                                                <AvatarFallback className="text-[8px] bg-primary/10 font-black">{u.name?.substring(0, 2)}</AvatarFallback>
-                                            </Avatar>
-                                            <span className="text-[10px] font-bold uppercase truncate">{u.name}</span>
+                                {stats.topSeccionales.length > 0 ? stats.topSeccionales.map((s, i) => {
+                                    let displayName = `Seccional ${s.name}`;
+
+                                    return (
+                                        <div key={s.name} className="flex items-center justify-between">
+                                            <div className="flex items-center gap-2 overflow-hidden">
+                                                <span className={cn(
+                                                    "font-black text-xs w-4 text-center",
+                                                    i === 0 ? "text-yellow-500" : i === 1 ? "text-slate-400" : i === 2 ? "text-amber-700" : "text-slate-600"
+                                                )}>{i + 1}</span>
+                                                <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 shrink-0">
+                                                    <MapPin className="h-3 w-3 text-primary" />
+                                                </div>
+                                                <span className="text-[10px] font-bold uppercase truncate">{displayName}</span>
+                                            </div>
+                                            <Badge className="h-5 px-1.5 text-[9px] font-black">{s.votes}</Badge>
                                         </div>
-                                        <Badge className="h-5 px-1.5 text-[9px] font-black">{u.votosCargados}</Badge>
-                                    </div>
-                                )) : (
+                                    )
+                                }) : (
                                     <p className="text-[10px] text-muted-foreground italic text-center py-4">Aún no hay votos registrados.</p>
                                 )}
                             </div>
