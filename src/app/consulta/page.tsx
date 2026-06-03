@@ -4,7 +4,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { collection, getDocs, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy, increment } from 'firebase/firestore';
+import { collection, getDocs, getDoc, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
@@ -84,6 +84,9 @@ export default function ConsultaPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    const [existingCapture, setExistingCapture] = useState<any>(null);
+    const [isCheckingCapture, setIsCheckingCapture] = useState(false);
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
     const isPresidente = user?.role === 'Presidente';
@@ -295,8 +298,29 @@ export default function ConsultaPage() {
             setManualLat(selectedPerson.LATITUD?.toString() || '');
             setManualLon(selectedPerson.LONGITUD?.toString() || '');
             setShowGps(false);
+            
+            const checkExisting = async () => {
+                if (!db) return;
+                setIsCheckingCapture(true);
+                try {
+                    const snap = await getDoc(doc(db, COLLECTION_CAPTURAS, selectedPerson.id));
+                    if (snap.exists()) {
+                        setExistingCapture(snap.data());
+                    } else {
+                        setExistingCapture(null);
+                    }
+                } catch (e) {
+                    console.error("Error checking existing capture", e);
+                    setExistingCapture(null);
+                } finally {
+                    setIsCheckingCapture(false);
+                }
+            };
+            checkExisting();
+        } else {
+            setExistingCapture(null);
         }
-    }, [selectedPerson]);
+    }, [selectedPerson, db]);
 
     const handleSearch = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -648,6 +672,22 @@ export default function ConsultaPage() {
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
                                     <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Referencia</Label><p className="font-black uppercase">{selectedPerson.LOCAL} | M: {selectedPerson.MESA} / O: {selectedPerson.ORDEN}</p></div>
                                 </div>
+                                {isCheckingCapture ? (
+                                    <div className="flex items-center justify-center py-4 text-muted-foreground text-xs font-bold uppercase animate-pulse">
+                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando estado...
+                                    </div>
+                                ) : existingCapture ? (
+                                    <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-4 flex items-start gap-3">
+                                        <AlertCircle className="h-5 w-5 text-yellow-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <h4 className="text-yellow-800 font-black uppercase text-xs">Atención: Voto Ya Registrado</h4>
+                                            <p className="text-yellow-700 font-medium text-[11px] uppercase mt-1">
+                                                Este elector ya fue cargado por <span className="font-black">{existingCapture.registradoPor_nombre || 'USUARIO DESCONOCIDO'}</span>. 
+                                                Si continúas y guardas, <b>sobrescribirás</b> el registro y pasará a ser tuyo.
+                                            </p>
+                                        </div>
+                                    </div>
+                                ) : null}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-5">
                                         <div className="space-y-2"><Label className="font-black text-[10px] uppercase">WhatsApp</Label><Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black text-lg" inputMode="numeric"/></div>

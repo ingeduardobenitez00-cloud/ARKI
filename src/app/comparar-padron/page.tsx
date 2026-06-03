@@ -50,6 +50,7 @@ export default function CompararPadronPage() {
     const [nameFormat, setNameFormat] = useState<'none' | 'together' | 'separated'>('separated');
     
     const [fetchedElectors, setFetchedElectors] = useState<Record<string, any>>({});
+    const [fetchedVotos, setFetchedVotos] = useState<Record<string, any>>({});
     
     const [status, setStatus] = useState<'idle' | 'reading' | 'checking' | 'mapping' | 'done' | 'error'>('idle');
     const [isDragging, setIsDragging] = useState(false);
@@ -107,6 +108,7 @@ export default function CompararPadronPage() {
         setStatus('reading');
         setLogs([]);
         setFetchedElectors({});
+        setFetchedVotos({});
         addLog('info', `Leyendo archivo: ${selectedFile.name}...`);
 
         const reader = new FileReader();
@@ -169,9 +171,10 @@ export default function CompararPadronPage() {
     const runPreChecking = async (data: any[], cedulaColumn: string) => {
         if (!db) return;
         setStatus('checking');
-        addLog('info', '🔍 Consultando estado de los electores en el Padrón Nacional (Firestore)...');
+        addLog('info', '🔍 Consultando estado en el Padrón Nacional y Votos Seguros...');
         
         const tempFetched: Record<string, any> = {};
+        const tempVotos: Record<string, any> = {};
         let notFound = 0;
         const total = data.length;
         
@@ -182,7 +185,7 @@ export default function CompararPadronPage() {
             return cedStr || null;
         });
 
-        const batchSize = 30;
+        const batchSize = 10;
         for (let i = 0; i < total; i += batchSize) {
             const chunkCedulas = allCedulas.slice(i, i + batchSize).filter(Boolean) as string[];
             
@@ -198,8 +201,9 @@ export default function CompararPadronPage() {
                         const ced = String(d.CEDULA).replace(/\D/g, '');
                         tempFetched[ced] = { id: docSnap.id, ...d };
                     });
-                } catch (e) {
+                } catch (e: any) {
                     console.error("Error en query numérica", e);
+                    addLog('error', `Error DB (num): ${e.message}`);
                 }
 
                 const remaining = uniqueCedulas.filter(c => !tempFetched[c]);
@@ -212,9 +216,34 @@ export default function CompararPadronPage() {
                             const ced = String(d.CEDULA).replace(/\D/g, '');
                             tempFetched[ced] = { id: docSnap.id, ...d };
                         });
-                    } catch (e) {
+                    } catch (e: any) {
                         console.error("Error en query string", e);
+                        addLog('error', `Error DB (str): ${e.message}`);
                     }
+                }
+
+                try {
+                    const qVotosNum = query(collection(db, 'votos_confirmados'), where('CEDULA', 'in', numCedulas));
+                    const snapVotosNum = await getDocs(qVotosNum);
+                    snapVotosNum.forEach(docSnap => {
+                        const d = docSnap.data();
+                        const ced = String(d.CEDULA).replace(/\D/g, '');
+                        tempVotos[ced] = { id: docSnap.id, ...d };
+                    });
+
+                    const remainingVotos = uniqueCedulas.filter(c => !tempVotos[c]);
+                    if (remainingVotos.length > 0) {
+                        const qVotosStr = query(collection(db, 'votos_confirmados'), where('CEDULA', 'in', remainingVotos));
+                        const snapVotosStr = await getDocs(qVotosStr);
+                        snapVotosStr.forEach(docSnap => {
+                            const d = docSnap.data();
+                            const ced = String(d.CEDULA).replace(/\D/g, '');
+                            tempVotos[ced] = { id: docSnap.id, ...d };
+                        });
+                    }
+                } catch (e: any) {
+                    console.error("Error consultando votos_confirmados", e);
+                    addLog('error', `Error DB (votos): ${e.message}`);
                 }
             }
 
@@ -235,7 +264,8 @@ export default function CompararPadronPage() {
         }
 
         setFetchedElectors(tempFetched);
-        addLog('success', `Análisis de seccionales completado. Registrados en padrón: ${total - notFound} | No encontrados: ${notFound}`);
+        setFetchedVotos(tempVotos);
+        addLog('success', `Análisis completado. Registrados en padrón: ${total - notFound} | No encontrados: ${notFound}`);
         setStatus('mapping');
     };
 
@@ -278,19 +308,21 @@ export default function CompararPadronPage() {
             } else {
                 cedulaSet.add(cedulaStr);
                 const elector = fetchedElectors[cedulaStr];
-                if (!elector) {
+                const voto = fetchedVotos[cedulaStr];
+
+                if (!elector && !voto) {
                     estado = "No está en Padrón";
                     countNoPadron++;
                 } else {
-                    seccional = elector.CODIGO_SEC || "";
-                    nombres = elector.NOMBRE || "";
-                    apellidos = elector.APELLIDO || "";
+                    seccional = elector?.CODIGO_SEC || voto?.CODIGO_SEC || "";
+                    nombres = elector?.NOMBRE || voto?.NOMBRE || "";
+                    apellidos = elector?.APELLIDO || voto?.APELLIDO || "";
                     nombreCompleto = `${nombres} ${apellidos}`.trim();
-                    telefono = elector.TELEFONO || elector.TELEFONO_MIGRADO || "";
+                    telefono = elector?.TELEFONO || elector?.TELEFONO_MIGRADO || voto?.TELEFONO || "";
                     
-                    if (elector.observacion === "VOTO SEGURO") {
+                    if (voto || elector?.observacion === "VOTO SEGURO") {
                         estado = "YA ES VOTO SEGURO";
-                        yaRegistradoPor = elector.registradoPor_nombre || elector.votoSeguroUpdatedBy_nombre || "DESCONOCIDO";
+                        yaRegistradoPor = voto?.registradoPor_nombre || elector?.registradoPor_nombre || elector?.votoSeguroUpdatedBy_nombre || "DESCONOCIDO";
                     } else {
                         estado = "Válido (Libre)";
                     }
@@ -503,9 +535,9 @@ export default function CompararPadronPage() {
                                             <h3 className="font-bold text-sm uppercase text-slate-700">Vista Previa ({Math.min(processedData.length, 50)} de {processedData.length} registros)</h3>
                                             <span className="text-[10px] text-slate-500 font-bold uppercase">Columnas Exactas del Excel a Descargar</span>
                                         </div>
-                                        <div className="overflow-x-auto max-h-[300px]">
-                                            <Table>
-                                                <TableHeader className="bg-slate-100/50 sticky top-0">
+                                        <div className="overflow-auto max-h-[400px] w-full">
+                                            <Table className="w-full">
+                                                <TableHeader className="bg-slate-100/50 sticky top-0 z-10 shadow-sm">
                                                     <TableRow>
                                                         {Object.keys(processedData[0]).map(k => (
                                                             <TableHead key={k} className="text-xs whitespace-nowrap">{k}</TableHead>

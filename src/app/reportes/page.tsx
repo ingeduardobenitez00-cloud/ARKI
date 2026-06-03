@@ -7,13 +7,15 @@ import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
 
+import { useToast } from '@/hooks/use-toast';
+
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash } from 'lucide-react';
+import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VotoSeguroData {
@@ -32,20 +34,28 @@ interface VotoSeguroData {
   [key: string]: any;
 }
 
-interface GroupedReport {
-  [userName: string]: {
-    userId: string;
-    seccional: string;
-    votos: VotoSeguroData[];
-    votosEfectuados: number;
-  };
+interface GroupedBySeccional {
+  [seccional: string]: {
+    seccionalName: string;
+    totalVotos: number;
+    totalVotaron: number;
+    dirigentes: {
+      [userName: string]: {
+        userId: string;
+        votos: VotoSeguroData[];
+        votosEfectuados: number;
+      }
+    }
+  }
 }
 
 export default function ReportesPage() {
   const { user } = useAuth();
   const db = useFirestore();
+  const { toast } = useToast();
   const [totalCaptures, setTotalCaptures] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
@@ -110,6 +120,34 @@ export default function ReportesPage() {
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleSyncETR = async () => {
+    setIsSyncing(true);
+    try {
+        const response = await fetch('/api/etr/sync', {
+            method: 'POST',
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            toast({
+                title: 'Sincronización Exitosa',
+                description: data.message,
+            });
+            handleRefresh(); // Recargar datos
+        } else {
+            throw new Error(data.error || 'Error desconocido');
+        }
+    } catch (error: any) {
+        toast({
+            title: 'Error de Sincronización',
+            description: error.message || 'No se pudo conectar con ETR.',
+            variant: 'destructive'
+        });
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
   // 2. FILTRADO POR ROLES Y JURISDICCIÓN
   const filteredList = useMemo(() => {
     if (!rawList || !user) return [];
@@ -158,11 +196,11 @@ export default function ReportesPage() {
 
   // 3. AGRUPAMIENTO POR USUARIO CON CÁLCULO DE PARTICIPACIÓN
   const groupedData = useMemo(() => {
-    const groups: GroupedReport = {};
+    const groups: GroupedBySeccional = {};
     filteredList.forEach((voto: VotoSeguroData) => {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
-        const itemSecc = String(voto.CODIGO_SEC || '');
+        const itemSecc = String(voto.CODIGO_SEC || 'SIN SECCIONAL');
         const yaVoto = voto.estado_votacion === 'Ya Votó';
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
@@ -179,28 +217,46 @@ export default function ReportesPage() {
             userName = "GUILLERMO FERNANDEZ";
         }
 
-        if (!groups[userName]) {
-            groups[userName] = { userId, seccional: itemSecc, votos: [], votosEfectuados: 0 };
+        if (!groups[itemSecc]) {
+            groups[itemSecc] = { seccionalName: itemSecc, totalVotos: 0, totalVotaron: 0, dirigentes: {} };
         }
-        groups[userName].votos.push(voto);
-        if (yaVoto) groups[userName].votosEfectuados += 1;
+        
+        if (!groups[itemSecc].dirigentes[userName]) {
+            groups[itemSecc].dirigentes[userName] = { userId, votos: [], votosEfectuados: 0 };
+        }
+
+        groups[itemSecc].dirigentes[userName].votos.push(voto);
+        groups[itemSecc].totalVotos += 1;
+        if (yaVoto) {
+            groups[itemSecc].dirigentes[userName].votosEfectuados += 1;
+            groups[itemSecc].totalVotaron += 1;
+        }
     });
 
-    const sorted: GroupedReport = {};
+    const sortedGroups: GroupedBySeccional = {};
     Object.keys(groups)
         .sort((a, b) => {
-            const secA = parseInt(String(groups[a].seccional || '').replace(/\D/g, ''), 10) || 999999;
-            const secB = parseInt(String(groups[b].seccional || '').replace(/\D/g, ''), 10) || 999999;
-            if (secA !== secB) {
-                return secA - secB;
-            }
+            const secA = parseInt(a.replace(/\D/g, ''), 10) || 999999;
+            const secB = parseInt(b.replace(/\D/g, ''), 10) || 999999;
+            if (secA !== secB) return secA - secB;
             return a.localeCompare(b);
         })
-        .forEach(k => {
-            groups[k].votos.sort((a,b) => (a.APELLIDO || '').localeCompare(b.APELLIDO || ''));
-            sorted[k] = groups[k];
+        .forEach(secKey => {
+            const secGroup = groups[secKey];
+            const sortedDirigentes: typeof secGroup.dirigentes = {};
+            
+            Object.keys(secGroup.dirigentes)
+                .sort((a, b) => a.localeCompare(b))
+                .forEach(dirKey => {
+                    const dirGroup = secGroup.dirigentes[dirKey];
+                    dirGroup.votos.sort((a,b) => (a.APELLIDO || '').localeCompare(b.APELLIDO || ''));
+                    sortedDirigentes[dirKey] = dirGroup;
+                });
+                
+            sortedGroups[secKey] = { ...secGroup, dirigentes: sortedDirigentes };
         });
-    return sorted;
+        
+    return sortedGroups;
   }, [filteredList]);
 
   const renderTable = (items: VotoSeguroData[]) => (
@@ -252,45 +308,85 @@ export default function ReportesPage() {
                     {totalCaptures !== null ? `${totalCaptures} CAPTURAS TOTALES` : (filteredList.length + ' CARGADAS')}
                 </Badge>
             </div>
-            <Button 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleRefresh} 
-                disabled={isLoading}
-                className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
-            >
-                <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
-                Actualizar
-            </Button>
+            <div className="flex items-center gap-2">
+                {isAdmin && (
+                    <Button 
+                        variant="secondary" 
+                        size="sm" 
+                        onClick={handleSyncETR} 
+                        disabled={isSyncing || isLoading}
+                        className="h-8 gap-2 text-[10px] font-black uppercase bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                    >
+                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseZap className="h-3 w-3" />}
+                        Sincronizar ETR
+                    </Button>
+                )}
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={handleRefresh} 
+                    disabled={isLoading || isSyncing}
+                    className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
+                >
+                    <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
+                    Actualizar
+                </Button>
+            </div>
         </CardHeader>
         <CardContent className="p-0">
             {isLoading ? <div className="p-8 space-y-4"><Skeleton className="h-12 w-full rounded-xl" /><Skeleton className="h-12 w-full rounded-xl" /></div> : 
             Object.keys(groupedData).length > 0 ? (
                 <div className="p-4">
-                    <Accordion type="multiple" className="w-full space-y-2">
-                        {Object.entries(groupedData).map(([userName, userData]) => {
-                            const pendientes = userData.votos.length - userData.votosEfectuados;
+                    <Accordion type="multiple" className="w-full space-y-4">
+                        {Object.entries(groupedData).map(([seccional, seccionalData]) => {
+                            const pendientesSecc = seccionalData.totalVotos - seccionalData.totalVotaron;
+                            const numDirigentes = Object.keys(seccionalData.dirigentes).length;
+                            
                             return (
-                                <AccordionItem key={userName} value={userName} className="border rounded-xl px-4 bg-muted/5">
-                                    <AccordionTrigger className="hover:no-underline py-4">
-                                        <div className="flex items-center gap-3 w-full">
-                                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/5"><UserIcon className="h-4 w-4 text-primary" /></div>
-                                            <div className="flex items-center gap-2 flex-1 text-left">
-                                                <span className="font-black text-xs uppercase text-slate-900">{userName}</span>
-                                                {userData.seccional && (
-                                                <div className="h-5 px-2 w-fit rounded-full bg-red-600 flex items-center justify-center text-[7px] font-black text-white shadow-sm ring-2 ring-white uppercase">
-                                                    SECC {userData.seccional}
-                                                </div>
-                                            )}
+                                <AccordionItem key={`sec-${seccional}`} value={`sec-${seccional}`} className="border-2 border-primary/20 rounded-2xl px-4 bg-muted/10 shadow-sm overflow-hidden">
+                                    <AccordionTrigger className="hover:no-underline py-5">
+                                        <div className="flex items-center gap-4 w-full">
+                                            <div className="h-10 w-10 rounded-full bg-primary flex items-center justify-center shadow-md">
+                                                <span className="font-black text-white text-xs">{seccional === 'SIN SECCIONAL' ? '-' : `S${seccional}`}</span>
+                                            </div>
+                                            <div className="flex flex-col flex-1 text-left">
+                                                <span className="font-black text-lg uppercase text-slate-900 tracking-tight">{seccional === 'SIN SECCIONAL' ? 'SIN SECCIONAL' : `SECCIONAL ${seccional}`}</span>
+                                                <span className="text-[10px] font-bold text-muted-foreground uppercase">{numDirigentes} {numDirigentes === 1 ? 'Dirigente' : 'Dirigentes'}</span>
                                             </div>
                                             <div className="flex gap-2 shrink-0">
-                                                <Badge variant="outline" className="text-[9px] font-black bg-white">{userData.votos.length} TOTAL</Badge>
-                                                <Badge className="text-[9px] font-black bg-green-600">{userData.votosEfectuados} VOTARON</Badge>
-                                                <Badge className="text-[9px] font-black bg-orange-500 text-white">{pendientes} PENDIENTES</Badge>
+                                                <Badge variant="outline" className="text-sm font-black bg-white px-3 py-1.5">{seccionalData.totalVotos} TOTAL</Badge>
+                                                <Badge className="text-sm font-black bg-green-600 px-3 py-1.5">{seccionalData.totalVotaron} VOTARON</Badge>
+                                                <Badge className="text-sm font-black bg-orange-500 text-white px-3 py-1.5">{pendientesSecc} PENDIENTES</Badge>
                                             </div>
                                         </div>
                                     </AccordionTrigger>
-                                    <AccordionContent className="pt-2 pb-4"><div className="border rounded-lg bg-white overflow-hidden shadow-sm">{renderTable(userData.votos)}</div></AccordionContent>
+                                    <AccordionContent className="pt-2 pb-4">
+                                        <div className="space-y-3 pl-2 pr-1 border-l-2 border-primary/10 ml-5">
+                                            <Accordion type="multiple" className="w-full space-y-2">
+                                                {Object.entries(seccionalData.dirigentes).map(([userName, userData]) => {
+                                                    const pendientes = userData.votos.length - userData.votosEfectuados;
+                                                    return (
+                                                        <AccordionItem key={`dir-${userName}-${seccional}`} value={`dir-${userName}-${seccional}`} className="border rounded-xl px-4 bg-white shadow-sm">
+                                                            <AccordionTrigger className="hover:no-underline py-4">
+                                                                <div className="flex items-center gap-3 w-full">
+                                                                    <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center border border-primary/5"><UserIcon className="h-4 w-4 text-primary" /></div>
+                                                                    <div className="flex items-center gap-2 flex-1 text-left">
+                                                                        <span className="font-black text-xs uppercase text-slate-900">{userName}</span>
+                                                                    </div>
+                                                                    <div className="flex gap-2 shrink-0">
+                                                                        <Badge variant="outline" className="text-[9px] font-black bg-slate-50">{userData.votos.length} TOTAL</Badge>
+                                                                        <Badge className="text-[9px] font-black bg-green-600">{userData.votosEfectuados} VOTARON</Badge>
+                                                                        <Badge className="text-[9px] font-black bg-orange-500 text-white">{pendientes} PENDIENTES</Badge>
+                                                                    </div>
+                                                                </div>
+                                                            </AccordionTrigger>
+                                                            <AccordionContent className="pt-2 pb-4"><div className="border rounded-lg bg-white overflow-hidden shadow-sm">{renderTable(userData.votos)}</div></AccordionContent>
+                                                        </AccordionItem>
+                                                    );
+                                                })}
+                                            </Accordion>
+                                        </div>
+                                    </AccordionContent>
                                 </AccordionItem>
                             );
                         })}
