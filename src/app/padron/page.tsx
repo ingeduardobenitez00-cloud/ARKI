@@ -29,6 +29,7 @@ export default function PadronPage() {
   const [data, setData] = useState<PadronDocument[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [page, setPage] = useState(1);
   
   const handleSearch = async (e: React.FormEvent) => {
@@ -40,6 +41,7 @@ export default function PadronPage() {
     }
 
     setIsSearching(true);
+    setHasSearched(true);
     setData([]);
     setPage(1);
 
@@ -207,10 +209,10 @@ export default function PadronPage() {
                 ) : (
                   <TableRow>
                     <TableCell colSpan={5} className="h-80 text-center">
-                      <div className="flex flex-col items-center justify-center gap-3 opacity-30">
-                        <UserIcon className="w-16 h-16 text-primary" />
-                        <p className="font-medium uppercase text-xs tracking-[0.2em] text-center max-w-[200px]">
-                          Realiza una búsqueda para mostrar resultados oficiales
+                      <div className={cn("flex flex-col items-center justify-center gap-3", hasSearched ? "opacity-100" : "opacity-30")}>
+                        <UserIcon className={cn("w-16 h-16", hasSearched ? "text-red-500" : "text-primary")} />
+                        <p className={cn("font-medium uppercase text-xs tracking-[0.2em] text-center max-w-[300px]", hasSearched && "text-red-600 font-black text-sm")}>
+                          {hasSearched ? 'NO SE ENCUENTRA AFILIADO EN CAPITAL' : 'Realiza una búsqueda para mostrar resultados oficiales'}
                         </p>
                       </div>
                     </TableCell>

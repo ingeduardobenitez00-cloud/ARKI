@@ -11,7 +11,7 @@ service cloud.firestore {
 
     // 2. PADRÓN (sheet1)
     match /sheet1/{docId} {
-      allow get: if true;
+      allow read: if true;
     }
 
     // 3. MAPA TÉCNICO POLÍTICO
