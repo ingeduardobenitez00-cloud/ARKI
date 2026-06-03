@@ -30,6 +30,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { logAction } from '@/lib/audit';
 import { CredentialDownloadButton } from '@/components/voto-seguro/CredentialDownloadButton';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import { FileText } from 'lucide-react';
 
 interface VotoSeguroData {
   id: string;
@@ -88,6 +91,7 @@ export default function VotoSeguroPage() {
   const userSeccionales = useMemo(() => user?.seccionales || [], [user]);
 
   const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false) || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false);
+  const canExportPdf = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false) || (user?.moduleActions?.['/users']?.includes('pdf') ?? false);
   const canDelete = isAdmin || isPresidente || isCoordinador || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
 
   /**
@@ -290,6 +294,53 @@ export default function VotoSeguroPage() {
         toast({ title: `Planilla de ${userName} exportada` });
     } catch (err) {
         console.error(err);
+        toast({ title: "Error en la exportación", variant: "destructive" });
+    }
+  };
+
+  const executeExportUserPDF = (userName: string, userVotos: VotoSeguroData[]) => {
+    if (userVotos.length === 0) return;
+    try {
+        const doc = new jsPDF();
+        doc.setFontSize(18);
+        doc.text(`Listado de Votos Seguros - ${userName}`, 14, 22);
+        
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, 30);
+        doc.text(`Total de votos registrados: ${userVotos.length}`, 14, 36);
+
+        const tableColumn = ["SECC", "Local", "Mesa", "Cédula", "Nombre", "Apellido", "Teléfono"];
+        const tableRows: any[] = [];
+
+        userVotos.forEach(row => {
+            const rowData = [
+                row.CODIGO_SEC || '',
+                row.LOCAL || '',
+                row.MESA || '',
+                row.CEDULA || '',
+                row.NOMBRE || '',
+                row.APELLIDO || '',
+                row.TELEFONO_MIGRADO || row.TELEFONO || ''
+            ];
+            tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 42,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold' },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            styles: { fontSize: 8 },
+        });
+
+        const filename = `VOTOS_${userName.replace(/[^a-zA-Z0-9]/g, '_').trim() || 'USUARIO'}.pdf`;
+        doc.save(filename);
+        toast({ title: `PDF de ${userName} exportado` });
+    } catch (error) {
+        console.error(error);
         toast({ title: "Error en la exportación", variant: "destructive" });
     }
   };
@@ -585,6 +636,15 @@ export default function VotoSeguroPage() {
                                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserCSV(userName, userData.votos); }}
                                                                         >
                                                                             <FileDown className="h-3.5 w-3.5 mr-1 text-emerald-600" /> EXCEL
+                                                                        </div>
+                                                                    )}
+                                                                    {canExportPdf && (
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                        >
+                                                                            <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF
                                                                         </div>
                                                                     )}
                                                                     {isAdmin && userData.votos.length > 0 && (
