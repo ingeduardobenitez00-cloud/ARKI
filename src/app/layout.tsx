@@ -159,7 +159,12 @@ function AppContent({ children }: { children: React.ReactNode }) {
   }
 
   if (isPublicRoute) {
-    return <>{children}</>;
+    return (
+      <>
+        {children}
+        <InstallPWA />
+      </>
+    );
   }
 
   if (!isAuthenticated) return null;
@@ -413,6 +418,9 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname();
+  const isConsulta = pathname === '/consulta-publica';
+
   useEffect(() => {
     const handleChunkError = (e: any) => {
       const errorMsg = e.message || (e.reason && e.reason.message) || "";
@@ -432,17 +440,18 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <title>ARKI CONCEJAL LISTA 2P OPCION 2</title>
+        <title>{isConsulta ? 'ARKI - Consulta de Padrón' : 'ARKI CONCEJAL LISTA 2P OPCION 2'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <meta name="theme-color" content="#ef4444" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="ARKI 2P" />
+        <meta name="apple-mobile-web-app-title" content={isConsulta ? "ARKI Consulta" : "ARKI 2P"} />
         
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" type="image/png" href="/icon-192x192.png" />
+        <link rel="manifest" href={isConsulta ? "/consulta-manifest.json" : "/manifest.json"} />
         
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
