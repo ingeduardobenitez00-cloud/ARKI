@@ -1,14 +1,5 @@
 import { NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin if it hasn't been initialized yet
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp();
-    } catch (error) {
-        console.error('Firebase admin initialization error', error);
-    }
-}
 
 export async function POST(request: Request) {
     try {
@@ -47,40 +38,10 @@ export async function POST(request: Request) {
         // Extract set of cedulas that have voted
         const votedCedulas = new Set(registros.map((r: any) => String(r.cedula)));
 
-        // Now, get all 'votos_confirmados' from our Firestore
-        const db = admin.firestore();
-        const snapshot = await db.collection('votos_confirmados').get();
-
-        let updateCount = 0;
-        let batch = db.batch();
-        let currentBatchSize = 0;
-        const commitPromises = [];
-
-        for (const doc of snapshot.docs) {
-            const docData = doc.data();
-            const cedula = String(docData.CEDULA);
-            if (votedCedulas.has(cedula) && docData.estado_votacion !== 'Ya Votó') {
-                batch.update(doc.ref, { estado_votacion: 'Ya Votó', updatedAt: new Date().toISOString() });
-                updateCount++;
-                currentBatchSize++;
-                
-                if (currentBatchSize >= 450) {
-                    commitPromises.push(batch.commit());
-                    batch = db.batch();
-                    currentBatchSize = 0;
-                }
-            }
-        }
-
-        if (currentBatchSize > 0) {
-            commitPromises.push(batch.commit());
-        }
-
-        await Promise.all(commitPromises);
-
         return NextResponse.json({ 
             success: true, 
-            message: `Sincronización completada. Se actualizaron ${updateCount} registros que ya votaron.` 
+            votedCedulas: Array.from(votedCedulas),
+            message: `Datos obtenidos. ${votedCedulas.size} registros registrados como Ya Votó en ETR.` 
         });
 
     } catch (error: any) {

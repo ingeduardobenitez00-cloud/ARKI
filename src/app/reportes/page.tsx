@@ -2,7 +2,7 @@
 "use client";
 
 import { useState, useMemo } from 'react';
-import { collection, query, limit, getCountFromServer, where, orderBy } from 'firebase/firestore';
+import { collection, query, getCountFromServer, where, orderBy, writeBatch, getDocs } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { useAuth } from '@/hooks/use-auth';
@@ -128,10 +128,43 @@ export default function ReportesPage() {
         });
         const data = await response.json();
         
-        if (data.success) {
+        if (data.success && data.votedCedulas) {
+            if (!db) throw new Error("No hay conexión a la base de datos local");
+            
+            const votedSet = new Set(data.votedCedulas.map(String));
+            let updateCount = 0;
+            let currentBatchSize = 0;
+            let batch = writeBatch(db);
+            const commitPromises = [];
+
+            // Leer todos los votos confirmados locales
+            const snap = await getDocs(collection(db, 'votos_confirmados'));
+            snap.docs.forEach(docSnap => {
+                const docData = docSnap.data();
+                const cedula = String(docData.CEDULA);
+                // Si la cédula local está en la lista de los que ya votaron de ETR
+                if (votedSet.has(cedula) && docData.estado_votacion !== 'Ya Votó') {
+                    batch.update(docSnap.ref, { estado_votacion: 'Ya Votó', updatedAt: new Date().toISOString() });
+                    updateCount++;
+                    currentBatchSize++;
+                    
+                    if (currentBatchSize >= 450) {
+                        commitPromises.push(batch.commit());
+                        batch = writeBatch(db);
+                        currentBatchSize = 0;
+                    }
+                }
+            });
+
+            if (currentBatchSize > 0) {
+                commitPromises.push(batch.commit());
+            }
+
+            await Promise.all(commitPromises);
+
             toast({
                 title: 'Sincronización Exitosa',
-                description: data.message,
+                description: `Se conectó al ETR y se actualizaron ${updateCount} registros locales.`,
             });
             handleRefresh(); // Recargar datos
         } else {
