@@ -13,7 +13,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft, Lock } from 'lucide-react';
+import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft, Lock, Search } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -84,6 +84,8 @@ export default function VotoSeguroPage() {
   const [destinationUserAllId, setDestinationUserAllId] = useState('');
   const [isMovingAll, setIsMovingAll] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
   const isCoordinador = user?.role === 'Coordinador';
@@ -145,12 +147,11 @@ export default function VotoSeguroPage() {
     return map;
   }, [allUsers, userSeccionales]);
 
-  // FILTRADO POR ROLES Y JURISDICCIÓN
+  // FILTRADO POR ROLES Y JURISDICCIÓN Y BÚSQUEDA
   const filteredList = useMemo(() => {
     if (!rawList || !user) return [];
     
-    // Admins (PC Central) ven TODO
-    if (isAdmin) return rawList;
+    let allowedList: VotoSeguroData[] = [];
 
     const normalize = (nameStr?: string) => String(nameStr || '').trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toUpperCase();
     const myNormalizedName = normalize(user.name);
@@ -163,9 +164,12 @@ export default function VotoSeguroPage() {
         return itemRegName === myNormalizedName;
     };
 
-    // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS o sus propios registros (filtro cliente)
-    if (isPresidente || isCoordinador) {
-        return rawList.filter(item => {
+    // Admins (PC Central) ven TODO
+    if (isAdmin) {
+        allowedList = rawList;
+    } else if (isPresidente || isCoordinador) {
+        // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS o sus propios registros
+        allowedList = rawList.filter(item => {
             const itemSec = String(item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
             
@@ -182,13 +186,38 @@ export default function VotoSeguroPage() {
             }
             return false;
         });
+    } else if (isDirigente) {
+        // Dirigentes: la query ya viene filtrada server-side, devolver todo
+        allowedList = rawList;
     }
 
-    // Dirigentes: la query ya viene filtrada server-side, devolver todo
-    if (isDirigente) return rawList;
+    if (!searchQuery.trim()) return allowedList;
 
-    return [];
-  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales, userSeccionalesMap]);
+    const normalizeString = (str: string) => str.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const qStr = normalizeString(searchQuery);
+    const qNum = qStr.replace(/[\.\-\s]/g, '');
+
+    return allowedList.filter(item => {
+        const idStr = String(item.id || '').replace(/[\.\-\s]/g, '');
+        const cedulaStr = String(item.CEDULA || '').replace(/[\.\-\s]/g, '');
+        const telStr = String(item.TELEFONO || '').replace(/[\.\-\s]/g, '');
+        const telMigStr = String(item.TELEFONO_MIGRADO || '').replace(/[\.\-\s]/g, '');
+        
+        const nombreStr = normalizeString(String(item.NOMBRE || ''));
+        const apellidoStr = normalizeString(String(item.APELLIDO || ''));
+        const registradoPorStr = normalizeString(String(item.registradoPor_nombre || ''));
+
+        const matchesCedula = qNum.length > 0 && (cedulaStr.includes(qNum) || idStr.includes(qNum) || telStr.includes(qNum) || telMigStr.includes(qNum));
+        const matchesNombre = qStr.length > 0 && (
+                              nombreStr.includes(qStr) || 
+                              apellidoStr.includes(qStr) || 
+                              `${nombreStr} ${apellidoStr}`.includes(qStr)
+        );
+        const matchesOperador = qStr.length > 0 && registradoPorStr.includes(qStr);
+
+        return matchesCedula || matchesNombre || matchesOperador;
+    });
+  }, [rawList, user, isAdmin, isPresidente, isCoordinador, isDirigente, userSeccionales, userSeccionalesMap, searchQuery]);
 
   // AGRUPAMIENTO POR USUARIO CON CÍRCULO DE SECCIONAL
   const groupedData = useMemo(() => {
@@ -587,6 +616,15 @@ export default function VotoSeguroPage() {
                     <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
                         {isLoading ? '...' : `${filteredList.length} REGISTROS`}
                     </Badge>
+                </div>
+                <div className="relative w-full md:w-72">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input 
+                        placeholder="Buscar elector, cédula u operador..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 h-9 text-xs font-bold bg-white"
+                    />
                 </div>
             </div>
         </CardHeader>
