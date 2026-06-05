@@ -24,7 +24,11 @@ export async function POST(request: Request) {
             headers: {
                 'Authorization': `Bearer ${token}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify({
+                codigo_dpto: 0,
+                cod_distrito: 0
+            })
         });
 
         if (!response.ok) {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, query, where, doc, updateDoc, limit, orderBy, getDoc } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, updateDoc, limit, orderBy, getDoc, getCountFromServer } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -92,6 +92,7 @@ export default function SeguimientoLlamadasPage() {
     const [isLoadingRecent, setIsLoadingRecent] = useState(false);
     const [filterStatus, setFilterStatus] = useState<'ALL' | 'PENDING' | 'CALLED'>('ALL');
     const [visibleCount, setVisibleCount] = useState(100);
+    const [totalCallsCount, setTotalCallsCount] = useState<number | null>(null);
 
     const filteredResults = useMemo(() => {
         if (filterStatus === 'PENDING') return searchResults.filter(p => !p.ESTADO_LLAMADA);
@@ -153,13 +154,10 @@ export default function SeguimientoLlamadasPage() {
         if (!db) return;
         setIsLoadingRecent(true);
         try {
-            const d = new Date();
-            d.setDate(d.getDate() - 30); // Últimos 30 días
             const q = query(
                 collection(db, COLLECTION_NAME),
-                where('ultimaLlamada_fecha', '>=', d.toISOString()),
-                orderBy('ultimaLlamada_fecha', 'desc'),
-                limit(50)
+                where('ultimaLlamada_fecha', '>', ''),
+                orderBy('ultimaLlamada_fecha', 'desc')
             );
             const snap = await getDocs(q);
             const calls: PadronData[] = [];
@@ -167,6 +165,17 @@ export default function SeguimientoLlamadasPage() {
                 calls.push({ id: doc.id, ...doc.data() } as PadronData);
             });
             setRecentCalls(calls);
+
+            try {
+                const countQ = query(
+                    collection(db, COLLECTION_NAME),
+                    where('ultimaLlamada_fecha', '>', '')
+                );
+                const countSnap = await getCountFromServer(countQ);
+                setTotalCallsCount(countSnap.data().count);
+            } catch (countError) {
+                console.error("Error fetching total count", countError);
+            }
         } catch (error) {
             console.error("Error fetching recent calls", error);
         } finally {
@@ -333,8 +342,12 @@ export default function SeguimientoLlamadasPage() {
                         newArray[alreadyExists] = updated;
                         return newArray;
                     }
-                    return [updated, ...prev].slice(0, 50);
+                    return [updated, ...prev];
                 });
+
+                if (!selectedPerson.ESTADO_LLAMADA) {
+                    setTotalCallsCount(prev => prev !== null ? prev + 1 : null);
+                }
                 
                 toast({ title: '¡Gestión Guardada!', description: 'El seguimiento de la llamada ha sido actualizado.' });
             })
@@ -380,14 +393,28 @@ export default function SeguimientoLlamadasPage() {
         return <Badge className={`text-[9px] uppercase ${stateObj.bg} ${stateObj.color} border-none`}>{stateObj.label}</Badge>;
     };
 
-    const handlePrintReport = () => {
-        if (recentCalls.length === 0) {
-            toast({ title: "Sin datos", description: "No hay registros de llamadas recientes para imprimir." });
-            return;
-        }
+    const handlePrintReport = async () => {
         setIsPrinting(true);
         
         try {
+            // Obtener absolutamente todos los registros que tienen fecha de llamada
+            const q = query(
+                collection(db!, COLLECTION_NAME),
+                where('ultimaLlamada_fecha', '>', ''),
+                orderBy('ultimaLlamada_fecha', 'desc')
+            );
+            const snap = await getDocs(q);
+            const allCalls: PadronData[] = [];
+            snap.forEach(docSnap => {
+                allCalls.push({ id: docSnap.id, ...docSnap.data() } as PadronData);
+            });
+
+            if (allCalls.length === 0) {
+                toast({ title: "Sin datos", description: "No hay registros de llamadas en la base de datos para imprimir." });
+                setIsPrinting(false);
+                return;
+            }
+
             const doc = new jsPDF('p', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             
@@ -395,10 +422,10 @@ export default function SeguimientoLlamadasPage() {
             doc.text("REPORTE DE SEGUIMIENTO DE LLAMADAS", pageWidth / 2, 15, { align: 'center' });
             
             doc.setFontSize(9); doc.setTextColor(80, 80, 80);
-            doc.text("HISTORIAL DE ÚLTIMAS LLAMADAS", pageWidth / 2, 22, { align: 'center' });
+            doc.text(`HISTORIAL GLOBAL DE LLAMADAS (${allCalls.length} REGISTROS)`, pageWidth / 2, 22, { align: 'center' });
 
             const tableColumn = ["ELECTOR", "CÉDULA / SECC", "ESTADO", "COMENTARIO", "OPERADOR / HORA"];
-            const tableRows = recentCalls.map(p => [
+            const tableRows = allCalls.map(p => [
                 `${p.NOMBRE} ${p.APELLIDO}`,
                 `C.I. ${p.CEDULA}\nSECC ${p.CODIGO_SEC || '-'}`,
                 CALL_STATES.find(s => s.id === p.ESTADO_LLAMADA)?.label || 'PENDIENTE',
@@ -416,8 +443,8 @@ export default function SeguimientoLlamadasPage() {
             });
             
             const today = new Date().toISOString().split('T')[0];
-            doc.save(`Reporte_Historial_Llamadas_${today}.pdf`);
-            toast({ title: "Reporte generado", description: "El PDF se ha descargado correctamente." });
+            doc.save(`Reporte_Global_Llamadas_${today}.pdf`);
+            toast({ title: "Reporte generado", description: "El PDF se ha generado correctamente con todos los registros." });
         } catch (error) {
             console.error(error);
             toast({ title: "Error al generar reporte", variant: "destructive" });
@@ -442,7 +469,7 @@ export default function SeguimientoLlamadasPage() {
                     <Button 
                         variant="outline" 
                         onClick={handlePrintReport} 
-                        disabled={isPrinting || recentCalls.length === 0}
+                        disabled={isPrinting}
                         className="font-black uppercase text-[10px] border-primary/20 hover:bg-primary/5 text-primary h-10"
                     >
                         {isPrinting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <Printer className="mr-2 h-4 w-4" />}
@@ -743,12 +770,18 @@ export default function SeguimientoLlamadasPage() {
                     <CardHeader className="bg-primary/5 border-b py-4">
                         <CardTitle className="text-xs font-black uppercase flex items-center justify-between">
                             <span className="flex items-center gap-2 text-primary">
-                                <History className="h-4 w-4" /> Historial de Seguimiento (Últimos 50)
+                                <History className="h-4 w-4" /> Historial de Seguimiento (Completo)
                             </span>
                             <div className="flex items-center gap-3">
+                                {totalCallsCount !== null && (
+                                    <div className="hidden sm:flex items-center gap-1.5 px-3 h-6 rounded-full bg-primary/10 text-primary border border-primary/20">
+                                        <span className="text-[9px] font-black uppercase tracking-widest">Total Global:</span>
+                                        <span className="text-[10px] font-black">{totalCallsCount}</span>
+                                    </div>
+                                )}
                                 {isLoadingRecent && <Loader2 className="h-3 w-3 animate-spin text-primary" />}
                                 <Button variant="ghost" size="sm" onClick={fetchRecentCalls} className="h-6 px-2 text-[9px] font-black uppercase hover:bg-primary/10">Actualizar</Button>
-                                <Badge variant="secondary" className="bg-white">{recentCalls.length}</Badge>
+                                <Badge variant="secondary" className="bg-white text-[10px]">{recentCalls.length}</Badge>
                             </div>
                         </CardTitle>
                     </CardHeader>
