@@ -569,7 +569,7 @@ export default function CompararPadronPage() {
                                 size="lg" 
                                 className="font-bold shadow-md bg-blue-600 hover:bg-blue-700 text-white"
                                 onClick={generateExcel}
-                                disabled={!mapping.cedula || status === 'checking'}
+                                disabled={!mapping.cedula}
                             >
                                 <Download className="h-4 w-4 mr-2" />
                                 Descargar Resultados en Excel

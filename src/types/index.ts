@@ -9,6 +9,7 @@ export interface User {
   role: 'Super-Admin' | 'Admin' | 'Presidente' | 'Coordinador' | 'Dirigente' | 'Mesario' | 'Recepcionista' | 'Comunicaciones'; // Role of the user
   seccional?: string; // Assigned seccional (Legacy)
   seccionales?: string[]; // Multiple assigned seccionales
+  preferredSeccional?: string; // Preferred or main seccional
   local?: string; // Assigned voting location
   mesas?: number[]; // Assigned voting tables
   permissions: string[]; // Array of hrefs for allowed modules

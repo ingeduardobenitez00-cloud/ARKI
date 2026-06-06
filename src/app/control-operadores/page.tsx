@@ -136,7 +136,7 @@ export default function RendimientoOperadoresPage() {
         if (!isGlobal && userSeccionales.length > 0) {
             return users.filter(u => {
                 const uSecs = u.seccionales || (u.seccional ? [u.seccional] : []);
-                return uSecs.some(sec => userSeccionales.includes(String(sec)) || userSeccionales.includes(Number(sec)));
+                return uSecs.some(sec => userSeccionales.includes(String(sec)));
             });
         }
         return users;
@@ -208,9 +208,10 @@ export default function RendimientoOperadoresPage() {
     }, [filteredUsers, seccionales, searchTerm]);
 
     const stats = useMemo(() => {
+        const eligibleRoles = ['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'];
         const activeOperators = visibleUsers.filter(u => u.votosCargados > 0).length;
-        const totalOps = visibleUsers.length;
-        const inactiveOps = totalOps - activeOperators;
+        const inactiveOps = visibleUsers.filter(u => u.votosCargados === 0 && eligibleRoles.includes(u.role)).length;
+        const totalOps = activeOperators + inactiveOps;
 
         // Top 10 best seccionales
         const seccionalVotes: Record<string, number> = {};
@@ -308,7 +309,7 @@ export default function RendimientoOperadoresPage() {
                 styles: { fontSize: 10 },
                 didParseCell: (data) => {
                     if (data.section === 'body') {
-                        const votes = Number(data.row.raw[2]);
+                        const votes = Number((data.row.raw as any)[2]);
                         if (votes > 0) {
                             data.cell.styles.fillColor = [236, 253, 245]; // emerald-50
                             data.cell.styles.textColor = [6, 95, 70]; // emerald-800

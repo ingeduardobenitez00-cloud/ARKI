@@ -138,5 +138,8 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
   },
   'Comunicaciones': {
     permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
+  },
+  'Vista': {
+    permissions: ['/', '/padron', '/resultados-electorales', '/perfil']
   }
 };

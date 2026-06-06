@@ -136,15 +136,20 @@ export default function MapaTecnicoPage() {
         setIsSyncing(true);
         try {
             const capturesSnap = await getDocs(collection(db, 'votos_confirmados'));
-            const totalsBySec: Record<string, number> = {};
+            const totalsBySec: Record<string, { total: number, efectuados: number }> = {};
             capturesSnap.docs.forEach(d => {
-                const rawSec = d.data().CODIGO_SEC;
+                const data = d.data();
+                const rawSec = data.CODIGO_SEC;
                 if (rawSec !== undefined && rawSec !== null) {
                     const sec = String(rawSec).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
                     const numericSec = parseInt(sec, 10);
                     const cleanSec = isNaN(numericSec) ? sec : String(numericSec);
                     if (cleanSec) {
-                        totalsBySec[cleanSec] = (totalsBySec[cleanSec] || 0) + 1;
+                        if (!totalsBySec[cleanSec]) totalsBySec[cleanSec] = { total: 0, efectuados: 0 };
+                        totalsBySec[cleanSec].total += 1;
+                        if (data.estado_votacion === 'Ya Votó') {
+                            totalsBySec[cleanSec].efectuados += 1;
+                        }
                     }
                 }
             });
@@ -153,9 +158,13 @@ export default function MapaTecnicoPage() {
                 const secIdClean = String(sec.id).trim();
                 const numericSecId = parseInt(secIdClean, 10);
                 const cleanSecId = isNaN(numericSecId) ? secIdClean : String(numericSecId);
+                const stats = totalsBySec[cleanSecId] || { total: 0, efectuados: 0 };
 
                 const ref = doc(db, 'seccionales_data', sec.id);
-                batch.update(ref, { total_votos_seguros: totalsBySec[cleanSecId] || 0 });
+                batch.update(ref, { 
+                    total_votos_seguros: stats.total,
+                    votos_efectuados: stats.efectuados 
+                });
             });
             await batch.commit();
             toast({ title: "Votos Sincronizados", description: "Se han recalculado y normalizado todos los votos por seccional." });
@@ -294,6 +303,9 @@ export default function MapaTecnicoPage() {
                                     {ZONAS_ESTRATEGICAS.map((zona) => {
                                         const zoneSeccionales = seccionalesPorZona[zona.id] || [];
                                         const hasBoundary = zonasData.find(z => Number(z.id) === zona.id)?.boundary;
+                                        const zoneTotal = zoneSeccionales.reduce((acc, sec) => acc + (sec.total_votos_seguros || 0), 0);
+                                        const zoneVotaron = zoneSeccionales.reduce((acc, sec) => acc + (sec.votos_efectuados || 0), 0);
+                                        const zonePendientes = zoneTotal - zoneVotaron;
                                         const isZoneActive = selectedZoneId === String(zona.id);
 
                                         return (
@@ -302,10 +314,16 @@ export default function MapaTecnicoPage() {
                                                     "hover:no-underline py-3 px-4 rounded-2xl transition-all border border-slate-100 shadow-sm",
                                                     isZoneActive ? "bg-primary/5 border-primary/20" : "bg-white"
                                                 )}>
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: zona.color }} />
-                                                        <span className="font-black text-[11px] uppercase tracking-wider">{zona.name}</span>
-                                                        <Badge variant="outline" className="text-[8px] font-black opacity-50">{zoneSeccionales.length}</Badge>
+                                                    <div className="flex items-center gap-3 flex-1 w-full justify-between pr-2">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-3 w-3 rounded-full shadow-sm" style={{ backgroundColor: zona.color }} />
+                                                            <span className="font-black text-[11px] uppercase tracking-wider">{zona.name}</span>
+                                                        </div>
+                                                        <div className="flex gap-2">
+                                                            <Badge variant="outline" className="text-[8px] font-black">{zoneTotal} TOTAL</Badge>
+                                                            <Badge className="bg-green-600 text-[8px] font-black text-white border-transparent">{zoneVotaron} VOTARON</Badge>
+                                                            <Badge className="bg-orange-500 text-[8px] font-black text-white border-transparent">{zonePendientes} PEND</Badge>
+                                                        </div>
                                                     </div>
                                                 </AccordionTrigger>
                                                 <AccordionContent className="pt-2 px-2 pb-4 space-y-4">
@@ -365,12 +383,18 @@ export default function MapaTecnicoPage() {
                                                                                     )}>
                                                                                         {sec.lat !== 0 ? 'Con GPS' : 'Sin GPS'}
                                                                                     </span>
-                                                                                    <span className="text-[8px] opacity-40">•</span>
                                                                                     <span className={cn(
                                                                                         "text-[8px] font-black uppercase",
                                                                                         selectedSecId === sec.id ? "text-rose-300" : "text-rose-600"
                                                                                     )}>
-                                                                                        Votos: {sec.total_votos_seguros || 0}
+                                                                                        T: {sec.total_votos_seguros || 0}
+                                                                                    </span>
+                                                                                    <span className="text-[8px] opacity-40">•</span>
+                                                                                    <span className={cn(
+                                                                                        "text-[8px] font-black uppercase",
+                                                                                        selectedSecId === sec.id ? "text-emerald-300" : "text-emerald-600"
+                                                                                    )}>
+                                                                                        V: {sec.votos_efectuados || 0}
                                                                                     </span>
                                                                                     <span className="text-[8px] opacity-40">•</span>
                                                                                     <span className={cn(

@@ -5,6 +5,7 @@ import { useState, useMemo } from 'react';
 import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy, increment, writeBatch } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
+import { useDoc } from '@/firebase/firestore/use-doc';
 import { useAuth } from '@/hooks/use-auth';
 
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
@@ -84,6 +85,10 @@ export default function VotoSeguroPage() {
   const [destinationUserAllId, setDestinationUserAllId] = useState('');
   const [isMovingAll, setIsMovingAll] = useState(false);
 
+  const [isDeleteAllDialogOpen, setIsDeleteAllDialogOpen] = useState(false);
+  const [userToDeleteAll, setUserToDeleteAll] = useState<{userName: string, userId: string, votos: VotoSeguroData[]} | null>(null);
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState('');
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
@@ -95,6 +100,13 @@ export default function VotoSeguroPage() {
   const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false) || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false);
   const canExportPdf = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false) || (user?.moduleActions?.['/users']?.includes('pdf') ?? false);
   const canDelete = isAdmin || isPresidente || isCoordinador || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
+
+  const configDocRef = useMemoFirebase(() => {
+    if (!db) return null;
+    return doc(db, 'configuraciones', 'system');
+  }, [db]);
+  const { data: systemConfig } = useDoc<any>(configDocRef);
+  const enableBulkDelete = systemConfig?.enableBulkDelete || false;
 
   /**
    * QUERY OPTIMIZADA POR ROL:
@@ -501,6 +513,51 @@ export default function VotoSeguroPage() {
       }
   };
 
+  const handleDeleteAllVotos = async () => {
+      if (!userToDeleteAll || !db || !user) return;
+      
+      setIsDeletingAll(true);
+      try {
+          const { votos, userId: oldUserId } = userToDeleteAll;
+          
+          if (votos.length === 0) return;
+
+          const chunkSize = 200;
+          for (let i = 0; i < votos.length; i += chunkSize) {
+              const chunk = votos.slice(i, i + chunkSize);
+              const batch = writeBatch(db);
+
+              chunk.forEach(voto => {
+                  const docRef = doc(db, 'votos_confirmados', voto.id);
+                  const padronRef = doc(db, 'sheet1', voto.id);
+
+                  batch.delete(docRef);
+                  batch.update(padronRef, { 
+                      registradoPor_id: null, 
+                      registradoPor_nombre: null,
+                      observacion: null
+                  });
+              });
+
+              await batch.commit();
+          }
+
+          if (oldUserId && oldUserId !== 'unknown') {
+              await updateDoc(doc(db, 'users', oldUserId), { votosCargados: increment(-votos.length) }).catch(() => {});
+          }
+
+          logAction(db, { userId: user.id, userName: user.name, module: 'VOTO SEGURO', action: 'ELIMINÓ TODOS LOS VOTOS', targetName: `De ${userToDeleteAll.userName} (${votos.length} votos)` });
+          toast({ title: 'Todos los votos eliminados correctamente' });
+          setIsDeleteAllDialogOpen(false);
+          setUserToDeleteAll(null);
+      } catch (err) {
+          console.error(err);
+          toast({ title: 'Error al eliminar masivamente', variant: 'destructive' });
+      } finally {
+          setIsDeletingAll(false);
+      }
+  };
+
   const renderTable = (items: VotoSeguroData[]) => {
     const hasAnyMigrated = items.some(p => String(p.TELEFONO_MIGRADO || '').trim().length >= 6);
 
@@ -694,6 +751,15 @@ export default function VotoSeguroPage() {
                                                                             <ArrowRightLeft className="h-3.5 w-3.5 mr-1 text-blue-600" /> MOVER TODO
                                                                         </div>
                                                                     )}
+                                                                    {enableBulkDelete && user?.role === 'Super-Admin' && userData.votos.length > 0 && (
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-2"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5 mr-1 text-red-600" /> BORRAR TODO
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         </AccordionTrigger>
@@ -807,6 +873,26 @@ export default function VotoSeguroPage() {
               </DialogFooter>
           </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isDeleteAllDialogOpen} onOpenChange={(open) => { setIsDeleteAllDialogOpen(open); if(!open){ setUserToDeleteAll(null); } }}>
+          <AlertDialogContent className="sm:max-w-[425px] rounded-3xl">
+              <AlertDialogHeader>
+                  <AlertDialogTitle className="font-black uppercase text-xl text-red-600 flex items-center gap-2">
+                      <Trash2 className="h-5 w-5" /> Eliminar Todos Los Votos
+                  </AlertDialogTitle>
+                  <AlertDialogDescription className="font-bold text-xs uppercase">
+                      ¿Estás completamente seguro? Esta acción es irreversible y eliminará los <strong className="text-red-600">{userToDeleteAll?.votos?.length || 0} votos</strong> registrados por <strong className="text-slate-900">{userToDeleteAll?.userName}</strong>.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="gap-2 mt-4">
+                  <AlertDialogCancel disabled={isDeletingAll} className="font-black uppercase text-xs h-11 rounded-xl">Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteAllVotos} disabled={isDeletingAll} className="bg-red-600 hover:bg-red-700 text-white font-black uppercase text-xs h-11 px-8 rounded-xl shadow-lg border-none">
+                      {isDeletingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                      {isDeletingAll ? 'Borrando...' : 'Sí, Borrar Todo'}
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

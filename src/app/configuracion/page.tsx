@@ -2,9 +2,11 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, getDocs, query, where, writeBatch, deleteField, doc, addDoc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
+import { collection, getDocs, query, where, writeBatch, deleteField, doc, addDoc, updateDoc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
+import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import { Switch } from '@/components/ui/switch';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -304,6 +306,22 @@ export default function ConfiguracionPage() {
   const [cardUnlockPassword, setCardUnlockPassword] = useState('');
   const { toast } = useToast();
 
+  const configDocRef = useMemoFirebase(() => {
+    if (!db) return null;
+    return doc(db, 'configuraciones', 'system');
+  }, [db]);
+  const { data: systemConfig } = useDoc<any>(configDocRef);
+
+  const handleToggleBulkDelete = async (checked: boolean) => {
+      if (!db) return;
+      try {
+          await setDoc(doc(db, 'configuraciones', 'system'), { enableBulkDelete: checked }, { merge: true });
+          toast({ title: checked ? 'Botón Habilitado' : 'Botón Oculto' });
+      } catch (e) {
+          toast({ title: 'Error al actualizar', variant: 'destructive' });
+      }
+  };
+
   const openResetDialog = () => {
     setIsResetAlertOpen(true);
   };
@@ -476,7 +494,27 @@ export default function ConfiguracionPage() {
             </CardContent>
         </Card>
 
-        <Card className="border-destructive/20 bg-destructive/5 shadow-sm rounded-3xl overflow-hidden lg:col-span-1">
+        <Card className="border-amber-200 bg-amber-50/30 shadow-sm rounded-3xl overflow-hidden lg:col-span-1">
+            <CardHeader className="border-b border-amber-100 py-4">
+                <CardTitle className="flex items-center gap-2 text-amber-600 font-black uppercase text-xs">
+                    <ShieldCheck className="h-4 w-4" /> Control de Funciones
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 space-y-4">
+                <div className="flex items-center justify-between gap-4">
+                    <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-amber-900 leading-none">Botón: Borrar Todo</Label>
+                        <p className="text-[9px] font-bold text-amber-700/60 uppercase leading-relaxed">Muestra el botón de borrado masivo a los Super-Admins en Voto Seguro.</p>
+                    </div>
+                    <Switch 
+                        checked={systemConfig?.enableBulkDelete || false} 
+                        onCheckedChange={handleToggleBulkDelete} 
+                    />
+                </div>
+            </CardContent>
+        </Card>
+
+        <Card className="border-destructive/20 bg-destructive/5 shadow-sm rounded-3xl overflow-hidden lg:col-span-2">
             <CardHeader className="border-b border-destructive/10">
                 <CardTitle className="flex items-center gap-2 text-destructive font-black uppercase text-xs">
                     <AlertTriangle className="h-4 w-4 animate-pulse" /> Mantenimiento Crítico

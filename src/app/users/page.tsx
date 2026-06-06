@@ -24,7 +24,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
-import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle, X, Award } from 'lucide-react';
+import { PlusCircle, MoreHorizontal, Edit, Trash2, Users, Loader2, Search, Camera, Smartphone, ShieldCheck, CheckSquare, Square, CheckCircle2, ChevronDown, MapPin, Hash, UserPlus, FileText, FileSpreadsheet, Layers, UserCircle, X, Award, Key } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -45,7 +45,7 @@ const userSchema = z.object({
   password: z.string().min(6, 'La contraseña debe tener al menos 6 caracteres'),
   telefono: z.string().optional(),
   photoUrl: z.string().optional(),
-  role: z.enum(['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente', 'Mesario', 'Recepcionista', 'Comunicaciones']),
+  role: z.enum(['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente', 'Mesario', 'Recepcionista', 'Comunicaciones', 'Vista']),
   seccionales: z.array(z.string()).optional(),
   preferredSeccional: z.string().optional(),
   local: z.string().optional(),
@@ -72,6 +72,7 @@ const ROLE_HIERARCHY: Record<string, number> = {
   'Recepcionista': 4,
   'Mesario': 5,
   'Comunicaciones': 6,
+  'Vista': 7,
 };
 
 function UserFormContent({ control, register, errors, editingUser, watch, setValue, seccionales }: {
@@ -855,6 +856,11 @@ export default function UsersPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
+  
+  const [isPasswordResetOpen, setIsPasswordResetOpen] = useState(false);
+  const [userToReset, setUserToReset] = useState<User | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
 
   const fetchUsersAndSeccionales = useCallback(async () => {
     setIsLoading(true);
@@ -1012,6 +1018,34 @@ export default function UsersPage() {
         } finally {
             setIsDeleting(false);
         }
+    }
+  };
+
+  const handlePasswordReset = async () => {
+    if (userToReset && newPassword && newPassword.length >= 6) {
+        setIsResettingPassword(true);
+        try {
+            const response = await fetch('/api/users/reset-password', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: userToReset.id, newPassword })
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                toast({ title: 'Contraseña Actualizada', description: `La contraseña de ${userToReset.name} ha sido cambiada.` });
+                setIsPasswordResetOpen(false);
+                setNewPassword('');
+            } else {
+                toast({ title: 'Error', description: data.error, variant: 'destructive' });
+            }
+        } catch (error) {
+            toast({ title: 'Error', description: 'Ocurrió un error inesperado.', variant: 'destructive' });
+        } finally {
+            setIsResettingPassword(false);
+        }
+    } else {
+        toast({ title: 'Aviso', description: 'La contraseña debe tener al menos 6 caracteres.', variant: 'destructive' });
     }
   };
 
@@ -1231,6 +1265,9 @@ export default function UsersPage() {
                                                             </DropdownMenuTrigger>
                                                             <DropdownMenuContent align="end" className="w-48 font-black uppercase text-[10px] rounded-2xl shadow-2xl border-primary/10 p-2">
                                                                 <DropdownMenuItem onClick={() => { setEditingUser(user); setIsDialogOpen(true); }} className="cursor-pointer rounded-xl"><Edit className="w-3.5 h-3.5 mr-3 text-primary" /> EDITAR FICHA</DropdownMenuItem>
+                                                                {(currentUser?.role === 'Admin' || currentUser?.role === 'Super-Admin') && (
+                                                                    <DropdownMenuItem onClick={() => { setUserToReset(user); setNewPassword(''); setIsPasswordResetOpen(true); }} className="cursor-pointer rounded-xl"><Key className="w-3.5 h-3.5 mr-3 text-amber-600" /> CAMBIAR CONTRASEÑA</DropdownMenuItem>
+                                                                )}
                                                                 <DropdownMenuItem onClick={() => toggleActive(user)} className={cn("cursor-pointer rounded-xl", user.active === false ? "text-green-600" : "text-amber-600")}>
                                                                     {user.active === false ? <CheckCircle2 className="w-3.5 h-3.5 mr-3" /> : <ShieldCheck className="w-3.5 h-3.5 mr-3" />}
                                                                     {user.active === false ? 'ACTIVAR CUENTA' : 'INACTIVAR CUENTA'}
@@ -1274,6 +1311,36 @@ export default function UsersPage() {
             ELIMINAR DEFINITIVAMENTE
         </Button></AlertDialogFooter></AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isPasswordResetOpen} onOpenChange={setIsPasswordResetOpen}>
+          <DialogContent className="sm:max-w-md rounded-[2.5rem] p-8">
+              <DialogHeader>
+                  <DialogTitle className="font-black uppercase text-2xl flex items-center gap-3">
+                      <Key className="h-6 w-6 text-amber-500" />
+                      Cambiar Contraseña
+                  </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                  <p className="text-sm font-medium text-muted-foreground">Escribe la nueva contraseña para <strong>{userToReset?.name}</strong>. Mínimo 6 caracteres.</p>
+                  <div>
+                      <Input
+                          type="text"
+                          placeholder="Nueva contraseña..."
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          className="font-bold h-12"
+                      />
+                  </div>
+              </div>
+              <DialogFooter className="gap-3">
+                  <Button type="button" variant="outline" onClick={() => setIsPasswordResetOpen(false)} className="font-black uppercase text-xs rounded-2xl h-12 w-full">CANCELAR</Button>
+                  <Button type="button" onClick={handlePasswordReset} disabled={isResettingPassword || !newPassword || newPassword.length < 6} className="font-black uppercase text-xs rounded-2xl h-12 w-full bg-amber-600 hover:bg-amber-700">
+                      {isResettingPassword ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
+                      GUARDAR CONTRASEÑA
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </div>
   );
 }
