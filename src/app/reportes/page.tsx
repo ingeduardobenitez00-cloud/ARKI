@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { collection, query, getCountFromServer, where, orderBy, writeBatch, getDocs } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -15,7 +15,8 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface VotoSeguroData {
@@ -54,7 +55,9 @@ export default function ReportesPage() {
   const db = useFirestore();
   const { toast } = useToast();
   const [totalCaptures, setTotalCaptures] = useState<number | null>(null);
+  const [totalVotaronGlobal, setTotalVotaronGlobal] = useState<number | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
@@ -109,12 +112,15 @@ export default function ReportesPage() {
   }, [allUsers, userSeccionales]);
 
   // CONTEO GLOBAL DESDE EL SERVIDOR
-  useState(() => {
+  useEffect(() => {
     if (!db) return;
     getCountFromServer(collection(db, 'votos_confirmados')).then((snap: any) => {
         setTotalCaptures(snap.data().count);
     });
-  });
+    getCountFromServer(query(collection(db, 'votos_confirmados'), where('estado_votacion', '==', 'Ya Votó'))).then((snap: any) => {
+        setTotalVotaronGlobal(snap.data().count);
+    });
+  }, [db, refreshKey]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -227,10 +233,21 @@ export default function ReportesPage() {
     return [];
   }, [rawList, user, isAdmin, isCoordinador, isPresidente, isDirigente, userSeccionales, userSeccionalesMap]);
 
+  const searchedList = useMemo(() => {
+    if (!searchQuery.trim()) return filteredList;
+    const lowerQuery = searchQuery.toLowerCase().trim();
+    return filteredList.filter((item: VotoSeguroData) => {
+      const fullname = `${item.NOMBRE || ''} ${item.APELLIDO || ''}`.toLowerCase();
+      const cedula = String(item.CEDULA || '').toLowerCase();
+      const dirigenteName = (item.registradoPor_nombre || '').toLowerCase();
+      return fullname.includes(lowerQuery) || cedula.includes(lowerQuery) || dirigenteName.includes(lowerQuery);
+    });
+  }, [filteredList, searchQuery]);
+
   // 3. AGRUPAMIENTO POR USUARIO CON CÁLCULO DE PARTICIPACIÓN
   const groupedData = useMemo(() => {
     const groups: GroupedBySeccional = {};
-    filteredList.forEach((voto: VotoSeguroData) => {
+    searchedList.forEach((voto: VotoSeguroData) => {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
         const itemSecc = String(voto.CODIGO_SEC || 'SIN SECCIONAL');
@@ -290,7 +307,7 @@ export default function ReportesPage() {
         });
         
     return sortedGroups;
-  }, [filteredList]);
+  }, [searchedList]);
 
   const renderTable = (items: VotoSeguroData[]) => (
     <div className="overflow-x-auto">
@@ -334,36 +351,57 @@ export default function ReportesPage() {
       </div>
 
       <Card className="border-primary/10 shadow-sm overflow-hidden">
-        <CardHeader className="bg-muted/30 border-b py-4 flex flex-row items-center justify-between">
-            <div className="flex items-center gap-3">
-                <CardTitle className="text-[11px] font-black uppercase">Resumen de Capturas</CardTitle>
-                <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
-                    {totalCaptures !== null ? `${totalCaptures} CAPTURAS TOTALES` : (filteredList.length + ' CARGADAS')}
-                </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-                {isAdmin && (
+        <CardHeader className="bg-muted/30 border-b py-4 space-y-4">
+            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex flex-wrap items-center gap-3">
+                    <CardTitle className="text-[11px] font-black uppercase">Resumen de Capturas</CardTitle>
+                    <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
+                        {totalCaptures !== null ? `${totalCaptures} CAPTURAS TOTALES` : (filteredList.length + ' CARGADAS')}
+                    </Badge>
+                    {totalVotaronGlobal !== null && totalCaptures !== null && (
+                        <>
+                            <Badge className="bg-green-600 font-black text-[10px] uppercase tracking-widest px-3 py-1 text-white">
+                                {totalVotaronGlobal} YA VOTARON
+                            </Badge>
+                            <Badge className="bg-orange-500 font-black text-[10px] uppercase tracking-widest px-3 py-1 text-white">
+                                {totalCaptures - totalVotaronGlobal} PENDIENTES
+                            </Badge>
+                        </>
+                    )}
+                </div>
+                <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+                    {isAdmin && (
+                        <Button 
+                            variant="secondary" 
+                            size="sm" 
+                            onClick={handleSyncETR} 
+                            disabled={isSyncing || isLoading}
+                            className="h-8 gap-2 text-[10px] font-black uppercase bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                        >
+                            {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseZap className="h-3 w-3" />}
+                            Sincronizar ETR
+                        </Button>
+                    )}
                     <Button 
-                        variant="secondary" 
+                        variant="ghost" 
                         size="sm" 
-                        onClick={handleSyncETR} 
-                        disabled={isSyncing || isLoading}
-                        className="h-8 gap-2 text-[10px] font-black uppercase bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
+                        onClick={handleRefresh} 
+                        disabled={isLoading || isSyncing}
+                        className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
                     >
-                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseZap className="h-3 w-3" />}
-                        Sincronizar ETR
+                        <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
+                        Actualizar
                     </Button>
-                )}
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={handleRefresh} 
-                    disabled={isLoading || isSyncing}
-                    className="h-8 gap-2 text-[10px] font-black uppercase hover:bg-primary/5 text-primary"
-                >
-                    <RefreshCw className={cn("h-3 w-3", isLoading && "animate-spin")} />
-                    Actualizar
-                </Button>
+                </div>
+            </div>
+            <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input 
+                    placeholder="Buscar por cédula, nombre o dirigente..." 
+                    className="pl-9 bg-white border-primary/20 focus-visible:ring-primary/30 h-10 text-sm font-medium"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                />
             </div>
         </CardHeader>
         <CardContent className="p-0">
