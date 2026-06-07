@@ -42,6 +42,7 @@
     "fflate": "^0.8.2",
     "firebase": "^10.12.3",
     "firebase-admin": "^12.2.0",
+    "framer-motion": "^12.40.0",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^2.5.1",

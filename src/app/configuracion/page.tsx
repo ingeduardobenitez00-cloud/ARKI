@@ -354,20 +354,30 @@ export default function ConfiguracionPage() {
     }
     setIsResetting(true);
     try {
-        const q = query(
+        // 1. Limpiar en el Padrón Principal
+        const qSheet = query(
             collection(db, SHEET_COLLECTION),
             where('estado_votacion', '==', 'Ya Votó')
         );
-        const snapshot = await getDocs(q);
+        const snapshotSheet = await getDocs(qSheet);
         
-        if (snapshot.empty) {
+        // 2. Limpiar en la lista de Votos Seguros
+        const qVotos = query(
+            collection(db, 'votos_confirmados'),
+            where('estado_votacion', '==', 'Ya Votó')
+        );
+        const snapshotVotos = await getDocs(qVotos);
+        
+        const docs = [...snapshotSheet.docs, ...snapshotVotos.docs];
+        const total = docs.length;
+        
+        if (total === 0) {
             toast({ title: "Operación Cancelada", description: "No se hallaron electores marcados como 'Votó' para reiniciar." });
             setIsResetAlertOpen(false);
+            setIsResetting(false);
             return;
         }
 
-        const docs = snapshot.docs;
-        const total = docs.length;
         let processed = 0;
 
         while (processed < total) {
@@ -394,7 +404,7 @@ export default function ConfiguracionPage() {
 
         toast({ 
             title: "¡Reinicio Exitoso!", 
-            description: `Se han limpiado ${total} marcas de participación del sistema.` 
+            description: `Se han limpiado ${total} marcas de participación del sistema (Padrón y Votos Seguros).` 
         });
     } catch (error) {
         console.error(error);

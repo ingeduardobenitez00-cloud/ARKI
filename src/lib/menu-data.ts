@@ -55,6 +55,7 @@ export const allMenuItems = [
   { href: '/control-votacion', label: 'Control Votación', icon: ClipboardCheck, tooltip: 'CONTROLA EL ESTADO DE VOTACIÓN POR MESA.' },
   { href: '/escaner-actas', label: 'Escaner de Actas', icon: QrCode, tooltip: 'ESCANEO DE ACTAS TREP Y CARGA DE RESULTADOS.' },
   { href: '/resultados-electorales', label: 'Resultados en Vivo', icon: BarChart3, tooltip: 'VISUALIZA LOS RESULTADOS ELECTORALES EN TIEMPO REAL.' },
+  { href: '/simulador', label: 'Simulador Máquina', icon: AppWindow, tooltip: 'SIMULADOR OFICIAL DE LA MÁQUINA DE VOTACIÓN TSJE.' },
   { href: '/configuracion-electoral', label: 'Metadata Electoral', icon: ImageIcon, tooltip: 'GESTIONA FOTOS Y NOMBRES DE CANDIDATOS.' },
   { href: '/voto-seguro', label: 'Lista Voto Seguro', icon: BookHeart, tooltip: 'VISUALIZA LA LISTA DE VOTOS SEGUROS (PERSONAL O DE TU SECC).' },
   { href: '/mapa-global', label: 'Mapa Territorial', icon: LucideMapIcon, tooltip: 'VISUALIZA EN EL MAPA A LOS ELECTORES (PERSONAL O DE TU SECC).' },
@@ -100,7 +101,7 @@ export const menuCategories = [
   {
     label: 'Operación Día D',
     icon: ClipboardCheck,
-    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/configuracion-electoral', '/verificador-actas', '/reportes']
+    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/simulador', '/configuracion-electoral', '/verificador-actas', '/reportes']
   },
   {
     label: 'Asistencia y Eventos',
@@ -125,13 +126,13 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
   },
   'Mesario': {
-    permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil']
+    permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil', '/simulador']
   },
   'Recepcionista': {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
@@ -140,6 +141,6 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
   },
   'Vista': {
-    permissions: ['/', '/padron', '/resultados-electorales', '/perfil']
+    permissions: ['/', '/padron', '/resultados-electorales', '/perfil', '/simulador']
   }
 };
