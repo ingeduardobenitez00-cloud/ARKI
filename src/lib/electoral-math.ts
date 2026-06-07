@@ -43,10 +43,10 @@ export function calculateDHondt(lists: ListResult[], totalSeats: number = 24): D
 
     // 4. Count seats per list
     return lists.map(list => {
-        const listSeats = winners.filter(w => w.listId === list.id).length;
-        const listQuotients = winners
-            .filter(w => w.listId === list.id)
-            .map(w => w.quotient);
+        const listWinners = winners.filter(w => w.listId === list.id);
+        const listSeats = listWinners.length;
+        // The quotients are already sorted descending because `winners` is sorted descending.
+        const listQuotients = listWinners.map(w => w.quotient);
             
         return {
             listId: list.id,
@@ -63,12 +63,12 @@ export function calculateDHondt(lists: ListResult[], totalSeats: number = 24): D
  * @param candidates Original candidate metadata for this list
  */
 export function rankCandidatesByPreferential(options: Record<string, number>, candidates: any[]) {
-    return [...candidates].sort((a, b) => {
-        const votesA = options[a.option] || 0;
-        const votesB = options[b.option] || 0;
-        
-        if (votesB !== votesA) {
-            return votesB - votesA; // High votes first
+    return [...candidates].map(c => ({
+        ...c,
+        votes: options[c.id] || options[c.option] || 0
+    })).sort((a, b) => {
+        if (b.votes !== a.votes) {
+            return b.votes - a.votes; // High votes first
         }
         return a.option - b.option; // Original order if tied
     });

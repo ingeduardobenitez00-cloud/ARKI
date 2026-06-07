@@ -358,13 +358,13 @@ export default function ReportesPage() {
                     <Badge className="bg-primary font-black text-[10px] uppercase tracking-widest px-3 py-1">
                         {totalCaptures !== null ? `${totalCaptures} CAPTURAS TOTALES` : (filteredList.length + ' CARGADAS')}
                     </Badge>
-                    {totalVotaronGlobal !== null && totalCaptures !== null && (
+                    {totalVotaronGlobal !== null && totalCaptures !== null && totalCaptures > 0 && (
                         <>
                             <Badge className="bg-green-600 font-black text-[10px] uppercase tracking-widest px-3 py-1 text-white">
-                                {totalVotaronGlobal} YA VOTARON
+                                {totalVotaronGlobal} ({((totalVotaronGlobal / totalCaptures) * 100).toFixed(1)}%) YA VOTARON
                             </Badge>
                             <Badge className="bg-orange-500 font-black text-[10px] uppercase tracking-widest px-3 py-1 text-white">
-                                {totalCaptures - totalVotaronGlobal} PENDIENTES
+                                {totalCaptures - totalVotaronGlobal} ({(((totalCaptures - totalVotaronGlobal) / totalCaptures) * 100).toFixed(1)}%) PENDIENTES
                             </Badge>
                         </>
                     )}
@@ -412,6 +412,8 @@ export default function ReportesPage() {
                         {Object.entries(groupedData).map(([seccional, seccionalData]) => {
                             const pendientesSecc = seccionalData.totalVotos - seccionalData.totalVotaron;
                             const numDirigentes = Object.keys(seccionalData.dirigentes).length;
+                            const secVotaronPct = seccionalData.totalVotos > 0 ? ((seccionalData.totalVotaron / seccionalData.totalVotos) * 100).toFixed(1) : '0.0';
+                            const secPendientesPct = seccionalData.totalVotos > 0 ? ((pendientesSecc / seccionalData.totalVotos) * 100).toFixed(1) : '0.0';
                             
                             return (
                                 <AccordionItem key={`sec-${seccional}`} value={`sec-${seccional}`} className="border-2 border-primary/20 rounded-2xl px-4 bg-muted/10 shadow-sm overflow-hidden">
@@ -426,8 +428,8 @@ export default function ReportesPage() {
                                             </div>
                                             <div className="flex gap-2 shrink-0">
                                                 <Badge variant="outline" className="text-sm font-black bg-white px-3 py-1.5">{seccionalData.totalVotos} TOTAL</Badge>
-                                                <Badge className="text-sm font-black bg-green-600 px-3 py-1.5">{seccionalData.totalVotaron} VOTARON</Badge>
-                                                <Badge className="text-sm font-black bg-orange-500 text-white px-3 py-1.5">{pendientesSecc} PENDIENTES</Badge>
+                                                <Badge className="text-sm font-black bg-green-600 px-3 py-1.5">{seccionalData.totalVotaron} ({secVotaronPct}%) VOTARON</Badge>
+                                                <Badge className="text-sm font-black bg-orange-500 text-white px-3 py-1.5">{pendientesSecc} ({secPendientesPct}%) PENDIENTES</Badge>
                                             </div>
                                         </div>
                                     </AccordionTrigger>
@@ -436,6 +438,8 @@ export default function ReportesPage() {
                                             <Accordion type="multiple" className="w-full space-y-2">
                                                 {Object.entries(seccionalData.dirigentes).map(([userName, userData]) => {
                                                     const pendientes = userData.votos.length - userData.votosEfectuados;
+                                                    const dirVotaronPct = userData.votos.length > 0 ? ((userData.votosEfectuados / userData.votos.length) * 100).toFixed(1) : '0.0';
+                                                    const dirPendientesPct = userData.votos.length > 0 ? ((pendientes / userData.votos.length) * 100).toFixed(1) : '0.0';
                                                     return (
                                                         <AccordionItem key={`dir-${userName}-${seccional}`} value={`dir-${userName}-${seccional}`} className="border rounded-xl px-4 bg-white shadow-sm">
                                                             <AccordionTrigger className="hover:no-underline py-4">
@@ -446,8 +450,8 @@ export default function ReportesPage() {
                                                                     </div>
                                                                     <div className="flex gap-2 shrink-0">
                                                                         <Badge variant="outline" className="text-[9px] font-black bg-slate-50">{userData.votos.length} TOTAL</Badge>
-                                                                        <Badge className="text-[9px] font-black bg-green-600">{userData.votosEfectuados} VOTARON</Badge>
-                                                                        <Badge className="text-[9px] font-black bg-orange-500 text-white">{pendientes} PENDIENTES</Badge>
+                                                                        <Badge className="text-[9px] font-black bg-green-600">{userData.votosEfectuados} ({dirVotaronPct}%) VOTARON</Badge>
+                                                                        <Badge className="text-[9px] font-black bg-orange-500 text-white">{pendientes} ({dirPendientesPct}%) PENDIENTES</Badge>
                                                                     </div>
                                                                 </div>
                                                             </AccordionTrigger>
