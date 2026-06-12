@@ -16,8 +16,10 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap, Search } from 'lucide-react';
+import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap, Search, Printer, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface VotoSeguroData {
   id: string;
@@ -309,10 +311,77 @@ export default function ReportesPage() {
     return sortedGroups;
   }, [searchedList]);
 
+  const generateDirigentePDF = (dirigenteName: string, votos: VotoSeguroData[], seccional: string) => {
+    if (votos.length === 0) {
+        toast({ title: "No hay votos para exportar", variant: "destructive" });
+        return;
+    }
+    try {
+        const doc = new jsPDF();
+        doc.setFontSize(16);
+        doc.text(`Listado de Votos Seguros`, 14, 20);
+        
+        doc.setFontSize(11);
+        doc.setTextColor(100);
+        doc.text(`DIRIGENTE: ${dirigenteName} | SECCIONAL: ${seccional}`, 14, 28);
+        doc.text(`Total Asignados: ${votos.length} | Generado el: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, 34);
+
+        const tableColumn = ["N°", "Cédula", "Elector", "Teléfono", "Local / Mesa", "Votó"];
+        const tableRows: any[] = [];
+
+        votos.forEach((row, index) => {
+            const rowData = [
+                index + 1,
+                row.CEDULA || '',
+                `${row.NOMBRE} ${row.APELLIDO}`,
+                row.TELEFONO || '',
+                `${row.LOCAL || ''}\nM: ${row.MESA || ''} / O: ${row.ORDEN || ''}`,
+                row.estado_votacion === 'Ya Votó' ? 'SI' : 'NO'
+            ];
+            tableRows.push(rowData);
+        });
+
+        autoTable(doc, {
+            head: [tableColumn],
+            body: tableRows,
+            startY: 40,
+            theme: 'grid',
+            headStyles: { fillColor: [220, 38, 38], textColor: 255, fontStyle: 'bold', fontSize: 9 },
+            alternateRowStyles: { fillColor: [250, 250, 250] },
+            styles: { fontSize: 8, cellPadding: 2 },
+            columnStyles: {
+                0: { halign: 'center', cellWidth: 8 },
+                1: { fontStyle: 'bold', cellWidth: 20 },
+                3: { cellWidth: 28 },
+                4: { cellWidth: 45 },
+                5: { halign: 'center', cellWidth: 12 }
+            },
+            didParseCell: (data) => {
+                if (data.section === 'body' && data.column.index === 5) {
+                    if (data.cell.raw === 'NO') {
+                        data.cell.styles.textColor = [220, 38, 38]; // Rojo
+                        data.cell.styles.fontStyle = 'bold';
+                    } else if (data.cell.raw === 'SI') {
+                        data.cell.styles.textColor = [22, 163, 74]; // Verde
+                        data.cell.styles.fontStyle = 'bold';
+                    }
+                }
+            }
+        });
+
+        const filename = `REPORTE_${dirigenteName.replace(/[^a-zA-Z0-9]/g, '_').trim() || 'OPERADOR'}.pdf`;
+        doc.save(filename);
+        toast({ title: `PDF de ${dirigenteName} descargado exitosamente` });
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Error en la exportación", variant: "destructive" });
+    }
+  };
+
   const renderTable = (items: VotoSeguroData[]) => (
     <div className="overflow-x-auto">
         <Table>
-            <TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase"><TableHead className="w-[100px] text-center">Cédula</TableHead><TableHead>Elector</TableHead><TableHead className="text-center">SECC</TableHead><TableHead>Local / Mesa</TableHead><TableHead className="text-center">Participó?</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow className="bg-muted/50 text-[10px] font-black uppercase"><TableHead className="w-[100px] text-center">Cédula</TableHead><TableHead>Elector</TableHead><TableHead className="text-center">Teléfono</TableHead><TableHead className="text-center">SECC</TableHead><TableHead>Local / Mesa</TableHead><TableHead className="text-center">Participó?</TableHead></TableRow></TableHeader>
             <TableBody>
                 {items.map((p) => {
                     const haVotado = p.estado_votacion === 'Ya Votó';
@@ -320,6 +389,7 @@ export default function ReportesPage() {
                         <TableRow key={p.id} className={cn("transition-colors", haVotado ? "bg-green-50/30" : "hover:bg-muted/20")}>
                             <TableCell className="font-mono text-[10px] text-center font-bold text-slate-600">{p.CEDULA}</TableCell>
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
+                            <TableCell className="text-center font-mono text-[10px]">{p.TELEFONO || '-'}</TableCell>
                             <TableCell className="text-center"><Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge></TableCell>
                             <TableCell className="text-[10px] uppercase">
                                 <div>{p.LOCAL}</div>
@@ -448,10 +518,22 @@ export default function ReportesPage() {
                                                                     <div className="flex items-center gap-2 flex-1 text-left">
                                                                         <span className="font-black text-xs uppercase text-slate-900">{userName}</span>
                                                                     </div>
-                                                                    <div className="flex gap-2 shrink-0">
+                                                                    <div className="flex gap-2 shrink-0 items-center">
                                                                         <Badge variant="outline" className="text-[9px] font-black bg-slate-50">{userData.votos.length} TOTAL</Badge>
                                                                         <Badge className="text-[9px] font-black bg-green-600">{userData.votosEfectuados} ({dirVotaronPct}%) VOTARON</Badge>
                                                                         <Badge className="text-[9px] font-black bg-orange-500 text-white">{pendientes} ({dirPendientesPct}%) PENDIENTES</Badge>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-6 px-2 text-[9px] font-black gap-1 ml-2"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                generateDirigentePDF(userName, userData.votos, seccional);
+                                                                            }}
+                                                                        >
+                                                                            <FileText className="h-3 w-3" />
+                                                                            PDF
+                                                                        </Button>
                                                                     </div>
                                                                 </div>
                                                             </AccordionTrigger>
