@@ -16,10 +16,11 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap, Search, Printer, FileText } from 'lucide-react';
+import { BookCheck, User as UserIcon, CheckCircle2, Circle, RefreshCw, Smartphone, MapPin, Hash, Loader2, DatabaseZap, Search, Printer, FileText, FileSpreadsheet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface VotoSeguroData {
   id: string;
@@ -311,6 +312,68 @@ export default function ReportesPage() {
     return sortedGroups;
   }, [searchedList]);
 
+  const generateGlobalExcel = () => {
+    if (searchedList.length === 0) {
+        toast({ title: "No hay datos para exportar", variant: "destructive" });
+        return;
+    }
+    try {
+        const dataForExcel = searchedList.map((row: VotoSeguroData, index: number) => ({
+            "N°": index + 1,
+            "Cédula": row.CEDULA || '',
+            "Elector": `${row.NOMBRE} ${row.APELLIDO}`,
+            "Teléfono": row.TELEFONO || '',
+            "Seccional": row.CODIGO_SEC || '',
+            "Local": row.LOCAL || '',
+            "Mesa": row.MESA || '',
+            "Orden": row.ORDEN || '',
+            "Dirigente": row.registradoPor_nombre || '',
+            "Participó": row.estado_votacion === 'Ya Votó' ? 'SI' : 'NO'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Votos Seguros Global");
+
+        const filename = `REPORTE_GLOBAL_VOTOS.xlsx`;
+        XLSX.writeFile(workbook, filename);
+        toast({ title: `Excel global descargado exitosamente` });
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Error en la exportación Excel", variant: "destructive" });
+    }
+  };
+
+  const generateDirigenteExcel = (dirigenteName: string, votos: VotoSeguroData[], seccional: string) => {
+    if (votos.length === 0) {
+        toast({ title: "No hay votos para exportar", variant: "destructive" });
+        return;
+    }
+    try {
+        const dataForExcel = votos.map((row, index) => ({
+            "N°": index + 1,
+            "Cédula": row.CEDULA || '',
+            "Elector": `${row.NOMBRE} ${row.APELLIDO}`,
+            "Teléfono": row.TELEFONO || '',
+            "Local": row.LOCAL || '',
+            "Mesa": row.MESA || '',
+            "Orden": row.ORDEN || '',
+            "Participó": row.estado_votacion === 'Ya Votó' ? 'SI' : 'NO'
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Votos Seguros");
+
+        const filename = `REPORTE_${dirigenteName.replace(/[^a-zA-Z0-9]/g, '_').trim() || 'OPERADOR'}.xlsx`;
+        XLSX.writeFile(workbook, filename);
+        toast({ title: `Excel de ${dirigenteName} descargado exitosamente` });
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Error en la exportación Excel", variant: "destructive" });
+    }
+  };
+
   const generateDirigentePDF = (dirigenteName: string, votos: VotoSeguroData[], seccional: string) => {
     if (votos.length === 0) {
         toast({ title: "No hay votos para exportar", variant: "destructive" });
@@ -453,6 +516,16 @@ export default function ReportesPage() {
                         </Button>
                     )}
                     <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={generateGlobalExcel} 
+                        disabled={isLoading || isSyncing || searchedList.length === 0}
+                        className="h-8 gap-2 text-[10px] font-black uppercase"
+                    >
+                        <FileSpreadsheet className="h-3 w-3 text-green-600" />
+                        Excel
+                    </Button>
+                    <Button 
                         variant="ghost" 
                         size="sm" 
                         onClick={handleRefresh} 
@@ -526,6 +599,18 @@ export default function ReportesPage() {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="h-6 px-2 text-[9px] font-black gap-1 ml-2"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                generateDirigenteExcel(userName, userData.votos, seccional);
+                                                                            }}
+                                                                        >
+                                                                            <FileSpreadsheet className="h-3 w-3 text-green-600" />
+                                                                            EXCEL
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-6 px-2 text-[9px] font-black gap-1 ml-1"
                                                                             onClick={(e) => {
                                                                                 e.stopPropagation();
                                                                                 generateDirigentePDF(userName, userData.votos, seccional);
