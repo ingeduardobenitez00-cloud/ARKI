@@ -237,7 +237,7 @@ export default function PadronVistaPage() {
     setIsExporting(true);
     try {
         const doc = new jsPDF('l', 'mm', 'a4');
-        doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold"); doc.text("LISTA 2P", 148, 20, { align: 'center' });
+        doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold"); doc.text("LISTA 1", 148, 20, { align: 'center' });
         const tableColumn = columnsToDisplay.map(c => c.label);
         const tableRows = filteredData.map(row => columnsToDisplay.map(col => formatValue(row[col.key], col.key)));
         (doc as any).autoTable({ head: [tableColumn], body: tableRows, startY: 35, styles: { fontSize: 7 }, headStyles: { fillColor: [239, 68, 68] } });

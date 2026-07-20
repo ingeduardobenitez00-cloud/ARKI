@@ -167,7 +167,7 @@ export default function ReunionesPage() {
             const doc = new jsPDF();
             const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold");
-            doc.text("LISTA 2P - OPCIÓN 2", pageWidth / 2, 20, { align: 'center' });
+            doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 20, { align: 'center' });
             const tableColumn = ["CÉDULA", "NOMBRE Y APELLIDO", "SECC", "TELÉFONO"];
             const tableRows = participantes.map(p => [p.CEDULA, `${p.NOMBRE} ${p.APELLIDO}`, p.CODIGO_SEC || '---', p.TELEFONO || '---']);
             (doc as any).autoTable({ head: [tableColumn], body: tableRows, startY: 35, styles: { fontSize: 8 }, headStyles: { fillColor: [239, 68, 68] } });

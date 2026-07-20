@@ -186,7 +186,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
           />
         </div>
         <div className="mt-4 text-center space-y-1">
-            <p className="text-[9px] uppercase tracking-[0.3em] text-slate-900 font-medium">LISTA 2P - OPCIÓN 2</p>
+            <p className="text-[9px] uppercase tracking-[0.3em] text-slate-900 font-medium">LISTA 1 - OPCIÓN 5</p>
             <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-medium">CAMILO PÉREZ INTENDENTE</p>
             <p className="text-[10px] uppercase tracking-[0.2em] text-primary font-medium">EL ARKI SOTOMAYOR CONCEJAL</p>
             <p className="text-[9px] uppercase tracking-[0.3em] text-slate-400 font-medium">ASUNCIÓN PUEDE</p>
@@ -276,7 +276,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
               </div>
               <div className="flex flex-col justify-center overflow-hidden py-1">
                   <p className="font-medium text-[7px] sm:text-[9px] tracking-[0.3em] uppercase text-slate-900 mb-0.5 leading-none">
-                    LISTA 2P - OPCIÓN 2
+                    LISTA 1 - OPCIÓN 5
                   </p>
                   <div className="flex flex-col">
                     <h2 className="font-medium text-[9px] sm:text-[11px] tracking-[0.1em] sm:tracking-[0.25em] uppercase text-primary leading-tight truncate">
@@ -440,13 +440,13 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <title>{isConsulta ? 'ARKI - Consulta de Padrón' : 'ARKI CONCEJAL LISTA 2P OPCION 2'}</title>
+        <title>{isConsulta ? 'ARKI - Consulta de Padrón' : 'ARKI CONCEJAL LISTA 1 OPCION 5'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <meta name="theme-color" content="#ef4444" />
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content={isConsulta ? "ARKI Consulta" : "ARKI 2P"} />
+        <meta name="apple-mobile-web-app-title" content={isConsulta ? "ARKI Consulta" : "ARKI 1"} />
         
         <link rel="icon" href="/favicon.ico" sizes="any" />
         <link rel="shortcut icon" href="/favicon.ico" />

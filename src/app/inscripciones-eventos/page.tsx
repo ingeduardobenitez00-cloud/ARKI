@@ -155,7 +155,7 @@ export default function InscripcionesEventosPage() {
             const doc = new jsPDF('l', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
             doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold");
-            doc.text("LISTA 2P - OPCIÓN 2", pageWidth / 2, 20, { align: 'center' });
+            doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 20, { align: 'center' });
             doc.setFontSize(12); doc.setTextColor(80, 80, 80);
             doc.text("REGISTRO DE INSCRIPCIONES PÚBLICAS", pageWidth / 2, 28, { align: 'center' });
             const tableColumn = ["FECHA", "EVENTO", "CÉDULA", "ELECTOR", "TELÉFONO", "SECC"];

@@ -5,9 +5,9 @@ import { MetadataRoute } from 'next'
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'ARKI CONCEJAL LISTA 2P',
-    short_name: 'ARKI 2P',
-    description: 'Sistema de Gestión Estratégica Lista 2P - Opción 2',
+    name: 'ARKI CONCEJAL LISTA 1',
+    short_name: 'ARKI 1',
+    description: 'Sistema de Gestión Estratégica Lista 1 - Opción 5',
     start_url: '/',
     display: 'standalone',
     background_color: '#ffffff',

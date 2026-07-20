@@ -115,7 +115,7 @@ export default function ConsultaPublicaPage() {
             <div className="relative h-16 w-16 mb-1">
                 <Image src="/logo.png?v=3" alt="Logo Arki" fill className="object-contain" priority />
             </div>
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 text-center">LISTA 2P - OPCIÓN 2</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 text-center">LISTA 1 - OPCIÓN 5</p>
             <div className="flex flex-col items-center gap-0.5">
                 <h2 className="text-[11px] font-black tracking-[0.2em] uppercase text-primary text-center">CAMILO PÉREZ INTENDENTE</h2>
                 <h2 className="text-[11px] font-black tracking-[0.2em] uppercase text-primary text-center">EL ARKI SOTOMAYOR CONCEJAL</h2>
@@ -229,7 +229,7 @@ export default function ConsultaPublicaPage() {
       {/* FOOTER PÚBLICO */}
       <div className="bg-slate-900 py-6 px-4 text-center mt-auto">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">SISTEMA OFICIAL DE CONSULTA</p>
-          <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-600 mt-1">LISTA 2P - CAMILO PÉREZ | EL ARKI SOTOMAYOR</p>
+          <p className="text-[8px] font-bold uppercase tracking-[0.2em] text-slate-600 mt-1">LISTA 1 - CAMILO PÉREZ | EL ARKI SOTOMAYOR</p>
       </div>
     </div>
   );

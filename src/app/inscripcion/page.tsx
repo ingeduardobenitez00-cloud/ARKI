@@ -21,8 +21,8 @@ export default function PublicRegistrationPage() {
     const db = useFirestore();
     const { toast } = useToast();
     
-    const [eventName, setEventName] = useState('LISTA 2P - OPCIÓN 2');
-    const [eventDescription, setEventDescription] = useState('EL EQUIPO DE LA LISTA 2P SE COMUNICARÁ CONTIGO.');
+    const [eventName, setEventName] = useState('LISTA 1 - OPCIÓN 5');
+    const [eventDescription, setEventDescription] = useState('EL EQUIPO DE LA LISTA 1 SE COMUNICARÁ CONTIGO.');
     const [closedMessage, setClosedMessage] = useState('LO SENTIMOS, EL REGISTRO NO ESTÁ HABILITADO EN ESTE MOMENTO.');
     const [flyerUrl, setFlyerUrl] = useState('/logo.png');
     const [isRegistrationOpen, setIsRegistrationOpen] = useState(true);
@@ -223,7 +223,7 @@ export default function PublicRegistrationPage() {
                     <div className="space-y-2">
                         <div className="flex items-center justify-center gap-2 text-primary">
                             <Sparkles className="h-3 w-3 fill-primary" />
-                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-900">LISTA 2P - OPCIÓN 2</p>
+                            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-900">LISTA 1 - OPCIÓN 5</p>
                             <Sparkles className="h-3 w-3 fill-primary" />
                         </div>
                         <h1 className="text-2xl sm:text-4xl font-black uppercase tracking-tight text-primary leading-tight px-4 whitespace-pre-wrap">
@@ -315,7 +315,7 @@ export default function PublicRegistrationPage() {
 
                 <div className="text-center opacity-40">
                     <p className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-900 leading-relaxed">
-                        SISTEMA DE GESTIÓN ESTRATÉGICA <br/> LISTA 2P - OPCIÓN 2
+                        SISTEMA DE GESTIÓN ESTRATÉGICA <br/> LISTA 1 - OPCIÓN 5
                     </p>
                 </div>
             </div>

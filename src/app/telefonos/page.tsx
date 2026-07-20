@@ -343,7 +343,7 @@ export default function TelefonosPage() {
                             )}
                         </CardContent>
                         <CardFooter className="bg-muted/10 border-t py-4 flex justify-between items-center px-8">
-                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 2P OPCION 2</p>
+                            <p className="text-[9px] font-black uppercase text-slate-400 tracking-widest">SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 1 OPCION 5</p>
                             <Badge variant="outline" className="text-[9px] font-black border-primary/10">NÚCLEO v5.2</Badge>
                         </CardFooter>
                     </Card>

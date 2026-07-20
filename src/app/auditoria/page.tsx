@@ -196,7 +196,7 @@ export default function AuditoriaPage() {
                 <CardFooter className="bg-muted/10 border-t py-3 flex justify-between items-center">
                     <div className="flex items-center gap-4">
                         <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-widest">
-                            Panel de Control Maestro - LISTA 2P OPCIÓN 2
+                            Panel de Control Maestro - LISTA 1 OPCIÓN 5
                         </p>
                         {totalEvents !== null && totalEvents > limitCount && (
                             <Button 

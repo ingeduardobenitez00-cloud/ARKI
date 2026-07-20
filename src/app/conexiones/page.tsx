@@ -229,7 +229,7 @@ export default function ConnectionsPage() {
                 </CardContent>
                  <CardFooter className="bg-muted/10 border-t py-3 flex justify-between items-center px-6">
                     <p className="text-[10px] text-muted-foreground uppercase font-medium tracking-widest">
-                        SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 2P OPCION 2
+                        SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 1 OPCION 5
                     </p>
                 </CardFooter>
             </Card>

@@ -593,7 +593,7 @@ export default function ConfiguracionPage() {
 
       <div className="text-center opacity-40 py-10">
         <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-900">
-            SISTEMA GESTIÓN ESTRATÉGICA LISTA 2P - ASUNCIÓN 2026
+            SISTEMA GESTIÓN ESTRATÉGICA LISTA 1 - ASUNCIÓN 2026
         </p>
       </div>
     </div>

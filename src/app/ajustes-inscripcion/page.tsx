@@ -62,9 +62,9 @@ export default function AjustesInscripcionPage() {
       getDoc(doc(db, SETTINGS_COLLECTION, 'global')).then(snap => {
         if (snap.exists()) {
           const data = snap.data();
-          setPublicEventName(data.public_event_name || 'LISTA 2P - OPCIÓN 2');
+          setPublicEventName(data.public_event_name || 'LISTA 1 - OPCIÓN 5');
           setPublicFlyerId(data.public_event_flyer_id || '');
-          setPublicEventDescription(data.public_event_description || 'EL EQUIPO DE LA LISTA 2P SE COMUNICARÁ CONTIGO.');
+          setPublicEventDescription(data.public_event_description || 'EL EQUIPO DE LA LISTA 1 SE COMUNICARÁ CONTIGO.');
           setPublicClosedMessage(data.public_closed_message || 'LO SENTIMOS, EL REGISTRO NO ESTÁ HABILITADO EN ESTE MOMENTO.');
           setPublicRegistrationOpen(data.public_registration_open !== undefined ? data.public_registration_open : true);
           setPublicRegistrationLimit(data.public_registration_limit || 0);
@@ -185,7 +185,7 @@ export default function AjustesInscripcionPage() {
             <div className="space-y-6">
                 <div className="space-y-2">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre Oficial del Evento</Label>
-                    <Textarea value={publicEventName} onChange={(e) => setPublicEventName(e.target.value.toUpperCase())} className="font-black uppercase min-h-[100px] text-lg rounded-2xl border-slate-200" placeholder="EJ: GRAN LANZAMIENTO LISTA 2P" />
+                    <Textarea value={publicEventName} onChange={(e) => setPublicEventName(e.target.value.toUpperCase())} className="font-black uppercase min-h-[100px] text-lg rounded-2xl border-slate-200" placeholder="EJ: GRAN LANZAMIENTO LISTA 1" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
@@ -228,7 +228,7 @@ export default function AjustesInscripcionPage() {
 
       <div className="text-center opacity-40 py-10">
         <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-900 leading-relaxed">
-            SISTEMA DE GESTIÓN ESTRATÉGICA <br/> LISTA 2P - ASUNCIÓN 2026
+            SISTEMA DE GESTIÓN ESTRATÉGICA <br/> LISTA 1 - ASUNCIÓN 2026
         </p>
       </div>
     </div>

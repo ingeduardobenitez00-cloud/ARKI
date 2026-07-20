@@ -84,7 +84,7 @@ export default function LoginPage() {
             </CardTitle>
             <div className="flex flex-col gap-0.5">
                 <CardDescription className="font-medium text-[9px] uppercase tracking-[0.3em] text-slate-900 mb-1">
-                    LISTA 2P - OPCIÓN 2
+                    LISTA 1 - OPCIÓN 5
                 </CardDescription>
                 <CardDescription className="font-medium text-[9px] uppercase tracking-[0.2em] text-slate-600">
                     CAMILO PÉREZ INTENDENTE

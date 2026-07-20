@@ -204,7 +204,7 @@ export default function PadronExportPage() {
         const doc = new jsPDF('p', 'mm', 'a4');
         const pageWidth = doc.internal.pageSize.getWidth();
         doc.setFontSize(14); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold");
-        doc.text("LISTA 2P - OPCIÓN 2", pageWidth / 2, 15, { align: 'center' });
+        doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 15, { align: 'center' });
         doc.setFontSize(8); doc.setTextColor(80, 80, 80);
         doc.text(`Padrón Electoral - SECCIONAL ${selectedSeccional}`, pageWidth / 2, 22, { align: 'center' });
         

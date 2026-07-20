@@ -1076,7 +1076,7 @@ export default function UsersPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><Users className="h-8 w-8 text-primary" /> Gestión de Operadores</h1><p className="text-muted-foreground font-medium">Control jerárquico de perfiles, roles y permisos de la LISTA 2P.</p></div>
+        <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><Users className="h-8 w-8 text-primary" /> Gestión de Operadores</h1><p className="text-muted-foreground font-medium">Control jerárquico de perfiles, roles y permisos de la LISTA 1.</p></div>
         <Button onClick={() => { setEditingUser(null); setIsDialogOpen(true); }} className="font-black h-12 px-8 shadow-xl rounded-2xl active:scale-95 transition-all"><PlusCircle className="w-5 h-5 mr-2" /> CREAR OPERADOR</Button>
       </div>
 
@@ -1306,7 +1306,7 @@ export default function UsersPage() {
       <UserDialog isOpen={isDialogOpen} onOpenChange={setIsDialogOpen} editingUser={editingUser} onSuccess={fetchUsersAndSeccionales} seccionales={seccionales} />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-        <AlertDialogContent className="rounded-[2.5rem]"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase tracking-tight text-2xl">¿Eliminar Operador?</AlertDialogTitle><AlertDialogDescription className="font-medium text-base">Esta acción es irreversible. Se revocará todo acceso de <strong>{userToDelete?.name}</strong> al sistema estratégico de la Lista 2P y se eliminará su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-3"><AlertDialogCancel disabled={isDeleting} className="font-black uppercase text-xs rounded-2xl h-12">CANCELAR</AlertDialogCancel><Button disabled={isDeleting} onClick={handleDelete} variant="destructive" className="font-black uppercase text-xs rounded-2xl h-12 px-8">
+        <AlertDialogContent className="rounded-[2.5rem]"><AlertDialogHeader><AlertDialogTitle className="font-black uppercase tracking-tight text-2xl">¿Eliminar Operador?</AlertDialogTitle><AlertDialogDescription className="font-medium text-base">Esta acción es irreversible. Se revocará todo acceso de <strong>{userToDelete?.name}</strong> al sistema estratégico de la Lista 1 y se eliminará su cuenta de acceso.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="gap-3"><AlertDialogCancel disabled={isDeleting} className="font-black uppercase text-xs rounded-2xl h-12">CANCELAR</AlertDialogCancel><Button disabled={isDeleting} onClick={handleDelete} variant="destructive" className="font-black uppercase text-xs rounded-2xl h-12 px-8">
             {isDeleting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : null}
             ELIMINAR DEFINITIVAMENTE
         </Button></AlertDialogFooter></AlertDialogContent>

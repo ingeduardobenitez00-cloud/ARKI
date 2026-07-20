@@ -44,7 +44,7 @@ export default function AyudaPage() {
             doc.setFontSize(18);
             doc.setTextColor(239, 68, 68);
             doc.setFont("helvetica", "bold");
-            doc.text("LISTA 2P - OPCIÓN 2", pageWidth / 2, yPos, { align: 'center' });
+            doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, yPos, { align: 'center' });
             yPos += 8;
 
             doc.setFontSize(10);
@@ -142,7 +142,7 @@ export default function AyudaPage() {
                         <HelpCircle className="h-9 w-9 text-primary" />
                         Guía de Usuario
                     </h1>
-                    <p className="text-muted-foreground font-medium uppercase text-sm">SISTEMA GESTIÓN ELECTORAL LISTA 2P - OPCIÓN 2</p>
+                    <p className="text-muted-foreground font-medium uppercase text-sm">SISTEMA GESTIÓN ELECTORAL LISTA 1 - OPCIÓN 5</p>
                 </div>
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                     <Button 
@@ -290,7 +290,7 @@ export default function AyudaPage() {
             </Accordion>
 
             <div className="text-center pt-10 opacity-40">
-                <p className="text-[9px] font-medium uppercase tracking-[0.3em]">SISTEMA GESTIÓN ELECTORAL - LISTA 2P OPCIÓN 2</p>
+                <p className="text-[9px] font-medium uppercase tracking-[0.3em]">SISTEMA GESTIÓN ELECTORAL - LISTA 1 OPCIÓN 5</p>
             </div>
         </div>
     );

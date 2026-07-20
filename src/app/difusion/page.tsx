@@ -71,11 +71,11 @@ interface Elector {
 }
 
 const EVENT_TEMPLATES = {
-    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestra gran REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🚀",
-    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a compartir una CENA de confraternidad con todo el equipo. ¡Será un gusto conversar contigo!\n\n¡Contamos con tu apoyo! 🚀",
-    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nEstaremos realizando una gran CAMINATA en tu zona. ¡Súmate a la marea roja para conocernos mejor!\n\n¡Contamos con tu apoyo! 🚀",
-    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nGran jornada de PEGATINA en la ciudad. ¡Vení a ponerle color y alegría a nuestro proyecto!\n\n¡Contamos con tu apoyo! 🚀",
-    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\n¡Hoy es un día especial! Desde el equipo de la Lista 2P te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉 Que pases un excelente día. ¡Un gran abrazo! 🚀"
+    REUNION: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nTe invitamos a participar de nuestra gran REUNIÓN política. Tu presencia es fundamental.\n\n¡Contamos con tu apoyo! 🚀",
+    CENA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nTe invitamos a compartir una CENA de confraternidad con todo el equipo. ¡Será un gusto conversar contigo!\n\n¡Contamos con tu apoyo! 🚀",
+    CAMINATA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nEstaremos realizando una gran CAMINATA en tu zona. ¡Súmate a la marea roja para conocernos mejor!\n\n¡Contamos con tu apoyo! 🚀",
+    PEGATINA: "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nGran jornada de PEGATINA en la ciudad. ¡Vení a ponerle color y alegría a nuestro proyecto!\n\n¡Contamos con tu apoyo! 🚀",
+    CUMPLEANOS: "¡Hola, {nombre}! 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\n¡Hoy es un día especial! Desde el equipo de la Lista 1 te deseamos un ¡MUY FELIZ CUMPLEAÑOS! 🎂🎉 Que pases un excelente día. ¡Un gran abrazo! 🚀"
 };
 
 const MESES = [
@@ -142,9 +142,9 @@ export default function DifusionPage() {
     
     const [invitationTemplate, setInvitationTemplate] = useState(() => {
         if (typeof window !== 'undefined') {
-            return localStorage.getItem('wa_custom_template') || "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+            return localStorage.getItem('wa_custom_template') || "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
         }
-        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 2P Opción 2. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
+        return "{¡Hola!|¡Buenas!|Saludos} {nombre} 👋\n\nTe saluda El Arki Sotomayor, Candidato a Concejal por la Lista 1 Opción 5. 🔴\n\nTe invitamos a participar de nuestras actividades de la semana.\n\n¡Contamos con tu apoyo! 🚀";
     });
     const [isBirthdayMode, setIsBirthdayMode] = useState(false);
     const [includeVotingData, setIncludeVotingData] = useState(false);
@@ -173,9 +173,9 @@ export default function DifusionPage() {
     const [sidebarBaseTemplate, setSidebarBaseTemplate] = useState(() => {
         if (typeof window !== 'undefined') {
             return localStorage.getItem('sidebar_base_template') || 
-                "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 2P opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
+                "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 1 opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
         }
-        return "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 2P opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
+        return "¡Hola, {nombre}! 👋 Te saluda El Arki Sotomayor.\n\nEste domingo 7 de junio, ¡queremos que vos seas el protagonista del cambio transformemos Asuncion juntos! Te invito a que nos sumemos para cambiar Asunción juntos. Con Camilo Pérez Intendente Lista 2 y El Arki Sotomayor Concejal Lista 1 opcion 2, el cambio real empieza con tu voto. ¡Contamos con vos!";
     });
 
     const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
@@ -1435,7 +1435,7 @@ export default function DifusionPage() {
 
             <div className="text-center pt-10 opacity-40">
                 <p className="text-[9px] font-black uppercase tracking-[0.5em] text-slate-900">
-                    SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 2P OPCION 2
+                    SISTEMA DE GESTIÓN ESTRATÉGICA - LISTA 1 OPCION 5
                 </p>
             </div>
         </div>

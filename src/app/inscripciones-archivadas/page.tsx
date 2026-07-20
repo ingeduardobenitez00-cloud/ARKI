@@ -132,7 +132,7 @@ export default function InscripcionesArchivadasPage() {
         try {
             const doc = new jsPDF('l', 'mm', 'a4');
             const pageWidth = doc.internal.pageSize.getWidth();
-            doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold"); doc.text("LISTA 2P - OPCIÓN 2", pageWidth / 2, 20, { align: 'center' });
+            doc.setFontSize(18); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold"); doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 20, { align: 'center' });
             const tableColumn = ["CÉDULA", "ELECTOR", "TELÉFONO", "SECC", "LOCAL"];
             const tableRows = data.map(p => [p.cedula, `${p.nombre} ${p.apellido}`.toUpperCase(), p.telefono, p.seccional, p.local]);
             (doc as any).autoTable({ head: [tableColumn], body: tableRows, startY: 35, headStyles: { fillColor: [239, 68, 68] } });

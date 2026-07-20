@@ -48,7 +48,7 @@ export default function PanelControlPage() {
                     <LayoutGrid className="h-12 w-12" />
                 </div>
                 <h1 className="text-3xl font-medium uppercase tracking-tight text-slate-900">Panel de Control</h1>
-                <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px]">LISTA 2P - OPCIÓN 2</p>
+                <p className="text-muted-foreground font-medium uppercase tracking-widest text-[10px]">LISTA 1 - OPCIÓN 5</p>
             </div>
             <div className="p-10 border border-dashed rounded-[2.5rem] bg-white shadow-sm">
                 <p className="font-medium text-slate-500 uppercase text-[11px] tracking-widest leading-relaxed">
@@ -144,7 +144,7 @@ export default function PanelControlPage() {
       <div className="text-center pt-24 pb-8 space-y-4">
         <div className="flex flex-col items-center justify-center gap-2 opacity-40">
             <p className="text-[9px] font-medium uppercase tracking-[0.3em] text-slate-900 mb-1">
-                LISTA 2P - OPCIÓN 2
+                LISTA 1 - OPCIÓN 5
             </p>
             <p className="text-[10px] font-medium uppercase tracking-[0.3em] text-primary">
                 CAMILO PÉREZ INTENDENTE - EL ARKI SOTOMAYOR CONCEJAL
