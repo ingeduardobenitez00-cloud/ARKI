@@ -113,7 +113,7 @@ export default function ConsultaPublicaPage() {
       <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-md mx-auto p-4 flex flex-col items-center justify-center space-y-2">
             <div className="relative h-16 w-16 mb-1">
-                <Image src="/logo.png?v=3" alt="Logo Arki" fill className="object-contain" priority />
+                <Image src="/logo.png?v=4" alt="Logo Arki" fill className="object-contain" priority />
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 text-center">LISTA 1 - OPCIÓN 5</p>
             <div className="flex flex-col items-center gap-0.5">

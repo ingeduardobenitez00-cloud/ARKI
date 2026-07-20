@@ -177,7 +177,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
       >
         <div className="relative h-24 w-24 drop-shadow-sm transition-transform group-hover:scale-105 duration-500">
           <Image 
-            src="/logo.png?v=3" 
+            src="/logo.png?v=4" 
             alt="Logo Arki" 
             fill 
             className="object-contain" 
@@ -272,7 +272,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
           <div className="flex items-center gap-3 overflow-hidden">
               <div className="relative h-10 w-10 shrink-0">
-                  <Image src="/logo.png?v=3" alt="Logo" fill className="object-contain" />
+                  <Image src="/logo.png?v=4" alt="Logo" fill className="object-contain" />
               </div>
               <div className="flex flex-col justify-center overflow-hidden py-1">
                   <p className="font-medium text-[7px] sm:text-[9px] tracking-[0.3em] uppercase text-slate-900 mb-0.5 leading-none">
