@@ -30,7 +30,8 @@ import {
     BarChart3,
     Image as ImageIcon,
     FileSpreadsheet,
-    PhoneCall
+    PhoneCall,
+    Briefcase
 } from 'lucide-react';
 
 export const allMenuItems = [
@@ -60,6 +61,7 @@ export const allMenuItems = [
   { href: '/simulador', label: 'Simulador Máquina', icon: AppWindow, tooltip: 'SIMULADOR OFICIAL DE LA MÁQUINA DE VOTACIÓN TSJE.' },
   { href: '/configuracion-electoral', label: 'Metadata Electoral', icon: ImageIcon, tooltip: 'GESTIONA FOTOS Y NOMBRES DE CANDIDATOS.' },
   { href: '/voto-seguro', label: 'Lista Voto Seguro', icon: BookHeart, tooltip: 'VISUALIZA LA LISTA DE VOTOS SEGUROS (PERSONAL O DE TU SECC).' },
+  { href: '/audiencia', label: 'Audiencia/Pedidos', icon: Briefcase, tooltip: 'REGISTRA Y GESTIONA LOS PEDIDOS DE LOS ELECTORES O DIRIGENTES.' },
   { href: '/mapa-global', label: 'Mapa Territorial', icon: LucideMapIcon, tooltip: 'VISUALIZA EN EL MAPA A LOS ELECTORES (PERSONAL O DE TU SECC).' },
   { href: '/reportes', label: 'Reportes', icon: BookCheck, tooltip: 'GENERA REPORTES DE VOTOS SEGUROS POR SECCIONAL.' },
   { href: '/auditoria', label: 'Auditoría', icon: ShieldCheck, tooltip: 'MONITOREA LAS ACCIONES REALIZADAS POR LOS USUARIOS EN EL SISTEMA.' },
@@ -93,7 +95,7 @@ export const menuCategories = [
   {
     label: 'Carga de Votos Seguros',
     icon: Database,
-    items: ['/consulta', '/voto-seguro', '/migrar-votos']
+    items: ['/consulta', '/voto-seguro', '/migrar-votos', '/audiencia']
   },
   {
     label: 'Comunicación',
@@ -128,10 +130,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil', '/simulador']
