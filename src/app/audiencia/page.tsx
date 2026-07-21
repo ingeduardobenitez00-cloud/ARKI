@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect } from 'react';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { collection, getDocs, getDoc, query, where, doc, updateDoc, setDoc, deleteDoc, limit, orderBy, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
@@ -12,6 +13,7 @@ import {
     Search, 
     Loader2, 
     Save, 
+    Navigation,
     UserCheck, 
     Lock, 
     History, 
@@ -56,6 +58,11 @@ interface PadronData {
 const COLLECTION_PADRON = 'sheet1';
 const COLLECTION_AUDIENCIA = 'pedidos_audiencia';
 
+const MapPicker = dynamic(() => import('@/components/MapPicker'), {
+  ssr: false,
+  loading: () => <div className="h-full w-full bg-muted flex items-center justify-center"><Loader2 className="animate-spin" /></div>
+});
+
 export default function AudienciaPage() {
     const { user } = useAuth();
     const db = useFirestore();
@@ -74,6 +81,11 @@ export default function AudienciaPage() {
     const [categoriaPedido, setCategoriaPedido] = useState('');
     const [descripcionPedido, setDescripcionPedido] = useState('');
     
+    const [manualLat, setManualLat] = useState('');
+    const [manualLon, setManualLon] = useState('');
+    const [isCapturingLocation, setIsCapturingLocation] = useState(false);
+    const [showGps, setShowGps] = useState(false);
+    
     const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
     const [pedidoToDelete, setPedidoToDelete] = useState<PadronData | null>(null);
 
@@ -86,6 +98,12 @@ export default function AudienciaPage() {
         if (!user) return [];
         return user.seccionales || (user.seccional ? [user.seccional] : []);
     }, [user]);
+
+    const usersQuery = useMemoFirebase(() => {
+        if (!db || !user) return null;
+        return query(collection(db, 'users'));
+    }, [db, user]);
+    const { data: allUsers } = useCollection<any>(usersQuery);
 
     // Query para obtener los pedidos registrados
     const registeredQuery = useMemoFirebase(() => {
@@ -108,6 +126,11 @@ export default function AudienciaPage() {
 
     const { data: rawList, isLoading: isLoadingList, error: listError } = useCollection<PadronData>(registeredQuery);
 
+    const historicalCount = useMemo(() => {
+        if (!selectedPerson || !rawList) return 0;
+        return rawList.filter(p => p.CEDULA === selectedPerson.CEDULA).length;
+    }, [selectedPerson, rawList]);
+
     const applyPhoneMask = (value: string) => {
         const cleanValue = value.replace(/\D/g, '').slice(0, 10);
         let formatted = cleanValue;
@@ -122,6 +145,9 @@ export default function AudienciaPage() {
             setDirigenteAcompanante('');
             setCategoriaPedido('');
             setDescripcionPedido('');
+            setManualLat(selectedPerson.LATITUD?.toString() || '');
+            setManualLon(selectedPerson.LONGITUD?.toString() || '');
+            setShowGps(false);
         }
     }, [selectedPerson]);
 
@@ -173,6 +199,22 @@ export default function AudienciaPage() {
         } catch (error) { toast({ title: 'Error de conexión', variant: 'destructive' }); } finally { setIsSearching(false); }
     };
 
+    const handleLocationPick = (lat: number, lon: number) => {
+        setManualLat(lat.toFixed(6));
+        setManualLon(lon.toFixed(6));
+        toast({ title: "Ubicación Fijada" });
+    };
+
+    const handleCaptureLocation = () => {
+        if (!navigator.geolocation) return;
+        setIsCapturingLocation(true);
+        navigator.geolocation.getCurrentPosition(
+            (pos) => { setManualLat(pos.coords.latitude.toString()); setManualLon(pos.coords.longitude.toString()); setIsCapturingLocation(false); },
+            () => setIsCapturingLocation(false),
+            { enableHighAccuracy: true }
+        );
+    };
+
     const handleSave = async () => {
         if (!selectedPerson || !user || !db || !categoriaPedido || !descripcionPedido) {
             toast({ title: 'Faltan datos requeridos', variant: 'destructive' });
@@ -191,6 +233,13 @@ export default function AudienciaPage() {
             createdAt: new Date().toISOString()
         };
 
+        if (manualLat && manualLon) {
+            dataToSave.LATITUD = parseFloat(manualLat);
+            dataToSave.LONGITUD = parseFloat(manualLon);
+            dataToSave.ubicadoPor_id = user.id;
+            dataToSave.ubicadoPor_nombre = user.name;
+        }
+
         const capturaRef = doc(db, COLLECTION_AUDIENCIA, `${selectedPerson.id}_${Date.now()}`); // Permitir múltiples pedidos por persona
 
         Promise.all([
@@ -206,6 +255,9 @@ export default function AudienciaPage() {
             setDirigenteAcompanante('');
             setCategoriaPedido('');
             setDescripcionPedido('');
+            setManualLat('');
+            setManualLon('');
+            setShowGps(false);
         }).catch(() => {
             toast({ title: 'Error al guardar', variant: 'destructive' });
         }).finally(() => setIsSaving(false));
@@ -317,57 +369,96 @@ export default function AudienciaPage() {
                         <CardContent className="pt-6">
                             {selectedPerson ? (
                             <div className="space-y-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs relative">
+                                    {historicalCount > 0 && (
+                                        <div className="absolute -top-3 -right-3 bg-red-600 text-white font-black text-[10px] uppercase px-3 py-1.5 rounded-full shadow-lg border-2 border-white animate-bounce flex items-center gap-1 z-10">
+                                            <History className="h-3 w-3" /> VINO {historicalCount} {historicalCount === 1 ? 'VEZ' : 'VECES'}
+                                        </div>
+                                    )}
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Cédula</Label><p className="font-black text-sm">{selectedPerson.CEDULA}</p></div>
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Solicitante</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
                                     <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Referencia</Label><p className="font-black uppercase">{selectedPerson.LOCAL} | M: {selectedPerson.MESA} / O: {selectedPerson.ORDEN}</p></div>
                                 </div>
                                 
-                                <div className="space-y-5">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label className="font-black text-[10px] uppercase">WhatsApp Contacto</Label>
-                                            <Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black" inputMode="numeric"/>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="space-y-2">
+                                                <Label className="font-black text-[10px] uppercase">WhatsApp Contacto</Label>
+                                                <Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black" inputMode="numeric"/>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <Label className="font-black text-[10px] uppercase text-primary">Con qué dirigente vino</Label>
+                                                <Input 
+                                                    list="dirigentes-list"
+                                                    value={dirigenteAcompanante} 
+                                                    onChange={(e) => setDirigenteAcompanante(e.target.value)} 
+                                                    placeholder="BUSCAR O ESCRIBIR DIRIGENTE..." 
+                                                    className="h-11 font-black uppercase border-primary/50" 
+                                                />
+                                                <datalist id="dirigentes-list">
+                                                    {allUsers?.slice().sort((a,b) => (a.name || '').localeCompare(b.name || '')).map(u => (
+                                                        <option key={u.id} value={u.name || u.email || 'SIN NOMBRE'} />
+                                                    ))}
+                                                    <option value="NINGUNO / VINO SOLO" />
+                                                </datalist>
+                                            </div>
                                         </div>
+                                        
                                         <div className="space-y-2">
-                                            <Label className="font-black text-[10px] uppercase text-primary">Con qué dirigente vino</Label>
-                                            <Input value={dirigenteAcompanante} onChange={(e) => setDirigenteAcompanante(e.target.value)} placeholder="Nombre del dirigente..." className="h-11 font-black uppercase border-primary/50" />
+                                            <Label className="font-black text-[10px] uppercase text-primary">Categoría del Pedido *</Label>
+                                            <Select value={categoriaPedido} onValueChange={setCategoriaPedido}>
+                                                <SelectTrigger className="h-11 font-black uppercase border-primary/50">
+                                                    <SelectValue placeholder="Seleccione la categoría..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="Gestión en la Municipalidad">Gestión en la Municipalidad</SelectItem>
+                                                    <SelectItem value="Recategorizacion">Recategorización</SelectItem>
+                                                    <SelectItem value="Contrato">Contrato</SelectItem>
+                                                    <SelectItem value="Nombramiento">Nombramiento</SelectItem>
+                                                    <SelectItem value="Otros">Otros</SelectItem>
+                                                </SelectContent>
+                                            </Select>
                                         </div>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <Label className="font-black text-[10px] uppercase text-primary">Categoría del Pedido *</Label>
-                                        <Select value={categoriaPedido} onValueChange={setCategoriaPedido}>
-                                            <SelectTrigger className="h-11 font-black uppercase border-primary/50">
-                                                <SelectValue placeholder="Seleccione la categoría..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="Gestión en la Municipalidad">Gestión en la Municipalidad</SelectItem>
-                                                <SelectItem value="Recategorizacion">Recategorización</SelectItem>
-                                                <SelectItem value="Contrato">Contrato</SelectItem>
-                                                <SelectItem value="Nombramiento">Nombramiento</SelectItem>
-                                                <SelectItem value="Otros">Otros</SelectItem>
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
 
-                                    <div className="space-y-2">
-                                        <Label className="font-black text-[10px] uppercase text-primary">Descripción del Pedido *</Label>
-                                        <Textarea 
-                                            value={descripcionPedido} 
-                                            onChange={(e) => setDescripcionPedido(e.target.value)} 
-                                            placeholder="Detalles del pedido..." 
-                                            className="min-h-[120px] resize-none font-black uppercase border-primary/50"
-                                        />
-                                    </div>
+                                        <div className="space-y-2">
+                                            <Label className="font-black text-[10px] uppercase text-primary">Descripción del Pedido *</Label>
+                                            <Textarea 
+                                                value={descripcionPedido} 
+                                                onChange={(e) => setDescripcionPedido(e.target.value)} 
+                                                placeholder="Detalles del pedido..." 
+                                                className="min-h-[120px] resize-none font-black uppercase border-primary/50"
+                                            />
+                                        </div>
 
-                                    <Button 
-                                        onClick={handleSave} 
-                                        disabled={isSaving || !categoriaPedido || !descripcionPedido} 
-                                        className="w-full h-14 font-black uppercase text-base bg-primary shadow-xl rounded-2xl"
-                                    >
-                                        {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR PEDIDO
-                                    </Button>
+                                        <Button 
+                                            onClick={handleSave} 
+                                            disabled={isSaving || !categoriaPedido || !descripcionPedido} 
+                                            className="w-full h-14 font-black uppercase text-base bg-primary shadow-xl rounded-2xl"
+                                        >
+                                            {isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR PEDIDO
+                                        </Button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        {!showGps ? (
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full h-full min-h-[330px] border-dashed border-2 border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 hover:border-slate-300 font-black uppercase rounded-3xl flex flex-col items-center justify-center gap-2 transition-all"
+                                                onClick={() => setShowGps(true)}
+                                            >
+                                                <div className="h-16 w-16 rounded-full bg-slate-100 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
+                                                    <MapPin className="h-7 w-7 text-slate-400" />
+                                                </div>
+                                                <span className="text-sm">TOQUE AQUÍ PARA FIJAR LA UBICACIÓN DEL VOTANTE</span>
+                                                <span className="text-[10px] font-bold opacity-50 tracking-widest bg-slate-200 text-slate-600 px-3 py-1 rounded-full mt-1">OPCIONAL</span>
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <div className="h-[280px] border-2 rounded-3xl overflow-hidden shadow-inner"><MapPicker key={`picker-${selectedPerson.id}-${manualLat}-${manualLon}`} lat={manualLat ? parseFloat(manualLat) : null} lon={manualLon ? parseFloat(manualLon) : null} onLocationPick={handleLocationPick} /></div>
+                                                <Button variant="secondary" className="w-full bg-red-600 text-white h-11 font-black rounded-xl text-xs uppercase" onClick={handleCaptureLocation} disabled={isCapturingLocation}><Navigation className="mr-2 h-4 w-4" /> CAPTURAR GPS</Button>
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
                             ) : (
