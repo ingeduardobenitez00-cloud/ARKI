@@ -6,7 +6,7 @@ import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Search, Loader2, User as UserIcon, MapPin, Smartphone } from 'lucide-react';
+import { Search, Loader2, User as UserIcon, MapPin, Smartphone, Library } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
@@ -127,7 +127,10 @@ export default function ConsultaPublicaPage() {
       <div className="flex-1 max-w-md w-full mx-auto p-4 sm:p-6 pb-20">
         
         <div className="mb-6 text-center space-y-2">
-            <h1 className="text-xl font-black uppercase tracking-tight text-slate-800">Consulta de Padrón</h1>
+            <h1 className="text-xl font-black uppercase tracking-tight text-slate-800 flex items-center justify-center gap-2">
+                <Library className="h-6 w-6 text-primary" />
+                Consulta RCP
+            </h1>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verifica tu local y mesa de votación en Capital</p>
         </div>
 
@@ -191,7 +194,7 @@ export default function ConsultaPublicaPage() {
                                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Lugar de Votación</span>
                                     <p className="text-sm font-black uppercase text-slate-700 flex items-start gap-2">
                                         <MapPin className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                                        {row.LOCAL}
+                                        {row.DESC_LOCAL || row.LOCAL}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">

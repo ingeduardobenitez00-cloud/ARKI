@@ -186,7 +186,7 @@ export default function PadronPage() {
                       </TableCell>
                       <TableCell className="py-6">
                         <div className="flex flex-col gap-1.5">
-                          <span className="text-[11px] font-black uppercase text-slate-700 truncate max-w-[250px]">{row.LOCAL}</span>
+                          <span className="text-[11px] font-black uppercase text-slate-700 truncate max-w-[250px]">{row.DESC_LOCAL || row.LOCAL}</span>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[10px] font-black bg-primary/5 text-primary border-primary/10">
                                 M: {row.MESA} / O: {row.ORDEN}

@@ -36,6 +36,9 @@ next-env.d.ts
 
 # specific large files
 /scripts/padron.xlsx
+*.dbf
+scripts/*.dbf
+serviceAccountKey.json
 
 # Env and Secrets
 .env
