@@ -117,7 +117,7 @@ export default function PadronPage() {
         <div>
             <h1 className="text-3xl font-medium uppercase tracking-tight flex items-center gap-3">
                 <Library className="h-8 w-8 text-primary" />
-                Consulta PADRON CAPITAL ANR
+                CONSULTA PADRON
             </h1>
             <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Explora y busca en la base de datos oficial de la ANR.</p>
         </div>

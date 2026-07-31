@@ -2,7 +2,7 @@
 "use client";
 
 import { useState } from 'react';
-import { collection, getDocs, query, where, writeBatch, deleteField, doc, addDoc, updateDoc, deleteDoc, orderBy, setDoc } from 'firebase/firestore';
+import { collection, getDocs, getDoc, query, where, writeBatch, deleteField, doc, addDoc, updateDoc, deleteDoc, orderBy, setDoc, limit } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useDoc } from '@/firebase/firestore/use-doc';
@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Zap, AlertTriangle, RefreshCw, Trash2, Activity, ShieldCheck, Gauge, ExternalLink, Info } from 'lucide-react';
+import { Loader2, Zap, AlertTriangle, RefreshCw, Trash2, Activity, ShieldCheck, Gauge, ExternalLink, Info, MapPin } from 'lucide-react';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -297,6 +297,149 @@ const Edit = ({ className }: { className?: string }) => (
   <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
 );
 
+function LocalesAssignmentManager() {
+  const db = useFirestore();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [locales, setLocales] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedSeccionales, setSelectedSeccionales] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+  const [filter, setFilter] = useState<'pending' | 'asignado' | 'todos'>('pending');
+
+  const fetchLocales = async () => {
+    if (!db) return;
+    setIsLoading(true);
+    try {
+      let q = collection(db, 'locales_votacion');
+      if (filter === 'pending') {
+        q = query(q, where('status', '==', 'pending_seccional'), limit(150));
+      } else if (filter === 'asignado') {
+        q = query(q, where('status', '==', 'asignado'), limit(150));
+      } else {
+        q = query(q, limit(150));
+      }
+      const snap = await getDocs(q);
+      setLocales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchLocales(); }, [db, filter]);
+
+  const handleAssign = async (localId: string, localName: string) => {
+    const secId = selectedSeccionales[localId];
+    if (!secId || !db) return;
+
+    setIsSubmitting(prev => ({ ...prev, [localId]: true }));
+    try {
+      // 1. Get Seccional Metadata
+      const metaRef = doc(db, 'seccionales_metadata', secId);
+      const metaSnap = await getDoc(metaRef);
+      
+      let localesList: string[] = [];
+      let mesasPorLocal: any[] = [];
+      
+      if (metaSnap.exists()) {
+        const data = metaSnap.data();
+        localesList = data.locales || [];
+        mesasPorLocal = data.mesas_por_local || [];
+      }
+      
+      if (!localesList.includes(localName)) {
+        localesList.push(localName);
+        mesasPorLocal.push({ localName, mesas: [] });
+      }
+
+      // 2. Batch Update
+      const batch = writeBatch(db);
+      
+      // Update locales_votacion
+      batch.update(doc(db, 'locales_votacion', localId), {
+        seccional_id: secId,
+        status: 'asignado',
+        updatedAt: new Date().toISOString()
+      });
+      
+      // Update seccionales_metadata
+      batch.set(metaRef, {
+        locales: localesList,
+        mesas_por_local: mesasPorLocal,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
+      
+      await batch.commit();
+      
+      toast({ title: "Local Asignado", description: `Se asignó ${localName} a la Seccional ${secId}` });
+      fetchLocales(); // Refresh list
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Error", description: "No se pudo asignar el local", variant: "destructive" });
+    } finally {
+      setIsSubmitting(prev => ({ ...prev, [localId]: false }));
+    }
+  };
+
+  const seccionalesOptions = Array.from({length: 45}, (_, i) => String(i + 1));
+
+  return (
+    <Card className="border-primary/10 shadow-sm rounded-3xl overflow-hidden bg-white lg:col-span-3">
+      <CardHeader className="bg-primary/5 border-b py-4 flex flex-row items-center justify-between">
+        <CardTitle className="font-black uppercase text-xs flex items-center gap-2">
+          <MapPin className="h-4 w-4 text-primary" />
+          Gestión de Locales y Seccionales
+        </CardTitle>
+        <select 
+          className="text-xs font-bold border rounded-lg px-2 py-1 outline-none bg-white"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value as any)}
+        >
+          <option value="pending">Solo Pendientes</option>
+          <option value="asignado">Solo Asignados</option>
+          <option value="todos">Todos los Locales</option>
+        </select>
+      </CardHeader>
+      <CardContent className="pt-6">
+        <div className="space-y-3">
+          {isLoading ? <Loader2 className="animate-spin h-5 w-5 mx-auto opacity-20" /> : 
+           locales.length === 0 ? <p className="text-[10px] text-center text-muted-foreground uppercase py-4">No hay locales pendientes de asignación</p> :
+           locales.map(l => (
+            <div key={l.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 gap-4 hover:border-primary/30 transition-colors">
+              <div className="flex flex-col">
+                <span className="text-xs font-black uppercase text-slate-800">{l.nombre}</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase">{l.distrito} - {l.zona}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <select 
+                  className="w-[140px] font-bold h-9 text-xs rounded-xl border border-input bg-background px-3 py-1 outline-none focus:ring-2 focus:ring-primary/50"
+                  value={selectedSeccionales[l.id] || l.seccional_id || ''} 
+                  onChange={(e) => setSelectedSeccionales(prev => ({...prev, [l.id]: e.target.value}))}
+                >
+                  <option value="" disabled>Seccional...</option>
+                  {seccionalesOptions.map(s => <option key={s} value={s}>Seccional {s}</option>)}
+                </select>
+                <Button 
+                  size="sm" 
+                  className="h-9 rounded-xl font-black text-[10px] uppercase"
+                  disabled={isSubmitting[l.id] || (!selectedSeccionales[l.id] && !l.seccional_id)}
+                  onClick={() => handleAssign(l.id, l.nombre)}
+                >
+                  {isSubmitting[l.id] ? <Loader2 className="animate-spin h-3 w-3 mr-1" /> : null}
+                  {l.seccional_id ? "Reasignar" : "Asignar"}
+                </Button>
+              </div>
+            </div>
+           ))
+          }
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function ConfiguracionPage() {
   const { user } = useAuth();
   const db = useFirestore();
@@ -450,6 +593,8 @@ export default function ConfiguracionPage() {
         </Card>
 
         <RolePresetsManager />
+
+        <LocalesAssignmentManager />
 
         {/* NUEVA TARJETA DE MONITOREO Y CAPACIDAD */}
         <Card className="border-blue-200 bg-blue-50/30 shadow-sm rounded-3xl overflow-hidden lg:col-span-2">

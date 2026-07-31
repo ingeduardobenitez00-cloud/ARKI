@@ -63,7 +63,24 @@ export default function PublicRegistrationPage() {
                     setRegistrationLimit(data.public_registration_limit || 0);
                     setRegistrationCount(data.public_registration_count || 0);
                     
-                    // NOTA: El flyer NO se carga aquí para ahorrar lecturas de bots.
+                    // Cargar el flyer inmediatamente para que se vea en el portal público
+                    if (data.public_event_flyer_id && data.public_event_flyer_id !== 'NONE') {
+                        try {
+                            const flyerSnap = await getDoc(doc(db, FLYERS_COLLECTION, data.public_event_flyer_id));
+                            if (flyerSnap.exists()) {
+                                const fData = flyerSnap.data();
+                                if (fData.isChunked) {
+                                    const chunksSnap = await getDocs(query(collection(db, FLYERS_COLLECTION, data.public_event_flyer_id, 'chunks'), orderBy('__name__', 'asc')));
+                                    const fullBase64 = chunksSnap.docs.sort((a,b) => parseInt(a.id)-parseInt(b.id)).map(d => d.data().data).join('');
+                                    setFlyerUrl(base64ToBlobUrl(fullBase64));
+                                } else {
+                                    setFlyerUrl(fData.url?.startsWith('data:') ? base64ToBlobUrl(fData.url) : (fData.url || '/logo.png'));
+                                }
+                            }
+                        } catch (errFlyer) {
+                            console.warn("Error loading initial flyer asset", errFlyer);
+                        }
+                    }
                 }
             } catch (e) {
                 console.error("Error loading public settings");
@@ -72,7 +89,7 @@ export default function PublicRegistrationPage() {
             }
         };
         fetchSettings();
-    }, [db]);
+    }, [db, base64ToBlobUrl]);
 
     const handlePhoneMask = (val: string) => {
         const clean = val.replace(/\D/g, '').slice(0, 10);
@@ -116,30 +133,7 @@ export default function PublicRegistrationPage() {
                 setElectorData({ id: snap.id, ...padronData });
                 setTelefono(padronData.TELEFONO || '');
                 
-                // CARGA DIFERIDA DEL FLYER (OPTIMIZACIÓN)
-                // Solo llegamos aquí si es un usuario válido.
-                try {
-                    const settingsSnap = await getDoc(doc(db!, SETTINGS_COLLECTION, 'global'));
-                    if (settingsSnap.exists()) {
-                        const data = settingsSnap.data();
-                        if (data.public_event_flyer_id && data.public_event_flyer_id !== 'NONE') {
-                            const flyerSnap = await getDoc(doc(db!, FLYERS_COLLECTION, data.public_event_flyer_id));
-                            if (flyerSnap.exists()) {
-                                const fData = flyerSnap.data();
-                                if (fData.isChunked) {
-                                    const chunksSnap = await getDocs(query(collection(db!, FLYERS_COLLECTION, data.public_event_flyer_id, 'chunks'), orderBy('__name__', 'asc')));
-                                    const fullBase64 = chunksSnap.docs.sort((a,b) => parseInt(a.id)-parseInt(b.id)).map(d => d.data().data).join('');
-                                    setFlyerUrl(base64ToBlobUrl(fullBase64));
-                                } else {
-                                    // Soporta tanto nueva URL de Storage como base64 viejo
-                                    setFlyerUrl(fData.url?.startsWith('data:') ? base64ToBlobUrl(fData.url) : (fData.url || '/logo.png'));
-                                }
-                            }
-                        }
-                    }
-                } catch (errFlyer) {
-                    console.warn("Error loading flyer asset, using fallback", errFlyer);
-                }
+                // El flyer ya se cargó al inicio, así que no es necesario cargarlo de nuevo.
 
                 setStep('form');
             } else {
@@ -218,7 +212,7 @@ export default function PublicRegistrationPage() {
             <div className="relative z-10 w-full max-w-2xl space-y-8 mt-10">
                 <div className="text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="relative h-56 sm:h-80 w-full max-w-lg mx-auto drop-shadow-2xl">
-                        <Image src={flyerUrl} alt="Logo" fill className="object-contain" priority />
+                        <Image src={flyerUrl} alt="Logo" fill className="object-contain" priority unoptimized />
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center justify-center gap-2 text-primary">
