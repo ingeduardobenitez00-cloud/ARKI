@@ -1,0 +1,39 @@
+<div id="logo_eleccion">
+    <img class="logo-eleccion imagen-alto-contraste" src="{{path_imagenes.logo_eleccion_alto_contraste}}" />
+    <img class="logo-eleccion" src="{{path_imagenes.logo_eleccion}}" />
+</div>
+{{#if mostrar_ubicacion}}
+<div id="datos_ubicacion">
+    <div class="label" id="_txt_l_eleccion">Elección: <span id="_txt_pais"></span></div>
+    <div class="label" id="_txt_l_distrito">Departamento: <span id="_txt_distrito"></span></div>
+    <div class="label" id="_txt_l_departamento">Distrito: <span id="_txt_departamento"></span></div>
+    <div class="label" id="_txt_l_localidad">Zona: <span id="_txt_localidad" style="display: none;"></span></div>
+    <div class="label" id="_txt_l_localidad">Local: <span id="_txt_establecimiento"></span></div>
+</div>
+{{else}}
+<p id="datos_eleccion">
+    <b id="_txt_titulo"></b> <br>
+    <span id="_txt_fecha"></span><br>
+    <span id="_txt_entidad"></span><br>
+</p>
+{{/if}}
+{{#voto}}
+    <div id="contenedor_solapa"></div>
+{{/voto}}
+{{#escrutinio}}
+    <span id="_txt_escrutinio_mesa" class="titulo-escrutinio">
+    </span>
+{{/escrutinio}}
+{{#mesa}}
+    <span class="num-mesa" id="numero_mesa"></span>
+{{/mesa}}
+<div id="baterias"></div>
+
+<div id="logo_votar">
+    <img class="logo-votar imagen-alto-contraste" src="{{path_imagenes.logo_votar_blanco}}" />
+    <img class="logo-votar" src="{{path_imagenes.logo_votar}}" />
+</div>
+
+<div class="cinta-capacitacion">
+    <ul class="cinta"><span id="_txt_cinta_capacitacion"></span></ul>
+</div>

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+    <html lang="en-US" translate="no">
+    <head>
+        <meta name="google" content="notranslate" />
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Simulador — Simulador de la Boleta &Uacute;nica Electr&oacute;nica</title>
+        <link rel="manifest" href="manifest.json">
+        <link rel="icon" href="img/favicon.ico">
+        <link rel="stylesheet" href="css/iframe-sufragio.css">
+        <script src="js/scale-iframe.js"></script>
+    </head>
+    <body>
+        <div id="frame-wrap">
+        <iframe
+            id="p6-frame"
+            src="about:blank"
+            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-top-navigation-by-user-activation"
+            frameborder="0">
+        </iframe>
+        </div>
+        <script>
+        (function(){
+        var q = window.location.search || "";
+        var f = document.getElementById("p6-frame");
+        f.src = "app.html" + q;
+
+        f.addEventListener("load", function(){
+            try {
+            var doc = f.contentDocument || f.contentWindow.document;
+            if (!doc) return;
+
+            var base = doc.querySelector("base") || doc.createElement("base");
+            base.setAttribute("target","_top");
+            if (!base.parentNode && doc.head) doc.head.insertBefore(base, doc.head.firstChild);
+
+            doc.querySelectorAll("a[href]").forEach(function(a){
+                var href = a.getAttribute("href") || "";
+                if (href.indexOf("index.html") !== -1 || href.charAt(0) === "#") {
+                a.setAttribute("target","_top");
+                }
+            });
+
+            doc.addEventListener("click", function(ev){
+                var a = ev.target.closest && ev.target.closest("a[href]");
+                if (!a) return;
+                var href = a.getAttribute("href") || "";
+                if (href.indexOf("index.html") !== -1 || href.charAt(0) === "#") {
+                a.setAttribute("target","_top");
+                }
+            }, true);
+            } catch (e) {}
+        });
+        })();
+        </script>
+    </body>
+    </html>

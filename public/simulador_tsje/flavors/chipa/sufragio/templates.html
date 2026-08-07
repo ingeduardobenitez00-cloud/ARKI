@@ -1,0 +1,1248 @@
+<script id="tmpl_chipa/categoria" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato {{seleccionado}}" id="{{id_boton}}">
+    <div class="nombre-cargo">{{categoria.nombre}}</div>
+    <div class="lista">
+        <p class="palabra-lista">{{palabra_lista}}</p>
+        <p class="numero-lista">{{candidato.lista.numero}}</p>
+    </div>
+    <div class="foto-candidato">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+    <div class="foto-partido">
+        {{imagen_candidatura candidato.lista.imagenes.[0]}}
+    </div>
+    <div class="candidato-principal">{{candidato.nombre}}</div>
+    <div class="candidato-secundario"> {{{secundarios}}}</div>
+    <div class="nombre-partido">{{candidato.lista.nombre}}</div>
+</div>
+
+</script>
+<script id="tmpl_chipa/lista" type="text/x-handlebars-template" class="raw_template">
+<div id="{{id_boton}}" class="candidato candidato-lista-completa boton-lista {{#if normal}}cand-{{cantidad_candidatos}}{{else}}candidato-agrupa{{/if}} {{seleccionado}}">
+    {{#if lista.numero}}
+        <div class="lista">
+            <p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+            <p class="numero-lista">{{lista.numero}}</p>
+        </div>
+    {{/if}}
+    {{#if normal}}
+        <div class="nombre-partido">{{lista.nombre}}</div>
+        <div class="foto-partido">
+            {{imagen_candidatura lista.imagenes.[0]}}
+        </div>
+
+        {{#candidatos}}
+            <div class="foto-candidato {{#if es_blanco}}blanco{{/if}}">
+                {{imagen_candidatura imagenes.[0]}}
+            </div>
+        {{/candidatos}}
+
+        {{colores lista.color}}
+        <div class="lista-candidatos">
+            {{#candidatos}}
+            <div class="nombre-categoria">{{categoria.nombre}}:</div>
+            <div class="nombre-candidato">
+                {{#if es_blanco}}
+                    {{i18n "palabra_no_presenta_candidatos"}}
+                {{else}}
+                    {{nombre}}
+                    {{#if categoria.cargo_ejecutivo}}
+                        / {{secundarios}}
+                    {{/if}}
+                {{/if}}
+            </div>
+            {{/candidatos}}
+        </div>
+    {{else}}
+        <div class="foto-candidato">
+            {{#if lista.imagenes.[0]}}
+                {{imagen_candidatura lista.imagenes.[0]}}
+            {{/if}}
+        </div>
+        <div class="nombre-partido">{{lista.nombre}}</div>
+    {{/if}}
+</div>
+
+</script>
+<script id="tmpl_chipa/partido" type="text/x-handlebars-template" class="raw_template">
+<div id="{{id_boton}}" class="candidato candidato-lista-completa partido {{extra_classes}}">
+    <div class="foto-partido">
+        {{imagen_candidatura partido.imagenes.[0]}}
+    </div>
+    {{#imagenes_candidatos}}
+    <div class="foto-candidato">
+        {{imagen_candidatura . }}
+    </div>
+    {{/imagenes_candidatos}}
+    {{colores lista.color}}
+    <!--<div class="clear"></div>-->
+    <div class="nombre-partido">
+        {{partido.nombre}}
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/consulta_popular" type="text/x-handlebars-template" class="raw_template">
+<div id="{{id_boton}}" class="opcion-consulta candidato {{seleccionado}}">
+    <div class="nombre-candidato">
+        <div class="candidato-principal" style="color:{{candidato.lista.color.[0]}}">{{candidato.nombre}}</div>
+        <div class="candidato-secundario">{{{candidato.secundarios}}}</div>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/confirmacion" type="text/x-handlebars-template" class="raw_template">
+<div class="conf_cerrada">
+    <div class="conf_cerrada-nombre_partido">{{candidato.lista.nombre}}</div>
+    <div class="conf_cerrada-lista">
+        <p class="conf_cerrada-palabra_lista">{{i18n "palabra_lista"}}</p>
+        <p class="conf_cerrada-numero_lista">{{candidato.lista.numero}}</p>
+    </div>
+
+    <div class="conf_cerrada-foto_candidato">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+    <div class="conf_cerrada-datos_candidato">
+        <div class="conf_cerrada-candidato_principal">{{candidato.nombre}}</div>
+        <div class="conf_cerrada-candidato_secundario">{{candidato.secundarios.[0]}}</div>
+    </div>
+</div>
+
+
+</script>
+<script id="tmpl_chipa/confirmacion_tarjeta" type="text/x-handlebars-template" class="raw_template">
+<article
+    class="confirmacion_tarjeta candidato {{#if blanco}}blanco{{/if}} {{consulta_popular}} {{#if modificar}}modificable{{/if}}
+            {{#if candidato.habilitar_tachas}}tachas{{/if}}"
+    id="{{id_boton}}" 
+    {{#if mostrar_color}}
+        style="background-color: {{candidato.lista.color}};
+            color: {{candidato.lista.color_tipografia}};"
+    {{/if}}
+>
+    <header class="confirmacion_tarjeta-header">
+        <h3 class="confirmacion_tarjeta-header__titulo">
+            {{categoria.nombre}}
+        </h3>
+    </header>
+    <main class="confirmacion_tarjeta-main">
+        {{> componenteConfirmacion }}
+    </main>
+    {{#if modificar}}
+    <footer class="confirmacion_tarjeta-footer">
+        {{#if boton_confirmar_claro}}
+            <p class="confirmacion_tarjeta-footer__btn_claro btn-modificar-voto-js">{{i18n "modificar"}}</p>
+            {{else}}
+            <p class="confirmacion_tarjeta-footer__btn btn-modificar-voto-js">{{i18n "modificar"}}</p>
+        {{/if}}
+    </footer>
+    {{/if}}
+</article>
+
+</script>
+<script id="tmpl_chipa/confirmacion_candidato_blanco" type="text/x-handlebars-template" class="raw_template">
+<main class="confirmacion_blanco">
+    <div class="confirmacion_blanco-foto_candidato">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+    <div class="confirmacion_blanco-candidato_principal">{{candidato.nombre}}</div>
+</main>
+</script>
+<script id="tmpl_chipa/candidatos_adicionales" type="text/x-handlebars-template" class="raw_template">
+{{#candidatos}}
+    <span>
+        {{this}}{{#unless @last}};{{/unless}}
+    </span>
+{{/candidatos}}
+
+</script>
+<script id="tmpl_chipa/candidato_hijo" type="text/x-handlebars-template" class="raw_template">
+    <div class="candidato-secundario">
+      {{categoria.nombre}}: 
+      {{candidato.nombre}}{{#if candidato.secundarios}}; {{/if}}
+      {{{candidato.secundarios}}}
+    </div>
+
+</script>
+<script id="tmpl_chipa/colores" type="text/x-handlebars-template" class="raw_template">
+{{#if mostrar_color}}
+<div class="color-lista">
+  {{#each colores}}
+  <div class="color colores{{../num_colores}}" style="background:{{this}}"></div>
+  {{/each}}
+</div>
+{{/if}}
+
+</script>
+<script id="tmpl_chipa/solapa" type="text/x-handlebars-template" class="raw_template">
+{{#categoria}}
+<div class="categoria">
+    {{nombre}}
+</div>
+{{/categoria}}
+{{#candidatura}}
+<div class="foto-candidato">
+    {{imagen_candidatura imagenes.[0]}}
+</div>
+<div class="candidato-principal">
+    {{nombre}}
+</div>
+{{/candidatura}}
+
+</script>
+<script id="tmpl_chipa/boleta_header" type="text/x-handlebars-template" class="raw_template">
+<header class="header max{{candidato_maxn n_secciones}}">
+    <div class="titulos {{#if previsualizacion}}ms-0 align-center justify-center{{/if}}">
+        <div id="logo">
+            <svg height="87" xmlns="http://www.w3.org/2000/svg"
+                 xmlns:xlink="http://www.w3.org/1999/xlink">
+                <image height="87" href="{{logo}}" xlink:href="{{logo}}" />
+            </svg>
+        </div>
+        <div class="texto">
+            <p class="titulo">{{titulo}}</p>
+            <p class="subtitulo">{{subtitulo}}</p>
+        </div>
+    </div>
+    {{!-- La ubicación es posible que no se requiera mostrar en algunas elecciones --}}
+    {{#if ubicacion}}
+    <div class="ubicacion">
+        <p class="texto">{{ubicacion}}</p>
+    </div>
+    {{/if}}
+</header>
+</script>
+<script id="tmpl_chipa/boleta_verificador" type="text/x-handlebars-template" class="raw_template">
+<div class="verificador max{{candidato_maxn n_secciones}}">
+    <div class="verificador-texto">
+        <p>Verifique</p>
+        <p>su voto</p>
+    </div>
+    <div id="verificador">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="10 0 150 200" width="150" height="200">
+            <defs>
+                <path id="icono" d="M72.948 116.022c-3.576-4.158-6.402-8.358-8.772-13.032-5.568-10.962-7.788-23.166-6.426-35.37 1.248-11.172 5.466-21.738 12.354-30.93 1.206-1.614 3.624-4.5 3.762-4.5.078 0 8.382 7.482 8.388 7.554.006.024-.192.27-.432.54-1.77 1.956-4.068 5.082-5.574 7.566-3.894 6.432-6.3 13.392-7.152 20.7-.27 2.304-.306 2.976-.306 6.06 0 2.988.03 3.672.27 5.802.828 7.302 3.24 14.364 7.098 20.778a55.467 55.467 0 0 0 5.262 7.266c.33.384.594.72.588.75-.012.024-1.056.966-2.328 2.1l-4.206 3.75-1.902 1.698-.624-.732zm99.03-3.012c-2.322-2.07-4.218-3.78-4.218-3.798 0-.024.234-.312.516-.636 9.738-11.232 14.208-25.836 12.378-40.416-1.272-10.158-5.658-19.854-12.558-27.75-.318-.36-.576-.678-.576-.696s1.062-.99 2.358-2.16c1.29-1.17 3.18-2.874 4.194-3.786l1.842-1.668.672.768c8.64 9.828 14.088 22.116 15.474 34.902.42 3.9.474 8.292.144 12.15-.882 10.476-4.428 20.592-10.314 29.46-1.638 2.466-3.726 5.19-5.442 7.098l-.258.288-4.212-3.756zM151.65 92.538c-2.67-1.728-4.896-3.162-4.938-3.192-.06-.036.042-.252.426-.9a27.05 27.05 0 0 0 3.366-9.126c.456-2.658.516-5.61.18-8.25-.492-3.864-1.92-7.836-3.96-11.016-.15-.234-.246-.45-.216-.468s2.232-1.476 4.896-3.24c4.056-2.676 4.86-3.186 4.92-3.12.042.048.282.408.528.804 6.84 10.968 7.74 24.798 2.376 36.69-.654 1.458-1.866 3.696-2.532 4.686l-.186.276-4.86-3.144zm-58.704 2.664c-1.35-2.196-2.316-4.134-3.216-6.432-2.418-6.174-3.198-12.906-2.274-19.59a38.335 38.335 0 0 1 3.81-12.186c.984-1.944 2.16-3.888 2.292-3.786.06.048 5.022 3.318 8.64 5.694l1.122.738-.258.402c-1.062 1.662-2.124 3.888-2.766 5.802-.624 1.848-1.026 3.69-1.278 5.766-.15 1.284-.15 4.728 0 5.97.498 4.092 1.728 7.752 3.69 10.998l.426.708-.432.276c-.24.15-2.442 1.572-4.896 3.156-2.46 1.578-4.5 2.886-4.53 2.898-.036.012-.186-.174-.33-.414zM23.7 74.424c0-8.4.024-15.264.048-15.252.096.036 16.212 15.228 16.212 15.276 0 .066-16.134 15.252-16.206 15.252-.03 0-.054-6.198-.054-15.276zm100.23 11.754c-1.716-.204-2.706-.474-4.032-1.098-3.6-1.704-6.06-5.136-6.558-9.12-.09-.744-.072-2.178.036-2.946a11.634 11.634 0 0 1 9.918-9.918c.846-.12 2.358-.12 3.18-.006 3.354.48 6.264 2.334 8.148 5.196.426.654 1.014 1.842 1.236 2.514.828 2.46.846 5.04.042 7.44-1.59 4.782-6.126 8.04-11.112 7.974a13.415 13.415 0 0 1-.858-.036z"/>
+                <clipPath id="clip-flecha">
+                <rect x="10" y="0" width="40" height="200"/>
+                </clipPath>
+                <clipPath id="clip-ondas">
+                <rect x="50" y="0" width="150" height="200"/>
+                </clipPath>
+            </defs>
+            <use href="#icono" fill="currentColor" clip-path="url(#clip-flecha)"/>
+            <use href="#icono" fill="currentColor" clip-path="url(#clip-ondas)" transform="rotate(90,115,70)"/>
+        </svg>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/boleta_watermark" type="text/x-handlebars-template" class="raw_template">
+<div class="watermark">
+    <svg version="1.1"
+         baseProfile="full"
+         width="2300" height="832"
+         xmlns="http://www.w3.org/2000/svg"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         style="font-family: 'Nimbus Sans L', Arial, Helvetica, 'Liberation Sans', sans-serif">
+        {{dibujar_watermark watermark}}
+    </svg>
+</div>
+
+</script>
+<script id="tmpl_chipa/boleta_troquel" type="text/x-handlebars-template" class="raw_template">
+<div class="troquel">
+    <svg version="1.1"
+         baseProfile="full"
+         width="2300" height="832"
+         xmlns="http://www.w3.org/2000/svg"
+         xmlns:xlink="http://www.w3.org/1999/xlink"
+         style="font-family: 'Nimbus Sans L', Arial, Helvetica, 'Liberation Sans', sans-serif">
+        {{dibujar_troquel troquel sub_troquel}}
+    </svg>
+</div>
+
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_voto_blanco" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="candidato_lista_sin_imagen-candidatos justify-center">
+                <div class="principales m-auto">
+                    <div class="candidato_lista_sin_imagen-voto_blanco">VOTO EN BLANCO</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_con_preferencias" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="sin_imagen-lista_preferencia">
+                <div class="sin_imagen-datos_lista sin_imagen-lista m-auto">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista {{ajustar_tamano numero_lista.numero}}">
+                        {{numero_lista.numero}}</p>
+                </div>
+                <p class="preferente_candidato-nro_orden">
+                    <span class="preferente_candidato-nro_orden__opcion">Opci&oacute;n</span><br>
+                    <span class="preferente_candidato-nro_orden__orden">{{nombre_candidato.nro_orden}}</span>
+                </p>
+            </div>
+            <div class="candidato_lista_sin_imagen-candidatos">
+                <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+                <div class="principales">
+                    {{#if nombre_candidato.titulo}}
+                    <p class="principales_titulo fw-normal">{{nombre_candidato.titulo}}</p>
+                    {{/if}}
+                    {{recorrer_nombre_candidatos_principales_preferencia nombre_candidato.texto}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_sin_preferencias" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="sin_imagen-lista_sin_preferencia">
+                <div class="sin_imagen-datos_lista sin_imagen-lista justify-center">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista {{ajustar_tamano numero_lista.numero}}">
+                        {{numero_lista.numero}}</p>
+                </div>
+            </div>
+            <div class="candidato_lista_sin_imagen-candidatos">
+                <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+                <div class="principales">
+                    {{#if nombre_candidato.titulo}}
+                    <p class="principales_titulo fw-normal">{{nombre_candidato.titulo}}</p>
+                    {{/if}}
+                    {{recorrer_nombre_candidatos_principales nombre_candidato.texto}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_con_secundarios" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="sin_imagen-lista_preferencia">
+                <div class="sin_imagen-datos_lista sin_imagen-lista m-auto">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista {{ajustar_tamano numero_lista.numero}}">
+                        {{numero_lista.numero}}</p>
+                </div>
+                <p class="preferente_candidato-nro_orden">
+                </p>
+            </div>
+            <div class="candidato_lista_sin_imagen-candidatos">
+                <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+                <div class="candidatos">
+                    <div class="principales">
+                        {{#if nombre_candidato.titulo}}
+                        <p class="principales_titulo fw-normal">{{nombre_candidato.titulo}}</p>
+                        {{/if}}
+                        {{recorrer_nombre_candidatos_principales_preferencia nombre_candidato.texto}}
+                    </div>
+                    {{#if secundarios}}
+                    <div class="secundarios">
+                        {{recorrer_nombre_candidatos_secundarios secundarios}}
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_con_suplentes" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}} py-5">
+            {{#if nombre_candidato}}
+            <div class="candidato_lista_sin_imagen-candidatos w-100 p-0">
+                {{#if numero_lista.numero}}
+                <div class="sin_imagen-datos_lista sin_imagen-lista flex-row align-center h-auto">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista fs-normal ms-1">
+                        {{numero_lista.numero}}</p>
+                </div>
+                {{/if}}
+                <div class="sin_imagen-nombre_lista w-100 mb-1">{{nombre_lista}}</div>
+                <div class="candidatos-container">
+                    <div class="principales">
+                        {{#if nombre_candidato.titulo}}
+                        <p class="principales_titulo fw-normal">{{nombre_candidato.titulo}}</p>
+                        {{/if}}
+                        {{recorrer_nombre_candidatos_principales nombre_candidato.texto}}
+                    </div>
+                    {{#if suplentes}}
+                    <div class="suplentes">
+                        <p class="suplentes_titulo fw-normal">Suplentes</p>
+                        <div class="suplentes_nombres">
+                            {{recorrer_nombre_candidatos_suplentes suplentes}}
+                        </div>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+        </div>
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_presidente_vice" type="text/x-handlebars-template" class="raw_template">
+<div id="boleta_tarjeta_presidente_vice" class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="sin_imagen-lista_sin_preferencia">
+                <div class="sin_imagen-datos_lista sin_imagen-lista justify-center">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista {{ajustar_tamano numero_lista.numero}}">
+                        {{numero_lista.numero}}</p>
+                </div>
+            </div>
+            <div class="candidato_lista_sin_imagen-candidatos">
+                <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+                <div class="principales">
+                    <div class="candidato_lista_sin_imagen-candidato_principal">Pdte.: {{nombre_candidato.texto.[0]}}</div>
+                    <div class="candidato_lista_sin_imagen-candidato_principal">Vice.{{#if secundarios.[1]}} 1º{{/if}}: {{secundarios.[0]}}</div>
+                    {{#if secundarios.[1]}}<div class="candidato_lista_sin_imagen-candidato_principal">Vice. 2º: {{secundarios.[1]}}</div>{{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_presidente" type="text/x-handlebars-template" class="raw_template">
+<div id="boleta_tarjeta_presidente" class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}}">
+            <div class="sin_imagen-lista_sin_preferencia">
+                <div class="sin_imagen-datos_lista sin_imagen-lista justify-center">
+                    <p class="sin_imagen-palabra_lista">Lista</p>
+                    <p class="sin_imagen-numero_lista {{ajustar_tamano numero_lista.numero}}">
+                        {{numero_lista.numero}}</p>
+                </div>
+            </div>
+            <div class="candidato_lista_sin_imagen-candidatos">
+                <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+                <div class="principales">
+                    <div class="candidato_lista_sin_imagen-candidato_principal">Pdte.: {{nombre_candidato.texto.[0]}}</div>
+                    {{#if secundarios.[0]}}<div class="candidato_lista_sin_imagen-candidato_principal">Vice.: {{secundarios.[0]}}</div>{{/if}}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+</script>
+<script id="tmpl_chipa/boleta_tarjeta_con_secundarios_y_suplentes" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato
+            max{{candidato_maxn n_secciones}}
+            {{#if (agrandar_seccion index n_columnas n_filas n_secciones)}}size_x2{{/if}}
+            {{#if troquel}}con-troquel{{/if}}">
+    <div class="candidato_lista_sin_imagen">
+        <h3 class="sin_imagen-nombre_cargo">{{titulo}}</h3>
+        <div class="datos-candidato max{{candidato_maxn n_secciones}} py-5">
+            {{#if nombre_candidato}}
+            <div class="candidato_lista_sin_imagen-candidatos w-100 p-0">
+                {{#if muestra_lista_en_primer_cargo}}
+                    {{#if (es_primer_cargo index)}}
+                    <div class="sin_imagen-nombre_lista mb-1">{{nombre_lista}}</div>
+                    {{/if}}
+                {{else}}
+                <div class="sin_imagen-nombre_lista mb-1">{{nombre_lista}}</div>
+                {{/if}}
+                <div class="candidatos-container">
+                    <div class="principales">
+                        {{#if nombre_candidato.titulo}}
+                        <p class="principales_titulo fw-normal">{{nombre_candidato.titulo}}</p>
+                        {{/if}}
+                        {{recorrer_nombre_candidatos_principales nombre_candidato.texto}}
+                    </div>
+                    {{#if secundarios}}
+                    <div class="secundarios">
+                        {{recorrer_nombre_candidatos_secundarios secundarios}}
+                    </div>
+                    {{/if}}
+                    {{#if suplentes}}
+                    <div class="suplentes">
+                        <p class="suplentes_titulo">Suplentes: </p>
+                        <div class="suplentes_nombres">
+                            {{recorrer_nombre_candidatos_suplentes suplentes}}
+                        </div>
+                    </div>
+                    {{/if}}
+                </div>
+            </div>
+            {{/if}}
+        </div>
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/candidato" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato candidato-persona {{extra_classes}}" id="{{id_boton}}" style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}}; border-color: {{{mod_color -0.5 candidato.lista.color}}};">
+    <div class="nombre-candidato" >
+        {{#if nombre_lista}}
+            <div class="lista">
+                <p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+                <p class="numero-lista">{{candidato.lista.numero}}</p>
+            </div>
+            <div class="nombre-lista">{{nombre_lista}}</div>
+            <div class="nombre-corto-lista">{{candidato.lista.nombre_corto}}</div>
+        {{/if}}
+        {{#if_mostrar_data_candidato candidato}}
+            <div class="candidato-principal">{{candidato.nombre}}</div>
+        {{/if_mostrar_data_candidato}}
+        {{#if candidato.cargo_ejecutivo}}
+            <div class="candidato-secundario">{{{secundarios}}}</div>
+        {{/if}}
+        {{#if candidato.mostrar_nombre_primer_candidato}}
+            <div class="candidato-principal">{{candidato.nombre}}</div>
+        {{/if}}
+        {{&extra_html}}
+    </div>
+</div>
+
+</script>
+<script id="tmpl_chipa/candidato_blanco" type="text/x-handlebars-template" class="raw_template">
+<article id="{{id_boton}}" class="candidato_blanco candidato candidato-persona {{extra_classes}}"
+	style="border-color: #808080;">
+	<h3 class="candidato_blanco-titulo">{{candidato.nombre}}</h3>
+	{{&extra_html}}
+</article>
+
+</script>
+<script id="tmpl_chipa/candidato_con_secundarios" type="text/x-handlebars-template" class="raw_template">
+<article class="candidato_con_secundarios candidato candidato-persona {{extra_classes}}" id="{{id_boton}}"
+	style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}}; border-color: {{{mod_color -0.5 candidato.lista.color}}};">
+	<h3 class="candidato_con_secundarios-nombre_lista">{{nombre_lista}}</h3>
+	<div class="candidato_con_secundarios-contenedor_imagenes">
+		{{#if es_pvm}}
+		<div class="candidato_con_secundarios-foto_candidato">
+			{{imagen_candidatura candidato.lista.imagenes.[0]}}
+		</div>
+		{{else if es_pvp}}
+			<div class="candidato_con_secundarios-foto_candidato">
+				{{imagen_candidatura candidato.imagenes.[0]}}
+			</div>
+			{{#if candidato.imagenes.[1]}}
+				<div class="candidato_con_secundarios-foto_candidato">
+					{{imagen_candidatura candidato.imagenes.[1]}}
+				</div>
+			{{/if}}
+			{{#if candidato.imagenes.[1]}}
+			<div class="candidato_con_secundarios-foto_candidato">
+				{{imagen_candidatura candidato.imagenes.[2]}}
+			</div>
+			{{/if}}
+		{{/if}}
+	</div>
+	<div class="candidato_con_secundarios-cargos">
+		{{#each candidato.lista.datos_extra.cargos}}
+			{{#if this.candidato}}
+				<li>
+					<p class="candidato_con_secundarios-cargos__nombre">{{this.nombre}}:</p>
+					<p class="candidato_con_secundarios-cargos__candidato">{{this.candidato}}</p>
+					</p>
+				</li>
+			{{/if}}
+		{{/each}}
+	</div>
+	<div class="candidato_con_secundarios-lista">
+		<p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+		<p class="numero-lista">{{candidato.lista.numero}}</p>
+		<div class="nombre-corto-lista">{{candidato.lista.nombre_corto}}</div>
+	</div>
+</article>
+
+</script>
+<script id="tmpl_chipa/candidato_lista_con_imagen" type="text/x-handlebars-template" class="raw_template">
+<article class="candidato_lista_con_imagen candidato candidato-persona {{extra_classes}}" id="{{id_boton}}"
+	{{#if mostrar_color}}
+		style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}}; border-color: {{{mod_color -0.5 candidato.lista.color}}};"
+	{{/if}}>
+	<h3 class="candidato_lista_con_imagen-nombre_lista">{{nombre_lista}}</h3>
+	<div class="candidato_lista_con_imagen-foto_candidato">
+		{{imagen_candidatura candidato.imagenes.[0]}}
+	</div>
+	<div class="candidato_lista_con_imagen-lista">
+		<p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+		<p class="numero-lista">{{candidato.lista.numero}}</p>
+		<div class="nombre-corto-lista">{{candidato.lista.nombre_corto}}</div>
+	</div>
+	<div class="candidato_lista_con_imagen-candidato_principal">{{candidato.nombre}}</div>
+	{{#unless candidato.cargo_ejecutivo}}
+		<div class="candidato_lista_con_imagen-candidato_principal_orden">Opción</br>{{candidato.nro_orden}}</div>
+	{{/unless}}
+</article>
+
+</script>
+<script id="tmpl_chipa/candidato_pre_vice_con_imagen" type="text/x-handlebars-template" class="raw_template">
+<article class="candidato_pre_vice_con_imagen candidato candidato-persona {{extra_classes}}" id="{{id_boton}}"
+	style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}}; border-color: {{{mod_color -0.5 candidato.lista.color}}};">
+	<h3 class="candidato_pre_vice_con_imagen-nombre_lista">{{nombre_lista}}</h3>
+	<div class="candidato_pre_vice_con_imagen-contenedor_imagenes">
+		{{#each candidato.imagenes}}
+			<div class="candidato_pre_vice_con_imagen-foto_candidato">
+				{{imagen_candidatura this}}
+			</div>	
+		{{/each}}
+	</div>
+	<div class="candidato_pre_vice_con_imagen-lista">
+		<p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+		<p class="numero-lista">{{candidato.lista.numero}}</p>
+		<div class="nombre-corto-lista">{{candidato.lista.nombre_corto}}</div>
+	</div>
+	<div class="candidato_pre_vice_con_imagen-cargos">
+		{{#each candidato.lista.datos_extra.cargos}}
+		<li>
+			<p class="candidato_pre_vice_con_imagen-cargos__nombre">{{this.nombre}}:</p>
+			<p class="candidato_pre_vice_con_imagen-cargos__candidato">{{this.candidato}}</p>
+			</p>
+		</li>
+		{{/each}}
+	</div>
+	
+</article>
+
+</script>
+<script id="tmpl_chipa/candidato_lista_sin_imagen" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato_lista_sin_imagen candidato candidato-persona {{extra_classes}}" id="{{id_boton}}" 
+    {{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}}; border-color: {{{mod_color -0.5 candidato.lista.color}}};"{{/if}}
+    >
+    <main class="sin_imagen-datos_lista">
+        <div class="sin_imagen-lista">
+            <p class="sin_imagen-palabra_lista">{{i18n "palabra_lista"}}</p>
+            <p class="sin_imagen-numero_lista">{{candidato.lista.numero}}</p>
+        </div>
+        <div class="sin_imagen-nombre_lista">{{nombre_lista}}</div>
+        <div class="sin_imagen-nombre_corto_lista">{{candidato.lista.nombre_corto}}</div>
+        {{&extra_html}}
+    </main>
+</div>
+
+</script>
+<script id="tmpl_chipa/candidato_verificacion_blanco" type="text/x-handlebars-template" class="raw_template">
+<div class=" candidato cant-{{cant_cargos}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} " id="{{id_boton}}"
+    {{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+    >
+    <div class="nombre-cargo">{{categoria.nombre}}</div>
+    <div class="datos-cargo-blanco">
+        <div class="nombre-blanco">{{candidato.nombre}}</div>
+        <div class="foto-blanco">
+            {{imagen_candidatura candidato.imagenes.[0]}}
+        </div>
+    </div>
+
+</div>
+</script>
+<script id="tmpl_chipa/candidato_verificacion_foto_izquierda" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato foto-izquierda cant-{{cant_cargos}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} " id="{{id_boton}}"
+    {{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+    >
+    <div class="nombre-cargo">{{categoria.nombre}}</div>
+    <div class="datos-cargo" style="{{#if blanco}}display:block;{{/if}}">
+        <div class="foto-candidato-principal">
+            {{imagen_candidatura candidato.imagenes.[0]}}
+        </div>
+        <div id="datos-texto">
+            <p class="nombre-lista">{{candidato.lista.nombre}}</p>
+            <p class="numero-lista">{{i18n "palabra_lista"}} {{candidato.lista.numero}}</p>
+            <div class="candidato-principal-int">{{candidato.nombre}}</div>
+            {{#if candidato.cargo_ejecutivo}}
+                <div class="candidato-secundario-int-menor">{{candidato.secundarios.[0]}}</div>
+                <div class="nro-orden"></div>
+            {{else}}
+                <div class="nro-orden">{{i18n "palabra_orden"}} {{candidato.nro_orden}}</div>
+            {{/if}}            
+        </div>
+    </div>
+
+</div>
+</script>
+<script id="tmpl_chipa/candidato_verificacion_con_secundarios" type="text/x-handlebars-template" class="raw_template">
+<div class=" candidato cant-{{cant_cargos}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} " id="{{id_boton}}"
+    {{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+    >
+    <div class="nombre-cargo">{{categoria.nombre}}</div>
+    <div class="datos-cargo" style="{{#if blanco}}display:block;{{/if}}">
+        
+        <div id="datos-texto">
+                <p class="nombre-lista">{{candidato.lista.nombre}}</p>
+                <p class="numero-lista">{{i18n "palabra_lista"}} {{candidato.lista.numero}}</p>
+        </div>
+        {{#if cat_cerrada_abierta}}
+            <div class="foto-candidato-principal">
+                {{imagen_candidatura candidato.lista.imagenes.[0]}}
+            </div>
+        {{else}}
+            <div class="fotos-terna">
+                <div class="foto-candidato-terna">
+                    {{imagen_candidatura candidato.imagenes.[1]}}
+                </div>
+
+                <div class="foto-candidato-terna">
+                    {{imagen_candidatura candidato.imagenes.[0]}}
+                </div>
+                
+                <div class="foto-candidato-terna">
+                    {{imagen_candidatura candidato.imagenes.[2]}}
+                </div>
+            </div>
+        {{/if}}    
+        <div id="datos-texto">
+        {{#if candidato.cargo_ejecutivo}}
+            <div class="candidatos-terna">
+                <div class="candidato-terna"><span class="key-pdte">Presidente :</span> {{presidente}}</div>
+                <div class="candidato-terna"><span class="key-pdte">Vice Pdte. 1°:</span> {{vice_1}}</div>
+                <div class="candidato-terna"><span class="key-pdte">Vice Pdte. 2°:</span> {{vice_2}}</div>
+            </div>
+            <div class="nro-orden"></div>
+        {{else}}
+            <div class="candidatos-terna">
+                <div class="candidato-terna"><span class="key-pdte">Presidente : </span>{{presidente}}</div>
+                <div class="candidato-terna"><span class="key-pdte">{{i18n "palabra_orden"}} {{candidato.nro_orden}} - </span>{{candidato.nombre}}</div>
+            </div>
+        {{/if}}
+        </div>
+    </div>
+
+</div>
+
+</script>
+<script id="tmpl_chipa/candidato_verificacion_con_secundarios_foto_izquierda" type="text/x-handlebars-template" class="raw_template">
+<div class=" candidato foto-izquierda cant-{{cant_cargos}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} " id="{{id_boton}}"
+    {{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+    >
+    <div class="nombre-cargo">{{categoria.nombre}}</div>
+    <div class="datos-cargo" style="{{#if blanco}}display:block;{{/if}}">
+
+        {{#if cat_cerrada_abierta}}
+        <div class="foto-lista">
+            {{imagen_candidatura candidato.lista.imagenes.[0]}}
+        </div>
+        {{else}}
+        <div class="fotos-terna">
+            <div class="foto-candidato-terna">
+                {{imagen_candidatura candidato.imagenes.[1]}}
+            </div>
+
+            <div class="foto-candidato-terna">
+                {{imagen_candidatura candidato.imagenes.[0]}}
+            </div>
+            
+            <div class="foto-candidato-terna">
+                {{imagen_candidatura candidato.imagenes.[2]}}
+            </div>
+        </div>
+        {{/if}}    
+        
+        <div id="datos-texto">
+            <p class="nombre-lista">{{candidato.lista.nombre}}</p>
+            <p class="numero-lista">{{i18n "palabra_lista"}} {{candidato.lista.numero}}</p>
+            
+            {{#if candidato.cargo_ejecutivo}}
+            <div class="candidatos-terna">
+                <div class="candidato-terna"><span class="key-pdte">Presidente :</span> {{presidente}}</div>
+                <div class="candidato-terna"><span class="key-pdte">Vice Pdte. 1°:</span> {{vice_1}}</div>
+                <div class="candidato-terna"><span class="key-pdte">Vice Pdte. 2°:</span> {{vice_2}}</div>
+            </div>
+            
+            {{else}}
+            <div class="candidatos-terna">
+                <div class="candidato-terna"><span class="key-pdte">Presidente : </span>{{presidente}}</div>
+                <div class="candidato-terna"><span class="key-pdte">{{i18n "palabra_orden"}} {{candidato.nro_orden}} - </span>{{candidato.nombre}}</div>
+            </div>
+            {{/if}}
+        </div>        
+    </div>
+
+</div>
+
+</script>
+<script id="tmpl_chipa/confirmacion_con_secundarios" type="text/x-handlebars-template" class="raw_template">
+<div class="confirmacion_con_secundarios">
+	<div class="confirmacion_con_secundarios-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="confirmacion_con_secundarios-lista">
+		<p class="confirmacion_con_secundarios-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="confirmacion_con_secundarios-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="confirmacion_con_secundarios-contenedor_imagenes">
+		<div class="confirmacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[1]}}
+		</div>
+
+		<div class="confirmacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[0]}}
+		</div>
+
+		<div class="confirmacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[2]}}
+		</div>
+	</div>
+
+	<div class="confirmacion_con_secundarios-cargos">
+		<li>
+			<span class="confirmacion_con_secundarios-cargos__nombre">Pdte:</span>
+			<span class="confirmacion_con_secundarios-cargos__candidato">{{candidato.nombre}}</span>
+		</li>
+		<li>
+			<span class="confirmacion_con_secundarios-cargos__nombre">Vice. Pdte. 1°:</span>
+			<span class="confirmacion_con_secundarios-cargos__candidato">{{vice1}}</span>
+		</li>
+		<li>
+			<span class="confirmacion_con_secundarios-cargos__nombre">Vice. Pdte. 2°:</span>
+			<span class="confirmacion_con_secundarios-cargos__candidato">{{vice2}}</span>
+		</li>
+	</div>
+</div>
+
+</script>
+<script id="tmpl_chipa/confirmacion_pre_vice" type="text/x-handlebars-template" class="raw_template">
+<div class="confirmacion_pre_vice">
+	<div class="confirmacion_pre_vice-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="confirmacion_pre_vice-lista">
+		<p class="confirmacion_pre_vice-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="confirmacion_pre_vice-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="confirmacion_pre_vice-contenedor_imagenes">
+		<div class="confirmacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[0]}}
+		</div>
+
+		<div class="confirmacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[1]}}
+		</div>
+
+		{{#if nombre_cargo_vicepresidente2}}
+		<div class="confirmacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[2]}}
+		</div>
+		{{/if}}
+	</div>
+
+	<div class="confirmacion_pre_vice-cargos">
+		<li>
+			<span class="confirmacion_pre_vice-cargos__nombre">{{nombre_cargo_presidente}}:</span>
+			<span class="confirmacion_pre_vice-cargos__candidato">{{candidato.nombre}}</span>
+		</li>
+		<li>
+			<span class="confirmacion_pre_vice-cargos__nombre">{{nombre_cargo_vicepresidente}}:</span>
+			<span class="confirmacion_pre_vice-cargos__candidato">{{vice1}}</span>
+		</li>
+		{{#if nombre_cargo_vicepresidente2}}
+		<li>
+			<span class="confirmacion_pre_vice-cargos__nombre">{{nombre_cargo_vicepresidente2}}:</span>
+			<span class="confirmacion_pre_vice-cargos__candidato">{{vice2}}</span>
+		</li>
+		{{/if}}
+	</div>
+</div>
+
+</script>
+<script id="tmpl_chipa/confirmacion_con_secundarios_y_preferentes" type="text/x-handlebars-template" class="raw_template">
+<div class="confirmacion_con_secundarios_y_preferentes">
+	<div class="confirmacion_con_secundarios_y_preferentes-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="confirmacion_con_secundarios_y_preferentes-lista">
+		<p class="confirmacion_con_secundarios_y_preferentes-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="confirmacion_con_secundarios_y_preferentes-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="confirmacion_con_secundarios_y_preferentes-contenedor_imagen">
+		{{imagen_candidatura candidato.lista.imagenes.[0]}}
+	</div>
+
+	<ol class="confirmacion_con_secundarios_y_preferentes-cargos">
+		<li>
+			<span class="confirmacion_con_secundarios_y_preferentes-cargos__nombre">Pdte:</span>
+			<span
+				class="confirmacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.presidente}}</span>
+		</li>
+		<li>
+			<span class="confirmacion_con_secundarios_y_preferentes-cargos__nombre">Vice. Pdte. 1°:</span>
+			<span
+				class="confirmacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.vice_1}}</span>
+		</li>
+		<li>
+			<span class="confirmacion_con_secundarios_y_preferentes-cargos__nombre">Vice. Pdte. 2°:</span>
+			<span
+				class="confirmacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.vice_2}}</span>
+		</li>
+	</ol>
+	<ol class="confirmacion_con_secundarios_y_preferentes-preferentes">
+		{{#each candidatos_confirmacion}}
+		{{#if_preferencia this.id_candidatura ../candidato.cod_categoria}}
+		<li>
+			<span class="confirmacion_con_secundarios_y_preferentes-preferentes__orden">Opción {{this.nro_orden}}: </span>
+			<span class="confirmacion_con_secundarios_y_preferentes-preferentes__nombre">{{this.nombre}}</span>
+		</li>
+		{{/if_preferencia}}
+		{{/each}}
+	</ol>
+</div>
+
+</script>
+<script id="tmpl_chipa/confirmacion_con_preferentes" type="text/x-handlebars-template" class="raw_template">
+<main class="conf_candidato_preferente">
+	<div class="conf_candidato_preferente-nombre_partido">{{candidato.lista.nombre}}</div>
+	<div class="conf_candidato_preferente-lista">
+		<p class="conf_candidato_preferente-palabra-lista">{{i18n "palabra_lista"}}</p>
+		<p class="conf_candidato_preferente-numero_lista">{{candidato.lista.numero}}</p>
+	</div>
+	{{#each candidatos_confirmacion}}
+	{{#if_preferencia this.id_umv ../candidato.cod_categoria}}
+
+	<div class="conf_candidato_preferente-contenedor_imagen">
+		{{imagen_candidatura this.imagenes.[0]}}
+	</div>
+	<div class="conf_candidato_preferente-datos_candidato">
+		<p class="conf_candidato_preferente-nombre_candidato">{{this.nombre}}</p>
+		<p class="conf_candidato_preferente-nro_orden">Opción {{this.nro_orden}}</p>
+	</div>
+	{{/if_preferencia}}
+	{{/each}}
+</main>
+
+</script>
+<script id="tmpl_chipa/verificacion_tarjeta" type="text/x-handlebars-template" class="raw_template">
+<article
+    class="candidato cant-{{cant_cargos}} verificacion_tarjeta candidato {{#if blanco}}blanco{{/if}} {{consulta_popular}} {{#if modificar}}modificable{{/if}}
+            {{#if candidato.habilitar_tachas}}tachas{{/if}}"
+            {{#if mostrar_color}}style="background-color: {{candidato.lista.color}};
+            color: {{candidato.lista.color_tipografia}};"
+            {{/if}}
+    >
+    <header class="verificacion_tarjeta-header">
+        <h3 class="verificacion_tarjeta-header__titulo">
+            {{categoria.nombre}}
+        </h3>
+    </header>
+    <main class="verificacion_tarjeta-main">
+        {{> componenteVerificacion }}
+    </main>
+</article>
+
+</script>
+<script id="tmpl_chipa/verificacion_con_secundarios" type="text/x-handlebars-template" class="raw_template">
+<div class= "candidato cant-{{cant_cargos}} verificacion_con_secundarios {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} "
+	{{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+	>
+	<div class="verificacion_con_secundarios-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="verificacion_con_secundarios-lista">
+		<p class="verificacion_con_secundarios-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="verificacion_con_secundarios-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="verificacion_con_secundarios-contenedor_imagenes">
+		<div class="verificacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[1]}}
+		</div>
+
+		<div class="verificacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[0]}}
+		</div>
+
+		<div class="verificacion_con_secundarios-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[2]}}
+		</div>
+	</div>
+
+	<div class="verificacion_con_secundarios-cargos">
+		{{#each candidato.lista.datos_extra.cargos}}
+		<li>
+			{{#ifCond this.nombre '==' 'Presidente'}}
+			<p class="candidato_con_secundarios-cargos__nombre">Pdte:</p>
+			{{/ifCond}}
+			{{#ifCond this.nombre '!=' 'Presidente'}}
+			<p class="candidato_con_secundarios-cargos__nombre">{{this.nombre}}:</p>
+			{{/ifCond}}
+			<p class="candidato_con_secundarios-cargos__candidato">{{this.candidato}}</p>
+		</li>
+		{{/each}}
+	</div>
+</div>
+
+</script>
+<script id="tmpl_chipa/verificacion_con_secundarios_y_preferentes" type="text/x-handlebars-template" class="raw_template">
+<div class= "candidato cant-{{cant_cargos}} verificacion_con_secundarios_y_preferentes {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} "
+	{{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+	>
+	<div class="verificacion_con_secundarios_y_preferentes-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="verificacion_con_secundarios_y_preferentes-lista">
+		<p class="verificacion_con_secundarios_y_preferentes-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="verificacion_con_secundarios_y_preferentes-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="verificacion_con_secundarios_y_preferentes-contenedor_imagen">
+		{{imagen_candidatura candidato.lista.imagenes.[0]}}
+	</div>
+
+	<ol class="verificacion_con_secundarios_y_preferentes-cargos">
+		<li>
+			<span class="verificacion_con_secundarios_y_preferentes-cargos__nombre">Pdte:</span>
+			<span
+				class="verificacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.presidente}}</span>
+		</li>
+		<li>
+			<span class="verificacion_con_secundarios_y_preferentes-cargos__nombre">Vice. Pdte. 1°:</span>
+			<span
+				class="verificacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.vice_1}}</span>
+		</li>
+		<li>
+			<span class="verificacion_con_secundarios_y_preferentes-cargos__nombre">Vice. Pdte. 2°:</span>
+			<span
+				class="verificacion_con_secundarios_y_preferentes-cargos__candidato">{{candidato.lista.datos_extra.vice_2}}</span>
+		</li>
+	</ol>
+	<ol class="verificacion_con_secundarios_y_preferentes-preferentes">
+		{{#each candidatos_confirmacion}}
+		{{#if_preferencia this.id_candidatura ../candidato.cod_categoria}}
+		<li>
+			<span class="verificacion_con_secundarios_y_preferentes-preferentes__orden">Opción {{this.nro_orden}}: </span>
+			<span class="verificacion_con_secundarios_y_preferentes-preferentes__nombre">{{this.nombre}}</span>
+		</li>
+		{{/if_preferencia}}
+		{{/each}}
+	</ol>
+</div>
+
+</script>
+<script id="tmpl_chipa/verificacion_con_preferentes" type="text/x-handlebars-template" class="raw_template">
+<main class= "candidato cant-{{cant_cargos}} conf_verificacion_candidato_preferente{{candidato.clase_less}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} ">
+	<div class="conf_verificacion_candidato_preferente-nombre_partido{{candidato.clase_less}}">{{candidato.lista.nombre}}</div>
+	<div class="conf_verificacion_candidato_preferente-lista{{candidato.clase_less}}">
+		<p class="conf_verificacion_candidato_preferente-palabra-lista{{candidato.clase_less}}">{{i18n "palabra_lista"}}</p>
+		<p class="conf_verificacion_candidato_preferente-numero_lista{{candidato.clase_less}}">{{candidato.lista.numero}}</p>
+	</div>
+	<div class="conf_verificacion_candidato_foto_preferente-contenedor{{candidato.clase_less}}">
+		{{imagen_candidatura candidato.imagenes.[0]}}
+	</div>
+	<div class="conf_verificacion_candidato_preferente-datos_candidato{{candidato.clase_less}}">
+		<p class="conf_verificacion_candidato_preferente-nombre_candidato{{candidato.clase_less}}">{{candidato.nombre}}</p>
+		<p class="conf_verificacion_candidato_preferente-nro_orden{{candidato.clase_less}}">Opción {{candidato.nro_orden}}</p>
+	</div>
+</main>
+
+</script>
+<script id="tmpl_chipa/verificacion_con_preferentes_img_izquierda" type="text/x-handlebars-template" class="raw_template">
+<main class= "candidato cant-{{cant_cargos}} conf_verificacion_candidato_preferente_imagen_izquierda{{candidato.clase_less}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} ">
+	<div class="conf_verificacion_candidato_preferente-nombre_partido_imagen_izquierda{{candidato.clase_less}}">{{candidato.lista.nombre}}</div>
+	<div class="conf_verificacion_candidato_preferente-lista_imagen_izquierda{{candidato.clase_less}}">
+		<p class="conf_verificacion_candidato_preferente-palabra-lista{{candidato.clase_less}}">{{i18n "palabra_lista"}}</p>
+		<p class="conf_verificacion_candidato_preferente-numero_lista{{candidato.clase_less}}">{{candidato.lista.numero}}</p>
+	</div>
+	<div class="conf_verificacion_candidato_foto_preferente-contenedor_imagen_izquierda{{candidato.clase_less}}">
+		{{imagen_candidatura candidato.imagenes.[0]}}
+	</div>
+	<div class="conf_verificacion_candidato_preferente-datos_candidato_imagen_izquierda{{candidato.clase_less}}">
+		<p class="conf_verificacion_candidato_preferente-nombre_candidato{{candidato.clase_less}}">{{candidato.nombre}}</p>
+		<p class="conf_verificacion_candidato_preferente-nro_orden{{candidato.clase_less}}">Opción {{candidato.nro_orden}}</p>
+	</div>
+</main>
+
+</script>
+<script id="tmpl_chipa/verificacion_cerrada" type="text/x-handlebars-template" class="raw_template">
+<div class= "candidato cant-{{cant_cargos}} verificacion_cerrada{{candidato.clase_less}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}}">
+    <div class="verificacion_cerrada-nombre_partido{{candidato.clase_less}}">{{candidato.lista.nombre}}</div>
+    <div class="verificacion_cerrada-lista{{candidato.clase_less}}">
+        <p class="verificacion_cerrada-palabra_lista">{{i18n "palabra_lista"}}</p>
+        <p class="verificacion_cerrada-numero_lista">{{candidato.lista.numero}}</p>        
+    </div>
+
+    <div class="verificacion_cerrada-foto_candidato{{candidato.clase_less}}">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+    <div class="verificacion_cerrada-datos_candidato{{candidato.clase_less}}">
+        <div class="verificacion_cerrada-candidato_principal{{candidato.clase_less}}">{{candidato.nombre}}</div>
+        <div class="verificacion_cerrada-candidato_secundario{{candidato.clase_less}}">{{candidato.secundarios.[0]}}</div>
+    </div>
+</div>
+
+
+</script>
+<script id="tmpl_chipa/verificacion_cerrada_img_izquierda" type="text/x-handlebars-template" class="raw_template">
+<div class= "candidato cant-{{cant_cargos}} verificacion_cerrada_imagen_izquierda{{candidato.clase_less}} {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}}">
+    <div class="verificacion_cerrada-nombre_partido_imagen_izquierda{{candidato.clase_less}}">{{candidato.lista.nombre}}</div>
+    <div class="verificacion_cerrada-lista_imagen_izquierda{{candidato.clase_less}}">
+        <p class="verificacion_cerrada-palabra_lista">{{i18n "palabra_lista"}}</p>
+        <p class="verificacion_cerrada-numero_lista">{{candidato.lista.numero}}</p>        
+    </div>
+
+    <div class="verificacion_cerrada-foto_candidato_imagen_izquierda{{candidato.clase_less}}">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+    <div class="verificacion_cerrada-datos_candidato_imagen_izquierda{{candidato.clase_less}}">
+        <div class="verificacion_cerrada-candidato_principal_imagen_izquierda{{candidato.clase_less}}">{{candidato.nombre}}</div>
+        <div class="verificacion_cerrada-candidato_secundario_imagen_izquierda{{candidato.clase_less}}">{{candidato.secundarios.[0]}}</div>
+    </div>
+</div>
+
+
+</script>
+<script id="tmpl_chipa/verificacion_candidato_blanco" type="text/x-handlebars-template" class="raw_template">
+<main class= "candidato cant-{{cant_cargos}} verificacion_blanco {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}}">
+    <div class="verificacion_blanco-candidato_principal">{{candidato.nombre}}</div>
+    <div class="verificacion_blanco-foto_candidato">
+        {{imagen_candidatura candidato.imagenes.[0]}}
+    </div>
+</main>
+</script>
+<script id="tmpl_chipa/verificacion_pre_vice" type="text/x-handlebars-template" class="raw_template">
+<div class= "candidato cant-{{cant_cargos}} verificacion_pre_vice {{#if blanco}}blanco{{/if}} {{#if es_consulta}}consulta_popular{{/if}} "
+	{{#if mostrar_color}}style="background-color: {{candidato.lista.color}}; color: {{candidato.lista.color_tipografia}};"{{/if}}
+	>
+	<div class="verificacion_pre_vice-nombre_lista">{{candidato.lista.nombre}}</div>
+
+	<div class="verificacion_pre_vice-lista">
+		<p class="verificacion_pre_vice-lista__palabra">{{i18n "palabra_lista"}}</p>
+		<p class="verificacion_pre_vice-lista__numero">{{candidato.lista.numero}}</p>
+	</div>
+
+	<div class="verificacion_pre_vice-contenedor_imagenes">
+		<div class="verificacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[0]}}
+		</div>
+
+		<div class="verificacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[1]}}
+		</div>
+
+		{{#if candidato.secundarios.[1]}}
+		<div class="verificacion_pre_vice-contenedor_imagenes__imagen">
+			{{imagen_candidatura candidato.imagenes.[2]}}
+		</div>
+		{{/if}}
+	</div>
+
+    <div class="verificacion_pre_vice-cargos">
+		<li>			
+			<p class="candidato_pre_vice-cargos__nombre">Pdte:</p>			
+			<p class="candidato_pre_vice-cargos__candidato">{{candidato.nombre}}</p>
+		</li>
+        <li>			
+			<p class="candidato_pre_vice-cargos__nombre">Vice.{{#if candidato.secundarios.[1]}} 1º{{/if}}:</p>
+			<p class="candidato_pre_vice-cargos__candidato">{{candidato.secundarios.[0]}}</p>
+		</li>
+		{{#if candidato.secundarios.[1]}}
+        <li>			
+			<p class="candidato_pre_vice-cargos__nombre">Vice. 2º</p>			
+			<p class="candidato_pre_vice-cargos__candidato">{{candidato.secundarios.[1]}}</p>
+		</li>
+		{{/if}}
+	</div>
+</div>
+</script>
+<script id="tmpl_chipa/tachas" type="text/x-handlebars-template" class="raw_template">
+<div class="candidato">
+    <div class="lista">
+        <p class="palabra-lista">{{i18n "palabra_lista"}}</p>
+        <p class="numero-lista">{{lista.numero}}</p>
+    </div>
+    <div class="foto-candidato">
+        {{imagen_candidatura lista.imagenes.[0]}}
+    </div>
+    <div class="clear"></div>
+    {{colores lista.color}}
+    <div class="nombre-partido">{{lista.nombre}}</div>
+</div>
+
+<div class="columna-izquierda">
+{{#each candidatos.izq}}
+    <div id="candidato_{{this.id_candidatura}}" class="opcion-tacha candidato {{this.seleccionado}}">
+        <i class="material-icons"></i>
+        {{this.nro_orden}}. {{this.nombre}}
+    </div>
+{{/each}}
+</div>
+
+<div class="columna-derecha">
+{{#each candidatos.der}}
+    <div id="candidato_{{this.id_candidatura}}" class="opcion-tacha candidato {{this.seleccionado}}">
+        <i class="material-icons"></i>
+        {{this.nro_orden}}. {{this.nombre}}
+    </div>
+{{/each}}
+</div>
+
+</script>
+<script id="tmpl_chipa/preferencias" type="text/x-handlebars-template" class="raw_template">
+<article class="preferente_encabezado candidato datos-lista"
+	{{#if mostrar_color}}style="background-color: {{lista.color}}; color: {{lista.color_tipografia}}; border-color: {{{mod_color -0.5 lista.color}}};"{{/if}}
+	>
+	<div class="preferente_encabezado-lista">
+		<p class="preferente_encabezado-palabra_lista">{{i18n "palabra_lista"}}</p>
+		<p class="preferente_encabezado-numero_lista">{{lista.numero}}</p>
+	</div>
+	<h3 class="preferente_encabezado-nombre_partido">{{lista.nombre}}</h3>
+</article>
+
+{{#each candidatos}}
+<article id="candidato_{{this.id_umv}}"
+	class="preferente_candidato opcion-preferencia candidato {{this.seleccionado}}"
+	{{#if mostrar_color}}style="border-color: {{{mod_color -0.5 ../lista.color}}};"{{/if}}
+	>
+	<h3 class="preferente_candidato-foto_preferencia">
+		{{imagen_candidatura this.imagen}}
+	</h3>
+	<p class="preferente_candidato-nro_orden">
+		<span class="preferente_candidato-nro_orden__opcion">Opción</span>
+		<span class="preferente_candidato-nro_orden__orden">{{this.nro_orden}}</span>
+	</p>
+	<p class="preferente_candidato-nombre_candidato">{{this.nombre}}</p>
+</article>
+{{/each}}
+
+</script>
+<script id="tmpl_chipa/colores" type="text/x-handlebars-template" class="raw_template">
+{{#if mostrar_color}}
+<div class="color-lista">
+  {{#each colores}}
+  <div class="color colores{{../num_colores}}" style="background:{{this}}"></div>
+  {{/each}}
+</div>
+{{/if}}
+
+</script>

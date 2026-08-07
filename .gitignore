@@ -16,6 +16,7 @@ build/
 # misc
 .DS_Store
 *.pem
+powershell.bat
 
 # debug
 npm-debug.log*

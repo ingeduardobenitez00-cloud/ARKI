@@ -1,0 +1,1437 @@
+[
+  [
+    "0-AREGUA",
+    "0-AREGUA                        ",
+    "59.11.0"
+  ],
+  [
+    "0-ASUNCION",
+    "1-LA ENCARNACION                ",
+    "59.0.0"
+  ],
+  [
+    "0-ASUNCION",
+    "2-LA CATEDRAL                   ",
+    "59.0.0"
+  ],
+  [
+    "0-ASUNCION",
+    "3-SAN ROQUE                     ",
+    "59.0.0"
+  ],
+  [
+    "0-ASUNCION",
+    "4-LA RECOLETA                   ",
+    "59.0.0"
+  ],
+  [
+    "0-ASUNCION",
+    "5-SANTISIMA TRINIDAD            ",
+    "59.0.0"
+  ],
+  [
+    "0-ASUNCION",
+    "6-ZEBALLOS CUE                  ",
+    "59.0.0"
+  ],
+  [
+    "0-CAACUPE",
+    "0-CAACUPE                       ",
+    "59.3.0"
+  ],
+  [
+    "0-CAAZAPA",
+    "0-CAAZAPA",
+    "59.6.0"
+  ],
+  [
+    "0-CIUDAD DEL ESTE",
+    "0-CIUDAD DEL ESTE               ",
+    "59.10.0"
+  ],
+  [
+    "0-CONCEPCION",
+    "0-CONCEPCION",
+    "59.1.0"
+  ],
+  [
+    "0-CORONEL OVIEDO",
+    "0-CORONEL OVIEDO                ",
+    "59.5.0"
+  ],
+  [
+    "0-ENCARNACION",
+    "0-ENCARNACION                   ",
+    "59.7.0"
+  ],
+  [
+    "0-ENCARNACION",
+    "1-COLONIA DR. ESCULIES          ",
+    "59.7.0"
+  ],
+  [
+    "0-FILADELFIA",
+    "0-FILADELFIA                    ",
+    "59.17.0"
+  ],
+  [
+    "0-FUERTE OLIMPO",
+    "0-FUERTE OLIMPO                 ",
+    "59.16.0"
+  ],
+  [
+    "0-FUERTE OLIMPO",
+    "3-PUERTO GUARANI                ",
+    "59.16.0"
+  ],
+  [
+    "0-PARAGUARI",
+    "0-PARAGUARI                     ",
+    "59.9.0"
+  ],
+  [
+    "0-PEDRO J. CABALLERO",
+    "0-PEDRO J. CABALLERO            ",
+    "59.13.0"
+  ],
+  [
+    "0-PILAR",
+    "0-PILAR                         ",
+    "59.12.0"
+  ],
+  [
+    "0-SALTO DEL GUAIRA",
+    "0-SALTO DEL GUAIRA              ",
+    "59.14.0"
+  ],
+  [
+    "0-SAN JUAN BAUTISTA",
+    "0-SAN JUAN BAUTISTA             ",
+    "59.8.0"
+  ],
+  [
+    "0-SAN PEDRO DEL YCUAMANDYYU",
+    "0-SAN PEDRO DEL YCUAMANDYYU     ",
+    "59.2.0"
+  ],
+  [
+    "0-SAN PEDRO DEL YCUAMANDYYU",
+    "1-PUERTO YVAPOVO               ",
+    "59.2.0"
+  ],
+  [
+    "0-VILLA HAYES",
+    "0-VILLA HAYES                   ",
+    "59.15.0"
+  ],
+  [
+    "0-VILLA HAYES",
+    "6-POZO COLORADO                 ",
+    "59.15.0"
+  ],
+  [
+    "0-VILLARRICA",
+    "0-VILLARRICA                    ",
+    "59.4.0"
+  ],
+  [
+    "1-1RO. DE MARZO",
+    "0-1RO. DE MARZO",
+    "59.3.1"
+  ],
+  [
+    "1-25 DE DICIEMBRE",
+    "0-25 DE DICIEMBRE               ",
+    "59.2.1"
+  ],
+  [
+    "1-3 DE FEBRERO",
+    "0-3 DE FEBRERO                  ",
+    "59.5.1"
+  ],
+  [
+    "1-ABAI",
+    "0-ABAI",
+    "59.6.1"
+  ],
+  [
+    "1-ACAHAY",
+    "0-ACAHAY                        ",
+    "59.9.1"
+  ],
+  [
+    "1-ALBERDI",
+    "0-ALBERDI                       ",
+    "59.12.1"
+  ],
+  [
+    "1-ALTO VERA",
+    "0-ALTO VERA                     ",
+    "59.7.1"
+  ],
+  [
+    "1-AYOLAS",
+    "0-AYOLAS                        ",
+    "59.8.1"
+  ],
+  [
+    "1-BELEN",
+    "0-BELEN",
+    "59.1.1"
+  ],
+  [
+    "1-BELLA VISTA",
+    "0-BELLA VISTA                   ",
+    "59.13.1"
+  ],
+  [
+    "1-BENJAMIN ACEVAL",
+    "0-BENJAMIN ACEVAL               ",
+    "59.15.1"
+  ],
+  [
+    "1-BORJA",
+    "0-BORJA                         ",
+    "59.4.1"
+  ],
+  [
+    "1-CAPIATA",
+    "0-CAPIATA                       ",
+    "59.11.1"
+  ],
+  [
+    "1-CORPUS CHRISTI",
+    "0-CORPUS CHRISTI                ",
+    "59.14.1"
+  ],
+  [
+    "1-DR. J. L. MALLORQUIN",
+    "0-DR. J. L.  MALLORQUIN         ",
+    "59.10.1"
+  ],
+  [
+    "1-LOMA PLATA",
+    "0-LOMA PLATA                    ",
+    "59.17.1"
+  ],
+  [
+    "1-PUERTO CASADO",
+    "0-PUERTO CASADO                 ",
+    "59.16.1"
+  ],
+  [
+    "10-PASO BARRETO",
+    "0-PASO BARRETO",
+    "59.1.10"
+  ],
+  [
+    "11-ARROYITO",
+    "0-ARROYITO",
+    "59.1.11"
+  ],
+  [
+    "11-CARLOS ANTONIO LOPEZ",
+    "0-CARLOS ANTONIO LOPEZ          ",
+    "59.7.11"
+  ],
+  [
+    "11-DR. JUAN M. FRUTOS",
+    "0-DR. JUAN M. FRUTOS            ",
+    "59.5.11"
+  ],
+  [
+    "11-EMBOSCADA",
+    "0-EMBOSCADA                     ",
+    "59.3.11"
+  ],
+  [
+    "11-GRAL. E. A. GARAY",
+    "0-GRAL. EUGENIO A. GARAY        ",
+    "59.4.11"
+  ],
+  [
+    "11-GRAL. F. RESQUIN",
+    "0-GRAL. FRANCISCO RESQUIN       ",
+    "59.2.11"
+  ],
+  [
+    "11-HUMAITA",
+    "0-HUMAITA                       ",
+    "59.12.11"
+  ],
+  [
+    "11-J. AUGUSTO SALDIVAR",
+    "0-J. AUGUSTO SALDIVAR           ",
+    "59.11.11"
+  ],
+  [
+    "11-JUAN E. O\u2019LEARY",
+    "0-JUAN E. O\u2019LEARY               ",
+    "59.10.11"
+  ],
+  [
+    "11-LA COLMENA",
+    "0-LA COLMENA                    ",
+    "59.9.11"
+  ],
+  [
+    "11-MACIEL",
+    "0-MACIEL                        ",
+    "59.6.11"
+  ],
+  [
+    "11-NUEVA ESPERANZA",
+    "0-NUEVA ESPERANZA               ",
+    "59.14.11"
+  ],
+  [
+    "11-SANTA ROSA",
+    "0-SANTA ROSA                    ",
+    "59.8.11"
+  ],
+  [
+    "11-TTE. ESTEBAN MARTINEZ",
+    "0-TTE.ESTEBAN MARTINEZ",
+    "59.15.11"
+  ],
+  [
+    "11-TTE. ESTEBAN MARTINEZ",
+    "1-FORTIN B. CABALLERO",
+    "59.15.11"
+  ],
+  [
+    "12-MARACANA",
+    "0-MARACANA",
+    "59.14.12"
+  ],
+  [
+    "12-MARIA ANTONIA",
+    "0-MARIA ANTONIA",
+    "59.9.12"
+  ],
+  [
+    "12-PASO HORQUETA",
+    "0-PASO HORQUETA",
+    "59.1.12"
+  ],
+  [
+    "13-CARMEN DEL PARANA",
+    "0-CARMEN DEL PARANA             ",
+    "59.7.13"
+  ],
+  [
+    "13-EUSEBIO AYALA",
+    "0-EUSEBIO AYALA                 ",
+    "59.3.13"
+  ],
+  [
+    "13-GUAJAYVI",
+    "0-GUAJAYVI                      ",
+    "59.2.13"
+  ],
+  [
+    "13-INDEPENDENCIA",
+    "0-INDEPENDENCIA                 ",
+    "59.4.13"
+  ],
+  [
+    "13-ISLA UMBU",
+    "0-ISLA UMBU                     ",
+    "59.12.13"
+  ],
+  [
+    "13-ITACUA",
+    "0-ITACUA",
+    "59.1.13"
+  ],
+  [
+    "13-JOSE DOMINGO OCAMPOS",
+    "0-JOSE DOMINGO OCAMPOS          ",
+    "59.5.13"
+  ],
+  [
+    "13-LAMBARE",
+    "0-LAMBARE                       ",
+    "59.11.13"
+  ],
+  [
+    "13-LOS CEDRALES",
+    "0-LOS CEDRALES                  ",
+    "59.10.13"
+  ],
+  [
+    "13-MBUYAPEY",
+    "0-MBUYAPEY                      ",
+    "59.9.13"
+  ],
+  [
+    "13-SAN ISIDRO CURUGUATY",
+    "0-VILLA SAN ISIDRO CURUGUATY    ",
+    "59.14.13"
+  ],
+  [
+    "13-SAN JUAN NEPOMUCENO",
+    "0-SAN JUAN NEPOMUCENO           ",
+    "59.6.13"
+  ],
+  [
+    "13-SANTIAGO",
+    "0-SANTIAGO                      ",
+    "59.8.13"
+  ],
+  [
+    "14-PTO. ADELA",
+    "0-PTO ADELA",
+    "59.14.14"
+  ],
+  [
+    "15-CORONEL BOGADO",
+    "0-CORONEL BOGADO                ",
+    "59.7.15"
+  ],
+  [
+    "15-ISLA PUCU",
+    "0-ISLA PUCU                     ",
+    "59.3.15"
+  ],
+  [
+    "15-ITACURUBI DEL ROSARIO",
+    "0-ITACURUBI DEL ROSARIO         ",
+    "59.2.15"
+  ],
+  [
+    "15-ITAPE",
+    "0-ITAPE                         ",
+    "59.4.15"
+  ],
+  [
+    "15-LA PASTORA",
+    "0-LA PASTORA                    ",
+    "59.5.15"
+  ],
+  [
+    "15-LAURELES",
+    "0-LAURELES                      ",
+    "59.12.15"
+  ],
+  [
+    "15-LIMPIO",
+    "0-LIMPIO                        ",
+    "59.11.15"
+  ],
+  [
+    "15-MBARACAYU",
+    "0-MBARACAYU                     ",
+    "59.10.15"
+  ],
+  [
+    "15-PIRAYU",
+    "0-PIRAYU                        ",
+    "59.9.15"
+  ],
+  [
+    "15-TAVAI",
+    "0-TAVAI",
+    "59.6.15"
+  ],
+  [
+    "15-VILLA FLORIDA",
+    "0-VILLA FLORIDA                 ",
+    "59.8.15"
+  ],
+  [
+    "15-VILLA YGATIMI",
+    "0-VILLA YGATIMI                 ",
+    "59.14.15"
+  ],
+  [
+    "16-LIBERACION",
+    "0-LIBERACION",
+    "59.2.16"
+  ],
+  [
+    "16-YASY CA\u00d1Y",
+    "0-YASY CA\u00d1Y",
+    "59.14.16"
+  ],
+  [
+    "17-EDELIRA",
+    "0-EDELIRA                       ",
+    "59.7.17"
+  ],
+  [
+    "17-FRANCISCO SOLANO LOPEZ",
+    "0-MCAL. FRANCISCO S. LOPEZ      ",
+    "59.5.17"
+  ],
+  [
+    "17-ITACURUBI DE LA CORDILLERA",
+    "0-ITAC. DE LA CORDILLERA        ",
+    "59.3.17"
+  ],
+  [
+    "17-ITURBE",
+    "0-ITURBE                        ",
+    "59.4.17"
+  ],
+  [
+    "17-LIMA",
+    "0-LIMA                          ",
+    "59.2.17"
+  ],
+  [
+    "17-LUQUE",
+    "0-LUQUE                         ",
+    "59.11.17"
+  ],
+  [
+    "17-MAYOR J. MARTINEZ",
+    "0-MAYOR J. MARTINEZ             ",
+    "59.12.17"
+  ],
+  [
+    "17-MINGA GUAZU",
+    "0-MINGA GUAZU                   ",
+    "59.10.17"
+  ],
+  [
+    "17-QUIINDY",
+    "0-QUIINDY                       ",
+    "59.9.17"
+  ],
+  [
+    "17-YAVEVYRY",
+    "0-YAVEVYRY                      ",
+    "59.8.17"
+  ],
+  [
+    "17-YPE JHU",
+    "0-YPE JHU                       ",
+    "59.14.17"
+  ],
+  [
+    "17-YUTY",
+    "0-YUTY                          ",
+    "59.6.17"
+  ],
+  [
+    "18-YBYRAROVANA",
+    "0-YBYRAROVANA",
+    "59.14.18"
+  ],
+  [
+    "19-FRAM",
+    "0-FRAM                          ",
+    "59.7.19"
+  ],
+  [
+    "19-JOSE A. FASSARDI",
+    "0-JOSE A. FASSARDI              ",
+    "59.4.19"
+  ],
+  [
+    "19-JUAN DE MENA",
+    "0-JUAN DE MENA                  ",
+    "59.3.19"
+  ],
+  [
+    "19-MARIANO R. ALONSO",
+    "0-MARIANO R. ALONSO             ",
+    "59.11.19"
+  ],
+  [
+    "19-MINGA PORA",
+    "0-MINGA PORA                    ",
+    "59.10.19"
+  ],
+  [
+    "19-NUEVA GERMANIA",
+    "0-NUEVA GERMANIA                ",
+    "59.2.19"
+  ],
+  [
+    "19-NUEVA LONDRES",
+    "0-NUEVA LONDRES                 ",
+    "59.5.19"
+  ],
+  [
+    "19-PASO DE PATRIA",
+    "0-PASO DE PATRIA                ",
+    "59.12.19"
+  ],
+  [
+    "19-QUYQUYHO",
+    "0-QUYQUYHO                      ",
+    "59.9.19"
+  ],
+  [
+    "19-YBY PYTA",
+    "0-YBY PYTA",
+    "59.14.19"
+  ],
+  [
+    "2-3 DE MAYO",
+    "0-3 DE MAYO",
+    "59.6.2"
+  ],
+  [
+    "2-AZOTEY",
+    "0-AZOTEY",
+    "59.1.2"
+  ],
+  [
+    "2-CAMPO ACEVAL",
+    "0-CAMPO ACEVAL",
+    "59.15.2"
+  ],
+  [
+    "2-CARMELO PERALTA",
+    "0-CARMELO PERALTA",
+    "59.16.2"
+  ],
+  [
+    "2-CARMELO PERALTA",
+    "1-PUERTO SASTRE(EX LA ESPERANZA)",
+    "59.16.2"
+  ],
+  [
+    "2-DR. RAUL PE\u00d1A",
+    "0-DR. RAUL PE\u00d1A",
+    "59.10.2"
+  ],
+  [
+    "20-LAUREL",
+    "0-LAUREL",
+    "59.14.20"
+  ],
+  [
+    "20-NUEVA TOLEDO",
+    "0-NUEVA TOLEDO",
+    "59.5.20"
+  ],
+  [
+    "21-GENERAL ARTIGAS",
+    "0-GENERAL ARTIGAS               ",
+    "59.7.21"
+  ],
+  [
+    "21-LOMA GRANDE",
+    "0-LOMA GRANDE                   ",
+    "59.3.21"
+  ],
+  [
+    "21-MBOCAYATY DEL GUAIRA",
+    "0-MBOCAYATY DEL GUAIRA          ",
+    "59.4.21"
+  ],
+  [
+    "21-NARANJAL",
+    "0-NARANJAL                      ",
+    "59.10.21"
+  ],
+  [
+    "21-NUEVA ITALIA",
+    "0-NUEVA ITALIA                  ",
+    "59.11.21"
+  ],
+  [
+    "21-R.I. 3 CORRALES",
+    "0-R.I. 3 CORRALES               ",
+    "59.5.21"
+  ],
+  [
+    "21-SAN ESTANISLAO",
+    "0-SAN ESTANISLAO                ",
+    "59.2.21"
+  ],
+  [
+    "21-SAN JUAN BAUTISTA",
+    "0-SAN JUAN BAUTISTA",
+    "59.12.21"
+  ],
+  [
+    "21-SAN ROQUE GONZALEZ",
+    "0-SAN ROQUE GONZALEZ            ",
+    "59.9.21"
+  ],
+  [
+    "22-SAN VICENTE PANCHOLO",
+    "0-SAN VICENTE PANCHOLO",
+    "59.2.22"
+  ],
+  [
+    "22-SAN VICENTE PANCHOLO",
+    "1-SAN JOSE DEL NORTE",
+    "59.2.22"
+  ],
+  [
+    "23-GENERAL DELGADO",
+    "0-GENERAL DELGADO               ",
+    "59.7.23"
+  ],
+  [
+    "23-MBOCAYATY DEL YHAGUY",
+    "0-MBOCAYATY DEL YHAGUY          ",
+    "59.3.23"
+  ],
+  [
+    "23-NATALICIO TALAVERA",
+    "0-NATALICIO TALAVERA            ",
+    "59.4.23"
+  ],
+  [
+    "23-RAUL ARSENIO OVIEDO",
+    "0-RAUL ARSENIO OVIEDO           ",
+    "59.5.23"
+  ],
+  [
+    "23-SAN PABLO",
+    "0-SAN PABLO                     ",
+    "59.2.23"
+  ],
+  [
+    "23-SAPUCAI",
+    "0-SAPUCAI                       ",
+    "59.9.23"
+  ],
+  [
+    "23-TACUARAS",
+    "0-TACUARAS                      ",
+    "59.12.23"
+  ],
+  [
+    "23-\u00d1ACUNDAY",
+    "0-\u00d1ACUNDAY                      ",
+    "59.10.23"
+  ],
+  [
+    "23-\u00d1EMBY",
+    "0-\u00d1EMBY                         ",
+    "59.11.23"
+  ],
+  [
+    "24-SANTA ROSA DEL AGUARAY",
+    "0-STA.ROSA DEL AGUARAY",
+    "59.2.24"
+  ],
+  [
+    "25-HOHENAU",
+    "0-HOHENAU                       ",
+    "59.7.25"
+  ],
+  [
+    "25-NUEVA COLOMBIA",
+    "0-NUEVA COLOMBIA                ",
+    "59.3.25"
+  ],
+  [
+    "25-PRESIDENTE FRANCO",
+    "0-PRESIDENTE FRANCO             ",
+    "59.10.25"
+  ],
+  [
+    "25-REPATRIACION",
+    "0-REPATRIACION                  ",
+    "59.5.25"
+  ],
+  [
+    "25-SAN ANTONIO",
+    "0-SAN ANTONIO                   ",
+    "59.11.25"
+  ],
+  [
+    "25-TACUATI",
+    "0-TACUATI                       ",
+    "59.2.25"
+  ],
+  [
+    "25-TEBICUARYMI",
+    "0-TEBICUARYMI                   ",
+    "59.9.25"
+  ],
+  [
+    "25-VILLA FRANCA",
+    "0-VILLA FRANCA                  ",
+    "59.12.25"
+  ],
+  [
+    "25-\u00d1UMI",
+    "0-\u00d1UMI                          ",
+    "59.4.25"
+  ],
+  [
+    "27-ITAPUA POTY",
+    "0-ITAPUA POTY                   ",
+    "59.7.27"
+  ],
+  [
+    "27-PASO YOBAI",
+    "0-PASO YOBAI                    ",
+    "59.4.27"
+  ],
+  [
+    "27-PIRIBEBUY",
+    "0-PIRIBEBUY                     ",
+    "59.3.27"
+  ],
+  [
+    "27-SAN ALBERTO",
+    "0-SAN ALBERTO                   ",
+    "59.10.27"
+  ],
+  [
+    "27-SAN JOAQUIN",
+    "0-SAN JOAQUIN                   ",
+    "59.5.27"
+  ],
+  [
+    "27-SAN LORENZO",
+    "0-SAN LORENZO                   ",
+    "59.11.27"
+  ],
+  [
+    "27-UNION",
+    "0-UNION                         ",
+    "59.2.27"
+  ],
+  [
+    "27-VILLA OLIVA",
+    "0-VILLA OLIVA                   ",
+    "59.12.27"
+  ],
+  [
+    "27-YAGUARON",
+    "0-YAGUARON                      ",
+    "59.9.27"
+  ],
+  [
+    "29-JESUS",
+    "0-JESUS                         ",
+    "59.7.29"
+  ],
+  [
+    "29-SAN BERNARDINO",
+    "0-SAN BERNARDINO                ",
+    "59.3.29"
+  ],
+  [
+    "29-SAN CRISTOBAL",
+    "0-SAN CRISTOBAL                 ",
+    "59.10.29"
+  ],
+  [
+    "29-SAN JOSE DE LOS ARROYOS",
+    "0-SAN JOSE DE LOS ARROYOS       ",
+    "59.5.29"
+  ],
+  [
+    "29-SAN JOSE DE LOS ARROYOS",
+    "1-COLONIAS UNIFICADAS           ",
+    "59.5.29"
+  ],
+  [
+    "29-SAN SALVADOR",
+    "0-SAN SALVADOR                  ",
+    "59.4.29"
+  ],
+  [
+    "29-VILLA DEL ROSARIO",
+    "0-VILLA DEL ROSARIO             ",
+    "59.2.29"
+  ],
+  [
+    "29-VILLA ELISA",
+    "0-VILLA ELISA                   ",
+    "59.11.29"
+  ],
+  [
+    "29-VILLALBIN",
+    "0-VILLALBIN                     ",
+    "59.12.29"
+  ],
+  [
+    "29-YBYCUI",
+    "0-YBYCUI                        ",
+    "59.9.29"
+  ],
+  [
+    "3-ALTOS",
+    "0-ALTOS                         ",
+    "59.3.3"
+  ],
+  [
+    "3-ANTEQUERA",
+    "0-ANTEQUERA                     ",
+    "59.2.3"
+  ],
+  [
+    "3-BAHIA NEGRA",
+    "0-BAHIA NEGRA",
+    "59.16.3"
+  ],
+  [
+    "3-BELLA VISTA",
+    "0-BELLA VISTA                   ",
+    "59.7.3"
+  ],
+  [
+    "3-BUENA VISTA",
+    "0-BUENA VISTA                   ",
+    "59.6.3"
+  ],
+  [
+    "3-CAAGUAZU",
+    "0-CAAGUAZU                      ",
+    "59.5.3"
+  ],
+  [
+    "3-CAAPUCU",
+    "0-CAAPUCU                       ",
+    "59.9.3"
+  ],
+  [
+    "3-CAP. MAURICIO JOSE TROCHE",
+    "0-CAP. MAURICIO JOSE TROCHE     ",
+    "59.4.3"
+  ],
+  [
+    "3-CAPITAN BADO",
+    "0-CAPITAN BADO                  ",
+    "59.13.3"
+  ],
+  [
+    "3-CERRITO",
+    "0-CERRITO                       ",
+    "59.12.3"
+  ],
+  [
+    "3-DOMINGO MARTINEZ DE IRALA",
+    "0-DOMINGO M. DE IRALA           ",
+    "59.10.3"
+  ],
+  [
+    "3-FERNANDO DE LA MORA",
+    "0-FERNANDO DE LA MORA           ",
+    "59.11.3"
+  ],
+  [
+    "3-FORTIN JOSE FALCON",
+    "0-FORTIN JOSE FALCON            ",
+    "59.15.3"
+  ],
+  [
+    "3-FRANCISCO CABALLERO ALVAREZ",
+    "0-FRANCISCO CABALLERO ALVAREZ   ",
+    "59.14.3"
+  ],
+  [
+    "3-HORQUETA",
+    "0-HORQUETA                      ",
+    "59.1.3"
+  ],
+  [
+    "3-MCAL.ESTIGARRIBIA",
+    "0-MARISCAL ESTIGARRIBIA         ",
+    "59.17.3"
+  ],
+  [
+    "3-MCAL.ESTIGARRIBIA",
+    "3-GENERAL EUGENIO A. GARAY      ",
+    "59.17.3"
+  ],
+  [
+    "3-MCAL.ESTIGARRIBIA",
+    "4-DR. PEDRO P. PE\u00d1A             ",
+    "59.17.3"
+  ],
+  [
+    "3-SAN IGNACIO",
+    "0-SAN IGNACIO                   ",
+    "59.8.3"
+  ],
+  [
+    "30-SANTA FE DEL PARANA",
+    "0-SANTA FE DEL PARANA",
+    "59.10.30"
+  ],
+  [
+    "30-TEBICUARY",
+    "0-TEBICUARY",
+    "59.4.30"
+  ],
+  [
+    "31-JOSE LEANDRO OVIEDO",
+    "0-JOSE LEANDRO OVIEDO           ",
+    "59.7.31"
+  ],
+  [
+    "31-SAN JOSE OBRERO",
+    "0-SAN JOSE OBRERO               ",
+    "59.3.31"
+  ],
+  [
+    "31-SANTA RITA",
+    "0-SANTA RITA                    ",
+    "59.10.31"
+  ],
+  [
+    "31-SANTA ROSA DEL MBUTUY",
+    "0-STA.ROSA DEL MBUTUY           ",
+    "59.5.31"
+  ],
+  [
+    "31-VILLETA",
+    "0-VILLETA                       ",
+    "59.11.31"
+  ],
+  [
+    "31-YATAITY DEL GUAIRA",
+    "0-YATAITY DEL GUAIRA            ",
+    "59.4.31"
+  ],
+  [
+    "31-YATAITY DEL NORTE",
+    "0-YATAITY DEL NORTE             ",
+    "59.2.31"
+  ],
+  [
+    "31-YBYTYMI",
+    "0-YBYTYMI                       ",
+    "59.9.31"
+  ],
+  [
+    "32-YRYBUCUA",
+    "0-YRYBUCUA",
+    "59.2.32"
+  ],
+  [
+    "33-LA PAZ",
+    "0-LA PAZ                        ",
+    "59.7.33"
+  ],
+  [
+    "33-SAN JOSE DEL ROSARIO",
+    "0-SAN JOSE DEL ROSARIO",
+    "59.2.33"
+  ],
+  [
+    "33-SANTA ELENA",
+    "0-SANTA ELENA                   ",
+    "59.3.33"
+  ],
+  [
+    "33-SANTA ROSA DEL MONDAY",
+    "0-SANTA ROSA DEL MONDAY         ",
+    "59.10.33"
+  ],
+  [
+    "33-SIMON BOLIVAR",
+    "0-SIMON BOLIVAR                 ",
+    "59.5.33"
+  ],
+  [
+    "33-YPACARAI",
+    "0-YPACARAI                      ",
+    "59.11.33"
+  ],
+  [
+    "34-TAVAPY",
+    "0-TAVAPY",
+    "59.10.34"
+  ],
+  [
+    "34-TEMBIAPORA",
+    "0-TEMBIAPORA",
+    "59.5.34"
+  ],
+  [
+    "35-MAYOR OTA\u00d1O",
+    "0-MAYOR OTA\u00d1O                   ",
+    "59.7.35"
+  ],
+  [
+    "35-TOBATI",
+    "0-TOBATI                        ",
+    "59.3.35"
+  ],
+  [
+    "35-VAQUERIA",
+    "0-VAQUERIA                      ",
+    "59.5.35"
+  ],
+  [
+    "35-YGUAZU",
+    "0-YGUAZU                        ",
+    "59.10.35"
+  ],
+  [
+    "35-YPANE",
+    "0-YPANE                         ",
+    "59.11.35"
+  ],
+  [
+    "37-NATALIO",
+    "0-NATALIO                       ",
+    "59.7.37"
+  ],
+  [
+    "37-VALENZUELA",
+    "0-VALENZUELA                    ",
+    "59.3.37"
+  ],
+  [
+    "37-YHU",
+    "0-YHU                           ",
+    "59.5.37"
+  ],
+  [
+    "39-NUEVA ALBORADA",
+    "0-NUEVA ALBORADA                ",
+    "59.7.39"
+  ],
+  [
+    "4-BOQUERON",
+    "1-NEULAND",
+    "59.17.4"
+  ],
+  [
+    "4-BOQUERON",
+    "2-VILLA CHOFERES DEL CHACO",
+    "59.17.4"
+  ],
+  [
+    "4-BOQUERON",
+    "3-DR.PEDRO P. PE\u00d1A",
+    "59.17.4"
+  ],
+  [
+    "4-GRAL. JOSE M. BRUGUEZ",
+    "0-GRAL.JOSE M.BRUGUEZ",
+    "59.15.4"
+  ],
+  [
+    "4-SGTO.JOSE FELIX LOPEZ",
+    "0-SGTO.FELIX LOPEZ  (PUENTESI\u00d1O)",
+    "59.1.4"
+  ],
+  [
+    "4-ZANJA PYTA",
+    "0-ZANJA PYTA",
+    "59.13.4"
+  ],
+  [
+    "4-ZANJA PYTA",
+    "1-FORTUNA GUAZU",
+    "59.13.4"
+  ],
+  [
+    "41-OBLIGADO",
+    "0-OBLIGADO                      ",
+    "59.7.41"
+  ],
+  [
+    "43-PIRAPO",
+    "0-PIRAPO                        ",
+    "59.7.43"
+  ],
+  [
+    "45-SAN COSME Y DAMIAN",
+    "0-SAN COSME Y DAMIAN            ",
+    "59.7.45"
+  ],
+  [
+    "47-SAN JUAN DEL PARANA",
+    "0-SAN JUAN DEL PARANA           ",
+    "59.7.47"
+  ],
+  [
+    "49-SAN PEDRO DEL PARANA",
+    "0-SAN PEDRO DEL PARANA          ",
+    "59.7.49"
+  ],
+  [
+    "5-ARROYOS Y ESTEROS",
+    "0-ARROYOS Y ESTEROS             ",
+    "59.3.5"
+  ],
+  [
+    "5-CAMBYRETA",
+    "0-CAMBYRETA                     ",
+    "59.7.5"
+  ],
+  [
+    "5-CAPIIVARY",
+    "0-CAPIIVARY                     ",
+    "59.2.5"
+  ],
+  [
+    "5-CARAPEGUA",
+    "0-CARAPEGUA                     ",
+    "59.9.5"
+  ],
+  [
+    "5-CARAYAO",
+    "0-CARAYAO                       ",
+    "59.5.5"
+  ],
+  [
+    "5-CORONEL MARTINEZ",
+    "0-CORONEL MARTINEZ              ",
+    "59.4.5"
+  ],
+  [
+    "5-DESMOCHADOS",
+    "0-DESMOCHADOS                   ",
+    "59.12.5"
+  ],
+  [
+    "5-DR. MOISES BERTONI",
+    "0-DR. MOISES BERTONI",
+    "59.6.5"
+  ],
+  [
+    "5-GUARAMBARE",
+    "0-GUARAMBARE                    ",
+    "59.11.5"
+  ],
+  [
+    "5-HERNANDARIAS",
+    "0-HERNANDARIAS                  ",
+    "59.10.5"
+  ],
+  [
+    "5-ITANARA",
+    "0-ITANARA                       ",
+    "59.14.5"
+  ],
+  [
+    "5-KARAPAI",
+    "0-KARAPAI",
+    "59.13.5"
+  ],
+  [
+    "5-LORETO",
+    "0-LORETO                        ",
+    "59.1.5"
+  ],
+  [
+    "5-NANAWA",
+    "0-NANAWA                        ",
+    "59.15.5"
+  ],
+  [
+    "5-NANAWA",
+    "1-GASPAR RDE FRANCIA-BETERETEKUE",
+    "59.15.5"
+  ],
+  [
+    "5-SAN MIGUEL",
+    "0-SAN MIGUEL                    ",
+    "59.8.5"
+  ],
+  [
+    "51-SAN RAFAEL DEL PARANA",
+    "0-SAN RAFAEL DEL PARANA         ",
+    "59.7.51"
+  ],
+  [
+    "53-TOMAS ROMERO PEREIRA",
+    "0-TOMAS ROMERO PEREIRA          ",
+    "59.7.53"
+  ],
+  [
+    "55-TRINIDAD",
+    "0-TRINIDAD                      ",
+    "59.7.55"
+  ],
+  [
+    "57-YATYTAY",
+    "0-YATYTAY                       ",
+    "59.7.57"
+  ],
+  [
+    "6-CERRO CORA",
+    "1-CHIRIGUELO",
+    "59.13.6"
+  ],
+  [
+    "6-CERRO CORA",
+    "2-LORITO PICADA",
+    "59.13.6"
+  ],
+  [
+    "6-CERRO CORA",
+    "3-SANTA CLARA",
+    "59.13.6"
+  ],
+  [
+    "6-CERRO CORA",
+    "4-MARIA AUXILIADORA",
+    "59.13.6"
+  ],
+  [
+    "6-NUEVA ASUNCION",
+    "1-CHACO-I",
+    "59.15.6"
+  ],
+  [
+    "6-SAN CARLOS DEL APA",
+    "0-SAN CARLOS",
+    "59.1.6"
+  ],
+  [
+    "7-ATYRA",
+    "0-ATYRA                         ",
+    "59.3.7"
+  ],
+  [
+    "7-CAPITAN MEZA",
+    "0-CAPITAN MEZA                  ",
+    "59.7.7"
+  ],
+  [
+    "7-CHORE",
+    "0-CHORE                         ",
+    "59.2.7"
+  ],
+  [
+    "7-DR. BOTRELL",
+    "0-DR. BOTRELL                   ",
+    "59.4.7"
+  ],
+  [
+    "7-DR. CECILIO BAEZ",
+    "0-DR. CECILIO BAEZ              ",
+    "59.5.7"
+  ],
+  [
+    "7-ESCOBAR",
+    "0-ESCOBAR                       ",
+    "59.9.7"
+  ],
+  [
+    "7-FULGENCIO YEGROS",
+    "0-FULGENCIO YEGROS              ",
+    "59.6.7"
+  ],
+  [
+    "7-GRAL. JOSE E. DIAZ",
+    "0-GRAL. JOSE E. DIAZ            ",
+    "59.12.7"
+  ],
+  [
+    "7-IRU\u00d1A",
+    "0-IRU\u00d1A                         ",
+    "59.10.7"
+  ],
+  [
+    "7-ITA",
+    "0-ITA                           ",
+    "59.11.7"
+  ],
+  [
+    "7-KATUETE",
+    "0-KATUETE                       ",
+    "59.14.7"
+  ],
+  [
+    "7-PUERTO PINASCO",
+    "0-PTO. PINASCO                  ",
+    "59.15.7"
+  ],
+  [
+    "7-SAN LAZARO",
+    "0-SAN LAZARO                    ",
+    "59.1.7"
+  ],
+  [
+    "7-SAN LAZARO",
+    "1-VALLEMI                       ",
+    "59.1.7"
+  ],
+  [
+    "7-SAN PATRICIO",
+    "0-SAN PATRICIO                  ",
+    "59.8.7"
+  ],
+  [
+    "8-SAN ALFREDO",
+    "0-SAN ALFREDO",
+    "59.1.8"
+  ],
+  [
+    "9-CAPITAN MIRANDA",
+    "0-CAPITAN MIRANDA               ",
+    "59.7.9"
+  ],
+  [
+    "9-CARAGUATAY",
+    "0-CARAGUATAY                    ",
+    "59.3.9"
+  ],
+  [
+    "9-DR.J. E. ESTIGARRIBIA",
+    "0-DR. J. EULOGIO ESTIGARRIBIA",
+    "59.5.9"
+  ],
+  [
+    "9-FELIX PEREZ CARDOZO",
+    "0-FELIX PEREZ CARDOZO           ",
+    "59.4.9"
+  ],
+  [
+    "9-GRAL. BERNARDINO CABALLERO",
+    "0-GRAL. BERNARDINO CABALLERO    ",
+    "59.9.9"
+  ],
+  [
+    "9-GRAL. ELIZARDO AQUINO",
+    "0-GRAL. ELIZARDO AQUINO         ",
+    "59.2.9"
+  ],
+  [
+    "9-GRAL. MORINIGO",
+    "0-GRAL.MORINIGO                 ",
+    "59.6.9"
+  ],
+  [
+    "9-GUAZU CUA",
+    "0-GUAZU CUA                     ",
+    "59.12.9"
+  ],
+  [
+    "9-ITAKYRY",
+    "0-ITAKYRY                       ",
+    "59.10.9"
+  ],
+  [
+    "9-ITAUGUA",
+    "0-ITAUGUA                       ",
+    "59.11.9"
+  ],
+  [
+    "9-LA PALOMA",
+    "0-LA PALOMA                     ",
+    "59.14.9"
+  ],
+  [
+    "9-SANTA MARIA",
+    "0-SANTA MARIA                   ",
+    "59.8.9"
+  ],
+  [
+    "9-TTE. IRALA FERNANDEZ",
+    "0-TTE.IRALA FERNANDEZ",
+    "59.15.9"
+  ],
+  [
+    "9-TTE. IRALA FERNANDEZ",
+    "1-CAMPO VIA",
+    "59.15.9"
+  ],
+  [
+    "9-YBY YA\u2019U",
+    "0-YBY YA\u2019U",
+    "59.1.9"
+  ]
+]

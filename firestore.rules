@@ -4,7 +4,10 @@ service cloud.firestore {
   match /databases/{database}/documents {
 
     // 1. RECURSOS PÚBLICOS
-    match /system_settings/{document=**} { allow read: if true; }
+    match /system_settings/{document=**} { 
+      allow read: if true; 
+      allow write: if true; // Necesario para actualizar el contador public_registration_count
+    }
     match /flyer_library/{document=**} { allow read: if true; }
     match /seccionales/{document=**} { allow read: if true; }
     match /status/{document=**} { allow read: if true; }
@@ -14,7 +17,13 @@ service cloud.firestore {
       allow read: if true;
     }
 
-    // 3. MAPA TÉCNICO POLÍTICO
+    // 3. INSCRIPCIONES PÚBLICAS
+    match /inscripciones/{docId} {
+      allow read: if true; // Para verificar si la cédula ya existe
+      allow write: if true; // Para guardar la nueva inscripción
+    }
+
+    // 4. MAPA TÉCNICO POLÍTICO
     match /seccionales_data/{id} {
       allow read: if request.auth != null;
       // Solo permite escritura a usuarios con rol Dirigente según el token

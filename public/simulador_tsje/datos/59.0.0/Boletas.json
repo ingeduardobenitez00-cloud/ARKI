@@ -1,0 +1,78 @@
+[
+  {
+    "INT": 1,
+    "codigo": "1",
+    "lista_completa": true
+  },
+  {
+    "JUN": 1476,
+    "codigo": "10",
+    "lista_completa": true
+  },
+  {
+    "JUN": 2234,
+    "codigo": "11",
+    "lista_completa": true
+  },
+  {
+    "JUN": 3063,
+    "codigo": "12",
+    "lista_completa": true
+  },
+  {
+    "JUN": 3726,
+    "codigo": "13",
+    "lista_completa": true
+  },
+  {
+    "JUN": 4430,
+    "codigo": "14",
+    "lista_completa": true
+  },
+  {
+    "INT": 264,
+    "codigo": "2",
+    "lista_completa": true
+  },
+  {
+    "INT": 314,
+    "codigo": "3",
+    "lista_completa": true
+  },
+  {
+    "INT": 363,
+    "codigo": "4",
+    "lista_completa": true
+  },
+  {
+    "JUN": 7363,
+    "codigo": "5",
+    "lista_completa": true
+  },
+  {
+    "JUN": 7975,
+    "codigo": "6",
+    "lista_completa": true
+  },
+  {
+    "JUN": 8719,
+    "codigo": "7",
+    "lista_completa": true
+  },
+  {
+    "JUN": 9451,
+    "codigo": "8",
+    "lista_completa": true
+  },
+  {
+    "JUN": 10075,
+    "codigo": "9",
+    "lista_completa": true
+  },
+  {
+    "INT": 664,
+    "JUN": 10769,
+    "codigo": "BLC",
+    "lista_completa": true
+  }
+]

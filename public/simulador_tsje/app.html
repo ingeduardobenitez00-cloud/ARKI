@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en-US" translate="no">
+    <head>
+        <meta charset="utf-8" />
+      <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="google" content="notranslate" />
+        <title>Simulador de la Boleta &Uacute;nica Electr&oacute;nica</title>
+	<link rel="manifest" href="manifest.json">
+	<link rel="icon" href="img/favicon.ico">
+        <link rel="stylesheet" href="css/sufragio.css">
+
+        <!-- IE8 y versiones anteriores -->
+        <!--[if lte IE 8]>
+            <link rel="stylesheet" href="css/ie8.css">
+        <![endif]-->
+        <script type="text/javascript" src="js/chancleta.js"></script>
+        <script type="text/javascript" src="js/patio.js"></script>
+        <script type="text/javascript" src="js/handlebars.js"></script>
+        <script type="text/javascript" src="js/imagenes.js"></script>
+        <script type="text/javascript" src="js/helpers.js"></script>
+        <script type="text/javascript" src="js/popup.js"></script>
+        <script type="text/javascript" src="js/eventos.js"></script>
+
+        <script type="text/javascript" src="js/teclado/base.js" ></script>
+        <script type="text/javascript" src="js/teclado/layouts.js" ></script>
+        <script type="text/javascript" src="js/teclado/tiles.js" ></script>
+        
+        <script type="text/javascript" src="js/boleta/compilador.js"></script>
+        <script type="text/javascript" src="js/boleta/helpers.js"></script>
+        <script type="text/javascript" src="js/boleta/funciones.js"></script>
+        
+        <script type="text/javascript" src="js/sufragio/ipc.js" ></script>
+        <script type="text/javascript" src="js/sufragio/voto.js"></script>
+        <script type="text/javascript" src="js/sufragio/interaccion.js"></script>
+        <script type="text/javascript" src="js/sufragio/base.js"></script>
+        <script type="text/javascript" src="js/sufragio/botonera.js"></script>
+        <script type="text/javascript" src="js/sufragio/show_hide.js"></script>
+        <script type="text/javascript" src="js/sufragio/pantallas.js"></script>
+        <script type="text/javascript" src="js/sufragio/templates.js"></script>
+        <script type="text/javascript" src="js/sufragio/asistida.js"></script>
+        <script type="text/javascript" src="js/sufragio/tiles.js"></script>
+        
+        <script type="text/javascript" src="js/sufragio/controller/dataService.js"></script>
+        <script type="text/javascript" src="js/sufragio/controller/seleccion.js"></script>
+        <script type="text/javascript" src="js/sufragio/controller/businessData.js"></script>
+        <script type="text/javascript" src="js/sufragio/controller/localController.js"></script>
+
+
+        <script type="text/javascript" src="js/presencia.js"></script>
+        <!-- esto esta ultimo a proposito -->
+        <script src="js/palier.js"></script>
+        <script src="js/baterias.js" ></script>
+        <script src="js/blur.js" ></script>
+    </head>
+    <body>
+        <div id="contenedor">
+            <div id="contenedor_izq">
+                <div id="encabezado"></div>
+                <div class="clear"></div>
+                <div id="contenedor_pantallas"></div>
+                <div id="contenedor_opciones"></div>
+            </div>
+        </div>
+        <div class="popup-box">
+        </div>
+    </body>
+</html>

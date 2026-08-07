@@ -1,0 +1,48 @@
+[
+  {
+    "INT": 15429,
+    "codigo": "3194",
+    "lista_completa": true
+  },
+  {
+    "INT": 15430,
+    "codigo": "3195",
+    "lista_completa": true
+  },
+  {
+    "INT": 15431,
+    "codigo": "3196",
+    "lista_completa": true
+  },
+  {
+    "JUN": 21330,
+    "codigo": "3197",
+    "lista_completa": true
+  },
+  {
+    "JUN": 21354,
+    "codigo": "3198",
+    "lista_completa": true
+  },
+  {
+    "JUN": 21378,
+    "codigo": "3199",
+    "lista_completa": true
+  },
+  {
+    "JUN": 21402,
+    "codigo": "3200",
+    "lista_completa": true
+  },
+  {
+    "JUN": 21426,
+    "codigo": "3201",
+    "lista_completa": true
+  },
+  {
+    "INT": 16560,
+    "JUN": 36095,
+    "codigo": "BLC",
+    "lista_completa": true
+  }
+]

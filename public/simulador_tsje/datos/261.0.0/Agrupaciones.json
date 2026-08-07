@@ -1,0 +1,186 @@
+[
+  {
+    "asistida": "2 - HONOR COLORADO",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3194",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3194",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "HONOR COLORADO",
+    "nombre_corto": "MHC",
+    "numero": "2",
+    "orden_absoluto": [
+      3194
+    ]
+  },
+  {
+    "asistida": "7 - FUERZA Y CAUSA REPUBLICANA POR ASUNCION",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3195",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3195",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "FUERZA Y CAUSA REPUBLICANA POR ASUNCION",
+    "nombre_corto": "MFCRA",
+    "numero": "7",
+    "orden_absoluto": [
+      3195
+    ]
+  },
+  {
+    "asistida": "300 - UNIVERSITARIO ESTUDIANTIL",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3196",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3196",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "UNIVERSITARIO ESTUDIANTIL",
+    "nombre_corto": "MUE",
+    "numero": "300",
+    "orden_absoluto": [
+      3196
+    ]
+  },
+  {
+    "asistida": "2C - HONOR COLORADO C",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3197",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3197",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "HONOR COLORADO C",
+    "nombre_corto": "MHC",
+    "numero": "2C",
+    "orden_absoluto": [
+      3197
+    ]
+  },
+  {
+    "asistida": "2P - HONOR COLORADO P",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3198",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3198",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "HONOR COLORADO P",
+    "nombre_corto": "MHC",
+    "numero": "2P",
+    "orden_absoluto": [
+      3198
+    ]
+  },
+  {
+    "asistida": "6 - COLORADO A\u00d1ETETE",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3199",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3199",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "COLORADO A\u00d1ETETE",
+    "nombre_corto": "MCA",
+    "numero": "6",
+    "orden_absoluto": [
+      3199
+    ]
+  },
+  {
+    "asistida": "7 - FUERZA Y CAUSA REPUBLICANA POR ASUNCION",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3200",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3200",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "FUERZA Y CAUSA REPUBLICANA POR ASUNCION",
+    "nombre_corto": "MFCRA",
+    "numero": "7",
+    "orden_absoluto": [
+      3200
+    ]
+  },
+  {
+    "asistida": "20 - ORDEN REPUBLICANO",
+    "clase": "Lista",
+    "cod_alianza": null,
+    "cod_partido": null,
+    "codigo": "3201",
+    "color": [
+      "#FFFFFF"
+    ],
+    "color_tipografia": [
+      "#000000"
+    ],
+    "id_candidatura": "3201",
+    "imagenes": [
+      "default_lista"
+    ],
+    "nombre": "ORDEN REPUBLICANO",
+    "nombre_corto": "MOR",
+    "numero": "20",
+    "orden_absoluto": [
+      3201
+    ]
+  }
+]

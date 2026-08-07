@@ -37,6 +37,7 @@ export default function PublicRegistrationPage() {
     const [isSearching, setIsSearching] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isSuccess, setIsSuccess] = useState(false);
+    const [isAlreadyRegistered, setIsAlreadyRegistered] = useState(false);
 
     const base64ToBlobUrl = useCallback((base64: string) => {
         try {
@@ -77,13 +78,19 @@ export default function PublicRegistrationPage() {
                                     setFlyerUrl(fData.url?.startsWith('data:') ? base64ToBlobUrl(fData.url) : (fData.url || '/logo.png'));
                                 }
                             }
-                        } catch (errFlyer) {
+                        } catch (errFlyer: any) {
                             console.warn("Error loading initial flyer asset", errFlyer);
+                            toast({ 
+                                title: "Error cargando flyer", 
+                                description: errFlyer?.message || String(errFlyer), 
+                                variant: "destructive" 
+                            });
                         }
                     }
                 }
-            } catch (e) {
+            } catch (e: any) {
                 console.error("Error loading public settings");
+                toast({ title: "Error de configuración", description: e?.message || String(e), variant: "destructive" });
             } finally {
                 setIsLoadingSettings(false);
             }
@@ -121,12 +128,7 @@ export default function PublicRegistrationPage() {
                 const [snapNum, snapStr] = await Promise.all([getDocs(qNumeric), getDocs(qString)]);
                 
                 if (!snapNum.empty || !snapStr.empty) {
-                    toast({ 
-                        title: "Ya estás registrado", 
-                        description: "Tu cédula ya figura en la lista de inscriptos.",
-                    });
-                    setElectorData({ id: snap.id, ...padronData });
-                    setIsSuccess(true);
+                    setIsAlreadyRegistered(true);
                     return;
                 }
 
@@ -211,8 +213,8 @@ export default function PublicRegistrationPage() {
             
             <div className="relative z-10 w-full max-w-2xl space-y-8 mt-10">
                 <div className="text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
-                    <div className="relative h-56 sm:h-80 w-full max-w-lg mx-auto drop-shadow-2xl">
-                        <Image src={flyerUrl} alt="Logo" fill className="object-contain" priority unoptimized />
+                    <div className="relative h-80 sm:h-[450px] md:h-[500px] w-full max-w-lg mx-auto drop-shadow-2xl">
+                        <img src={flyerUrl} alt="Logo" className="w-full h-full object-contain" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center justify-center gap-2 text-primary">
@@ -236,6 +238,16 @@ export default function PublicRegistrationPage() {
                         </h2>
                         <p className="text-sm font-medium text-slate-500 uppercase leading-relaxed whitespace-pre-wrap">
                             {closedMessage}
+                        </p>
+                    </Card>
+                ) : isAlreadyRegistered ? (
+                    <Card className="rounded-[2.5rem] bg-white border-primary/10 shadow-2xl overflow-hidden max-w-md mx-auto p-10 text-center space-y-6">
+                        <div className="h-20 w-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto shadow-inner">
+                            <Info className="h-12 w-12 text-blue-600" />
+                        </div>
+                        <h2 className="text-2xl font-black uppercase tracking-tight text-slate-900">¡Ya estás inscripto!</h2>
+                        <p className="text-sm font-medium text-slate-500 uppercase leading-relaxed whitespace-pre-wrap">
+                            Ya te encuentras inscripto al evento. <br/>¡Te esperamos!
                         </p>
                     </Card>
                 ) : isSuccess ? (
@@ -310,6 +322,9 @@ export default function PublicRegistrationPage() {
                 <div className="text-center opacity-40">
                     <p className="text-[8px] font-black uppercase tracking-[0.5em] text-slate-900 leading-relaxed">
                         SISTEMA DE GESTIÓN ESTRATÉGICA <br/> LISTA 1 - OPCIÓN 5
+                    </p>
+                    <p className="text-[7px] font-bold text-slate-500 mt-2 tracking-widest uppercase">
+                        &copy; Desarrollado por el Ing. Eduardo Benítez
                     </p>
                 </div>
             </div>

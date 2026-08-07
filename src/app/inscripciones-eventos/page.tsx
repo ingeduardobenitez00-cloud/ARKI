@@ -97,7 +97,7 @@ export default function InscripcionesEventosPage() {
     }, [db]);
 
     const inscripcionesQuery = useMemoFirebase(() => {
-        return query(collection(db, 'inscripciones'), orderBy('createdAt', 'desc'), limit(100));
+        return query(collection(db, 'inscripciones'), orderBy('createdAt', 'desc'));
     }, [db, refreshKey]);
 
     const { data: inscripciones, isLoading } = useCollection<Inscripcion>(inscripcionesQuery);
