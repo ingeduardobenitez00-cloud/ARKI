@@ -11,7 +11,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { AlertCircle, Vote, Loader2 } from 'lucide-react';
+import { AlertCircle, Vote, Loader2, Archive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
@@ -40,6 +40,7 @@ export default function ControlVotacionPage() {
     const [selectedSeccional, setSelectedSeccional] = useState<string | null>(null);
     const [selectedLocal, setSelectedLocal] = useState<string | null>(null);
     const [selectedMesa, setSelectedMesa] = useState<number | null>(null);
+    const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
     
     const [electores, setElectores] = useState<Elector[]>([]);
     const [metadata, setMetadata] = useState<any>(null);
@@ -140,11 +141,14 @@ export default function ControlVotacionPage() {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ 
-                id: doc.id, 
-                ...doc.data(), 
-                estado_votacion: doc.data().estado_votacion || 'Pendiente' 
-            } as Elector));
+            const list = snapshot.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id, 
+                    ...data, 
+                    estado_votacion: viewMode === 'internas' ? (data.estado_votacion_internas || 'Pendiente') : (data.estado_votacion || 'Pendiente')
+                } as Elector;
+            });
             setElectores(list);
             setIsLoadingElectores(false);
         }, (error) => {
@@ -154,10 +158,10 @@ export default function ControlVotacionPage() {
         });
 
         return () => unsubscribe();
-    }, [selectedSeccional, selectedLocal, selectedMesa, db, toast, user, isAdmin]);
+    }, [selectedSeccional, selectedLocal, selectedMesa, db, toast, user, isAdmin, viewMode]);
 
     const handleToggleVoto = (elector: Elector) => {
-        if (isUpdating || !db || !user) return;
+        if (isUpdating || !db || !user || viewMode === 'internas') return;
         setIsUpdating(true);
         const newStatus = elector.estado_votacion === 'Ya Votó' ? 'Pendiente' : 'Ya Votó';
         const electorRef = doc(db, 'sheet1', elector.id);
@@ -189,7 +193,28 @@ export default function ControlVotacionPage() {
 
     return (
         <div className="space-y-6">
-            <div><h1 className="text-3xl font-bold">Control de Votación por Mesa</h1></div>
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl font-bold">Control de Votación por Mesa</h1>
+                </div>
+                <div className="flex bg-muted/50 p-1 rounded-xl">
+                    <Button 
+                        variant={viewMode === 'generales' ? 'default' : 'ghost'} 
+                        onClick={() => setViewMode('generales')}
+                        className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'generales' ? "shadow-sm" : "")}
+                    >
+                        Generales
+                    </Button>
+                    <Button 
+                        variant={viewMode === 'internas' ? 'default' : 'ghost'} 
+                        onClick={() => setViewMode('internas')}
+                        className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm" : "")}
+                    >
+                        <Archive className="w-3.5 h-3.5 mr-2" />
+                        internas_ANR_2026
+                    </Button>
+                </div>
+            </div>
             <Card>
                 <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-6">
                     {isAdmin && (
@@ -209,7 +234,7 @@ export default function ControlVotacionPage() {
                         {ordenes.map((orden: number) => {
                             const elector = electoresMap.get(orden);
                             const haVotado = elector?.estado_votacion === 'Ya Votó';
-                            return <Button key={orden} onClick={() => elector && handleToggleVoto(elector)} disabled={isLoadingElectores || isUpdating || !elector} className={cn("h-10 w-full p-0 font-bold rounded-none border-b border-r text-xs", haVotado ? "bg-green-500 text-white" : "bg-white")} variant="outline">{orden}</Button>
+                            return <Button key={orden} onClick={() => elector && handleToggleVoto(elector)} disabled={isLoadingElectores || isUpdating || !elector || viewMode === 'internas'} className={cn("h-10 w-full p-0 font-bold rounded-none border-b border-r text-xs", haVotado ? "bg-green-500 text-white" : "bg-white")} variant="outline">{orden}</Button>
                         })}
                     </div>
                 </CardContent></Card>

@@ -14,7 +14,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft, Lock, Search } from 'lucide-react';
+import { BookHeart, FileDown, User as UserIcon, Trash2, Loader2, ArrowRightLeft, Lock, Search, Archive } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -34,6 +34,7 @@ import { CredentialDownloadButton } from '@/components/voto-seguro/CredentialDow
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { FileText } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface VotoSeguroData {
   id: string;
@@ -74,6 +75,7 @@ export default function VotoSeguroPage() {
   const [votoToDelete, setVotoToDelete] = useState<VotoSeguroData | null>(null);
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
+  const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
   
   const [isMoveDialogOpen, setIsMoveDialogOpen] = useState(false);
   const [votoToMove, setVotoToMove] = useState<VotoSeguroData | null>(null);
@@ -99,7 +101,8 @@ export default function VotoSeguroPage() {
 
   const canExportExcel = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('excel') ?? false) || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false);
   const canExportPdf = isAdmin || (user?.moduleActions?.['/voto-seguro']?.includes('pdf') ?? false) || (user?.moduleActions?.['/users']?.includes('pdf') ?? false);
-  const canDelete = isAdmin || isPresidente || isCoordinador || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false);
+  // Disabled delete and move actions in internas mode
+  const canDelete = (isAdmin || isPresidente || isCoordinador || (user?.moduleActions?.['/voto-seguro']?.includes('delete') ?? false)) && viewMode !== 'internas';
 
   const configDocRef = useMemoFirebase(() => {
     if (!db) return null;
@@ -118,11 +121,13 @@ export default function VotoSeguroPage() {
   const registeredQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
 
+    const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : 'votos_confirmados';
+
     // Dirigentes: solo sus propios votos (server-side, sin techo)
     // Cada Dirigente carga únicamente sus registros — pueden tener hasta 1000+
     if (isDirigente) {
       return query(
-        collection(db, 'votos_confirmados'),
+        collection(db, collectionName),
         where('registradoPor_id', '==', user.id),
         orderBy('APELLIDO', 'asc')
       );
@@ -130,10 +135,10 @@ export default function VotoSeguroPage() {
 
     // Admins, Presidentes, Coordinadores: todos los votos sin límites para que soporte 20000 o más sin errores de Firestore
     return query(
-      collection(db, 'votos_confirmados'),
+      collection(db, collectionName),
       orderBy('APELLIDO', 'asc')
     );
-  }, [db, user, isDirigente]);
+  }, [db, user, isDirigente, viewMode]);
 
   const { data: rawList, isLoading, error } = useCollection<VotoSeguroData>(registeredQuery);
 
@@ -610,7 +615,7 @@ export default function VotoSeguroPage() {
                           <TableCell className="text-right">
                               <div className="flex items-center justify-end gap-1">
                                   <CredentialDownloadButton voto={p} />
-                                  {isAdmin && (
+                                  {isAdmin && viewMode !== 'internas' && (
                                       <Button 
                                           variant="ghost" 
                                           size="sm" 
@@ -620,9 +625,11 @@ export default function VotoSeguroPage() {
                                           <ArrowRightLeft className="h-4 w-4" />
                                       </Button>
                                   )}
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
-                                      <Trash2 className="h-4 w-4" />
-                                  </Button>
+                                  {viewMode !== 'internas' && (
+                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
+                                          <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                  )}
                               </div>
                           </TableCell>
                       </TableRow>
@@ -659,9 +666,31 @@ export default function VotoSeguroPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookHeart className="h-8 w-8 text-primary" /> Listado de Voto Seguro</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control optimizado de captación por operador.</p></div>
+        <div>
+            <h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3">
+                <BookHeart className="h-8 w-8 text-primary" /> Listado de Voto Seguro
+            </h1>
+            <p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control optimizado de captación por operador.</p>
+        </div>
         <div className="flex gap-2">
-            <Button onClick={() => { if(canExportExcel) setIsFilenameDialogOpen(true); else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={filteredList.length === 0 || isExporting || !canExportExcel} variant="default" className="font-black uppercase text-[10px] h-9 shadow-lg"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
+            <div className="flex bg-muted/50 p-1 rounded-xl">
+                <Button 
+                    variant={viewMode === 'generales' ? 'default' : 'ghost'} 
+                    onClick={() => setViewMode('generales')}
+                    className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'generales' ? "shadow-sm" : "")}
+                >
+                    Generales
+                </Button>
+                <Button 
+                    variant={viewMode === 'internas' ? 'default' : 'ghost'} 
+                    onClick={() => setViewMode('internas')}
+                    className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm" : "")}
+                >
+                    <Archive className="w-3.5 h-3.5 mr-2" />
+                    internas_ANR_2026
+                </Button>
+            </div>
+            <Button onClick={() => { if(canExportExcel) setIsFilenameDialogOpen(true); else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={filteredList.length === 0 || isExporting || !canExportExcel} variant="outline" className="font-black uppercase text-[10px] h-9 bg-white"><FileDown className="mr-2 h-4 w-4" /> EXPORTAR VISTA</Button>
         </div>
       </div>
 
@@ -742,7 +771,7 @@ export default function VotoSeguroPage() {
                                                                             <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF
                                                                         </div>
                                                                     )}
-                                                                    {isAdmin && userData.votos.length > 0 && (
+                                                                    {isAdmin && userData.votos.length > 0 && viewMode !== 'internas' && (
                                                                         <div 
                                                                             className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-blue-50 text-blue-700 border border-blue-200 rounded-full hover:bg-blue-100 hover:border-blue-300 transition-all cursor-pointer shadow-sm ml-2"
                                                                             onPointerDown={(e) => { e.stopPropagation(); setUserToMoveAll({userName, userId: userData.userId, votos: userData.votos}); setIsMoveAllDialogOpen(true); }}
@@ -751,7 +780,7 @@ export default function VotoSeguroPage() {
                                                                             <ArrowRightLeft className="h-3.5 w-3.5 mr-1 text-blue-600" /> MOVER TODO
                                                                         </div>
                                                                     )}
-                                                                    {enableBulkDelete && user?.role === 'Super-Admin' && userData.votos.length > 0 && (
+                                                                    {enableBulkDelete && user?.role === 'Super-Admin' && userData.votos.length > 0 && viewMode !== 'internas' && (
                                                                         <div 
                                                                             className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-2"
                                                                             onPointerDown={(e) => { e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}

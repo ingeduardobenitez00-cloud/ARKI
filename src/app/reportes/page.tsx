@@ -62,6 +62,7 @@ export default function ReportesPage() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin';
   const isPresidente = user?.role === 'Presidente';
@@ -73,10 +74,12 @@ export default function ReportesPage() {
   const registeredQuery = useMemoFirebase(() => {
     if (!db || !user) return null;
 
+    const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : 'votos_confirmados';
+
     if (isDirigente) {
       // El Dirigente solo descarga sus propios votos seguros (sin límite bajo para garantizar carga completa)
       return query(
-        collection(db, 'votos_confirmados'),
+        collection(db, collectionName),
         where('registradoPor_id', '==', user.id),
         orderBy('APELLIDO', 'asc')
       );
@@ -85,10 +88,10 @@ export default function ReportesPage() {
     // Coordinadores, Presidentes, Admins o PC Central descargan de manera fluida y sin límites.
     // Se remueve la llamada a 'limit' por completo, lo que permite traer 20,000 o más registros sin restricciones del servidor de Firebase.
     return query(
-      collection(db, 'votos_confirmados'),
+      collection(db, collectionName),
       orderBy('APELLIDO', 'asc')
     );
-  }, [db, user, isDirigente, isCoordinador, isPresidente, userSeccionales, refreshKey]);
+  }, [db, user, isDirigente, isCoordinador, isPresidente, userSeccionales, refreshKey, viewMode]);
 
   const { data: rawList, isLoading } = useCollection<VotoSeguroData>(registeredQuery);
 
@@ -117,13 +120,15 @@ export default function ReportesPage() {
   // CONTEO GLOBAL DESDE EL SERVIDOR
   useEffect(() => {
     if (!db) return;
-    getCountFromServer(collection(db, 'votos_confirmados')).then((snap: any) => {
+    const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : 'votos_confirmados';
+    
+    getCountFromServer(collection(db, collectionName)).then((snap: any) => {
         setTotalCaptures(snap.data().count);
     });
-    getCountFromServer(query(collection(db, 'votos_confirmados'), where('estado_votacion', '==', 'Ya Votó'))).then((snap: any) => {
+    getCountFromServer(query(collection(db, collectionName), where('estado_votacion', '==', 'Ya Votó'))).then((snap: any) => {
         setTotalVotaronGlobal(snap.data().count);
     });
-  }, [db, refreshKey]);
+  }, [db, refreshKey, viewMode]);
 
   const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
@@ -481,6 +486,27 @@ export default function ReportesPage() {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div><h1 className="text-3xl font-black uppercase tracking-tight flex items-center gap-3"><BookCheck className="h-8 w-8 text-primary" /> Reporte de Carga de Votos Seguros</h1><p className="text-muted-foreground font-medium uppercase text-[10px] tracking-widest mt-1">Control de participación real de votos seguros.</p></div>
+        <div className="flex bg-slate-100 p-1 rounded-2xl w-fit">
+            <button 
+                onClick={() => setViewMode('generales')}
+                className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all", 
+                    viewMode === 'generales' ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+            >
+                Generales
+            </button>
+            <button 
+                onClick={() => setViewMode('internas')}
+                className={cn(
+                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2", 
+                    viewMode === 'internas' ? "bg-orange-500 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                )}
+            >
+                <DatabaseZap className="h-3 w-3" />
+                internas_ANR_2026
+            </button>
+        </div>
       </div>
 
       <Card className="border-primary/10 shadow-sm overflow-hidden">
@@ -503,7 +529,7 @@ export default function ReportesPage() {
                     )}
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    {isAdmin && (
+                    {isAdmin && viewMode === 'generales' && (
                         <Button 
                             variant="secondary" 
                             size="sm" 

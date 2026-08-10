@@ -29,7 +29,8 @@ import {
     Share2,
     MessageSquare,
     Users,
-    FileSpreadsheet
+    FileSpreadsheet,
+    Archive
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
@@ -84,6 +85,7 @@ export default function ConsultaPage() {
     const [isSaving, setIsSaving] = useState(false);
     const [isDeleting, setIsDeleting] = useState(false);
     const [refreshKey, setRefreshKey] = useState(0);
+    const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
 
     const [existingCapture, setExistingCapture] = useState<any>(null);
     const [isCheckingCapture, setIsCheckingCapture] = useState(false);
@@ -118,11 +120,12 @@ export default function ConsultaPage() {
 
         const role = user.role;
         const isDirigente = role === 'Dirigente';
+        const targetCollection = viewMode === 'internas' ? 'votos_confirmados_internas' : COLLECTION_CAPTURAS;
 
         if (isDirigente) {
             // El Dirigente solo descarga sus propios votos seguros (sin límite artificial bajo para poder ver sus 400+ votos)
             return query(
-                collection(db, COLLECTION_CAPTURAS),
+                collection(db, targetCollection),
                 where('registradoPor_id', '==', user.id),
                 orderBy('APELLIDO', 'asc')
             );
@@ -131,10 +134,10 @@ export default function ConsultaPage() {
         // Coordinadores, Admins y Presidentes descargan todo de manera fluida y sin límites.
         // Se remueve la llamada a 'limit' por completo, lo que permite traer 20,000 o más registros sin restricciones del servidor de Firebase.
         return query(
-            collection(db, COLLECTION_CAPTURAS),
+            collection(db, targetCollection),
             orderBy('APELLIDO', 'asc')
         );
-    }, [db, user, userSeccionales, refreshKey]);
+    }, [db, user, userSeccionales, refreshKey, viewMode]);
 
     const { data: rawList, isLoading: isLoadingList, error: listError } = useCollection<PadronData>(registeredQuery);
 
@@ -496,7 +499,7 @@ export default function ConsultaPage() {
                 // Formato internacional paraguayo (5959xxxxxxx)
                 const formattedPhone = cleanPhone.startsWith('09') ? '595' + cleanPhone.substring(1) : (cleanPhone.startsWith('9') ? '595' + cleanPhone : cleanPhone);
                 
-                const messageText = `¡Hola *${selectedOperator.name}*! Te saluda *${user.name}*. Acabo de captar a un elector para tu seccional y te lo acabo de asignar en el sistema: \n\n👤 *Elector:* ${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}\n🪪 *C.I.:* ${selectedPerson.CEDULA}\n📍 *Local:* ${selectedPerson.LOCAL || 'No especificado'}\n📱 *Teléfono:* ${telefono || 'No especificado'}\n\n¡Ya lo tienes en tu listado de Voto Seguro de ARKI! 💪🔴`;
+                const messageText = `¡Hola *${selectedOperator.name}*! Te saluda *${user.name}*. Acabo de captar a un elector para tu seccional y te lo acabo de asignar en el sistema: \n\n👤 *Elector:* ${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}\n🪪 *C.I.:* ${selectedPerson.CEDULA}\n📍 *Local:* ${selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || 'No especificado'}\n📱 *Teléfono:* ${telefono || 'No especificado'}\n\n¡Ya lo tienes en tu listado de Voto Seguro de ARKI! 💪🔴`;
                 
                 const waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
                 window.open(waUrl, '_blank');
@@ -553,8 +556,8 @@ export default function ConsultaPage() {
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
                             <TableCell className="text-center"><Badge variant="outline" className="text-[9px]">SECC {p.CODIGO_SEC}</Badge></TableCell>
                             <TableCell className="text-[10px] uppercase">
-                                <div>{p.LOCAL}</div>
-                                <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>
+                                <div>{p.DESC_LOCAL || p.LOCAL}</div>
+                                <div className="text-primary font-bold">MESA: {p.MESA} / ORDEN: {p.ORDEN}</div>
                             </TableCell>
                             <TableCell className="text-[11px] font-bold text-green-700">{p.TELEFONO || '---'}</TableCell>
                             <TableCell className="text-right">
@@ -570,9 +573,11 @@ export default function ConsultaPage() {
                                     >
                                         <Eye className="h-4 w-4" />
                                     </Button>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsDeleteAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
+                                    {viewMode !== 'internas' && (
+                                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsDeleteAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -626,7 +631,24 @@ export default function ConsultaPage() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
-                    {['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'].includes(user?.role || '') && (
+                    <div className="flex bg-muted/50 p-1 rounded-xl mr-2">
+                        <Button 
+                            variant={viewMode === 'generales' ? 'default' : 'ghost'} 
+                            onClick={() => setViewMode('generales')}
+                            className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'generales' ? "shadow-sm" : "")}
+                        >
+                            Generales
+                        </Button>
+                        <Button 
+                            variant={viewMode === 'internas' ? 'default' : 'ghost'} 
+                            onClick={() => setViewMode('internas')}
+                            className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm" : "")}
+                        >
+                            <Archive className="w-3.5 h-3.5 mr-2" />
+                            internas_ANR_2026
+                        </Button>
+                    </div>
+                    {['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'].includes(user?.role || '') && viewMode !== 'internas' && (
                         <Link href="/migrar-votos">
                             <Button 
                                 variant="outline" 
@@ -637,7 +659,7 @@ export default function ConsultaPage() {
                             </Button>
                         </Link>
                     )}
-                    <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black px-4 py-2 text-xs">{registeredList.length} CAPTURAS ACTIVAS</Badge>
+                    <Badge variant="secondary" className="bg-primary/5 text-primary border-primary/10 font-black px-4 py-2 text-xs">{registeredList.length} CAPTURAS {viewMode === 'internas' ? 'HISTÓRICAS' : 'ACTIVAS'}</Badge>
                 </div>
             </div>
 
@@ -670,7 +692,7 @@ export default function ConsultaPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Cédula</Label><p className="font-black text-sm">{selectedPerson.CEDULA}</p></div>
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
-                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Referencia</Label><p className="font-black uppercase">{selectedPerson.LOCAL} | M: {selectedPerson.MESA} / O: {selectedPerson.ORDEN}</p></div>
+                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
                                 </div>
                                 {isCheckingCapture ? (
                                     <div className="flex items-center justify-center py-4 text-muted-foreground text-xs font-bold uppercase animate-pulse">
@@ -688,10 +710,21 @@ export default function ConsultaPage() {
                                         </div>
                                     </div>
                                 ) : null}
+                                {viewMode === 'internas' && selectedPerson.registradoPor_nombre_internas && (
+                                    <div className="bg-slate-50 border-2 border-slate-200 rounded-2xl p-4 flex items-start gap-3 mt-2">
+                                        <History className="h-5 w-5 text-slate-600 shrink-0 mt-0.5" />
+                                        <div>
+                                            <h4 className="text-slate-800 font-black uppercase text-xs">Histórico Internas 2026</h4>
+                                            <p className="text-slate-700 font-medium text-[11px] uppercase mt-1">
+                                                En las internas fue captado por: <span className="font-black">{selectedPerson.registradoPor_nombre_internas}</span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                )}
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-5">
-                                        <div className="space-y-2"><Label className="font-black text-[10px] uppercase">WhatsApp</Label><Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black text-lg" inputMode="numeric"/></div>
-                                        <Button onClick={handleSave} disabled={isSaving} className="w-full h-14 font-black uppercase text-base bg-primary shadow-xl rounded-2xl">{isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR VOTO SEGURO</Button>
+                                        <div className="space-y-2"><Label className="font-black text-[10px] uppercase">WhatsApp</Label><Input value={telefono} onChange={(e) => setTelefono(applyPhoneMask(e.target.value))} placeholder="0981-123-456" className="h-11 font-black text-lg" inputMode="numeric" disabled={viewMode === 'internas'}/></div>
+                                        <Button onClick={handleSave} disabled={isSaving || viewMode === 'internas'} className="w-full h-14 font-black uppercase text-base bg-primary shadow-xl rounded-2xl">{isSaving ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-5 w-5" />} GUARDAR VOTO SEGURO</Button>
                                     </div>
                                     <div className="space-y-4">
                                         {!showGps ? (
@@ -709,7 +742,7 @@ export default function ConsultaPage() {
                                         ) : (
                                             <>
                                                 <div className="h-[280px] border-2 rounded-3xl overflow-hidden shadow-inner"><MapPicker key={`picker-${selectedPerson.id}-${manualLat}-${manualLon}`} lat={manualLat ? parseFloat(manualLat) : null} lon={manualLon ? parseFloat(manualLon) : null} onLocationPick={handleLocationPick} /></div>
-                                                <Button variant="secondary" className="w-full bg-red-600 text-white h-11 font-black rounded-xl text-xs uppercase" onClick={handleCaptureLocation} disabled={isCapturingLocation}><Navigation className="mr-2 h-4 w-4" /> CAPTURAR GPS</Button>
+                                                <Button variant="secondary" className="w-full bg-red-600 text-white h-11 font-black rounded-xl text-xs uppercase" onClick={handleCaptureLocation} disabled={isCapturingLocation || viewMode === 'internas'}><Navigation className="mr-2 h-4 w-4" /> CAPTURAR GPS</Button>
                                             </>
                                         )}
                                     </div>

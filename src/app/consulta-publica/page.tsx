@@ -129,7 +129,7 @@ export default function ConsultaPublicaPage() {
         <div className="mb-6 text-center space-y-2">
             <h1 className="text-xl font-black uppercase tracking-tight text-slate-800 flex items-center justify-center gap-2">
                 <Library className="h-6 w-6 text-primary" />
-                Consulta RCP
+                Consulta Padrón
             </h1>
             <p className="text-xs text-slate-500 font-bold uppercase tracking-wider">Verifica tu local y mesa de votación en Capital</p>
         </div>
@@ -181,10 +181,6 @@ export default function ConsultaPublicaPage() {
                                 <div className="flex-1">
                                     <h3 className="font-black text-lg uppercase text-slate-800 leading-tight">{row.NOMBRE} {row.APELLIDO}</h3>
                                     <p className="text-xs font-bold text-slate-500 mt-1 uppercase">CI: <span className="font-mono tracking-tight">{row.CEDULA}</span></p>
-                                </div>
-                                <div className="h-12 w-12 rounded-2xl bg-primary/10 flex flex-col items-center justify-center border border-primary/20 shrink-0 shadow-sm">
-                                    <span className="text-[8px] font-black uppercase text-primary leading-none">SECC</span>
-                                    <span className="text-base font-black text-primary leading-none mt-0.5">{row.CODIGO_SEC}</span>
                                 </div>
                             </div>
                             

@@ -7,6 +7,7 @@ import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useAuth } from '@/hooks/use-auth';
 import { useDoc } from '@/firebase/firestore/use-doc';
 import { Switch } from '@/components/ui/switch';
+import { Progress } from '@/components/ui/progress';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -306,6 +307,7 @@ function LocalesAssignmentManager() {
   const [selectedSeccionales, setSelectedSeccionales] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
   const [filter, setFilter] = useState<'pending' | 'asignado' | 'todos'>('pending');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchLocales = async () => {
     if (!db) return;
@@ -313,11 +315,11 @@ function LocalesAssignmentManager() {
     try {
       let q = collection(db, 'locales_votacion');
       if (filter === 'pending') {
-        q = query(q, where('status', '==', 'pending_seccional'), limit(150));
+        q = query(q, where('status', '==', 'pending_seccional'), limit(500));
       } else if (filter === 'asignado') {
-        q = query(q, where('status', '==', 'asignado'), limit(150));
+        q = query(q, where('status', '==', 'asignado'), limit(500));
       } else {
-        q = query(q, limit(150));
+        q = query(q, limit(500));
       }
       const snap = await getDocs(q);
       setLocales(snap.docs.map(d => ({ id: d.id, ...d.data() })));
@@ -384,33 +386,52 @@ function LocalesAssignmentManager() {
   };
 
   const seccionalesOptions = Array.from({length: 45}, (_, i) => String(i + 1));
+  const filteredLocales = locales.filter(l => 
+    l.total_electores > 0 && 
+    l.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <Card className="border-primary/10 shadow-sm rounded-3xl overflow-hidden bg-white lg:col-span-3">
-      <CardHeader className="bg-primary/5 border-b py-4 flex flex-row items-center justify-between">
-        <CardTitle className="font-black uppercase text-xs flex items-center gap-2">
+      <CardHeader className="bg-primary/5 border-b py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <CardTitle className="font-black uppercase text-xs flex items-center gap-2 shrink-0">
           <MapPin className="h-4 w-4 text-primary" />
           Gestión de Locales y Seccionales
         </CardTitle>
-        <select 
-          className="text-xs font-bold border rounded-lg px-2 py-1 outline-none bg-white"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as any)}
-        >
-          <option value="pending">Solo Pendientes</option>
-          <option value="asignado">Solo Asignados</option>
-          <option value="todos">Todos los Locales</option>
-        </select>
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Input 
+                placeholder="BUSCAR LOCAL..." 
+                className="h-8 text-xs font-bold w-full sm:w-64"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <select 
+              className="text-xs font-bold border rounded-lg px-2 py-1 outline-none bg-white shrink-0 h-8"
+              value={filter}
+              onChange={(e) => setFilter(e.target.value as any)}
+            >
+              <option value="pending">Solo Pendientes</option>
+              <option value="asignado">Solo Asignados</option>
+              <option value="todos">Todos los Locales</option>
+            </select>
+        </div>
       </CardHeader>
       <CardContent className="pt-6">
         <div className="space-y-3">
           {isLoading ? <Loader2 className="animate-spin h-5 w-5 mx-auto opacity-20" /> : 
-           locales.length === 0 ? <p className="text-[10px] text-center text-muted-foreground uppercase py-4">No hay locales pendientes de asignación</p> :
-           locales.map(l => (
+           filteredLocales.length === 0 ? <p className="text-[10px] text-center text-muted-foreground uppercase py-4">No hay locales para mostrar</p> :
+           filteredLocales.map(l => (
             <div key={l.id} className="flex flex-col md:flex-row md:items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 gap-4 hover:border-primary/30 transition-colors">
               <div className="flex flex-col">
                 <span className="text-xs font-black uppercase text-slate-800">{l.nombre}</span>
-                <span className="text-[9px] font-bold text-muted-foreground uppercase">{l.distrito} - {l.zona}</span>
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase">{l.distrito} - {l.zona}</span>
+                    {l.total_electores && (
+                        <span className="text-[9px] font-black text-primary bg-primary/10 px-2 py-0.5 rounded-md">
+                            {l.total_electores.toLocaleString()} Electores • {l.total_mesas} Mesas
+                        </span>
+                    )}
+                </div>
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 <select 
@@ -444,8 +465,9 @@ export default function ConfiguracionPage() {
   const { user } = useAuth();
   const db = useFirestore();
   const [isOptimizing, setIsOptimizing] = useState(false);
-  const [isResetting, setIsResetting] = useState(false);
-  const [isResetAlertOpen, setIsResetAlertOpen] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [archiveProgress, setArchiveProgress] = useState({ current: 0, total: 0, text: '' });
+  const [isArchiveAlertOpen, setIsArchiveAlertOpen] = useState(false);
   const [cardUnlockPassword, setCardUnlockPassword] = useState('');
   const { toast } = useToast();
 
@@ -465,8 +487,8 @@ export default function ConfiguracionPage() {
       }
   };
 
-  const openResetDialog = () => {
-    setIsResetAlertOpen(true);
+  const openArchiveDialog = () => {
+    setIsArchiveAlertOpen(true);
   };
 
   const isAdmin = user?.role === 'Admin' || user?.role === 'Super-Admin' || user?.role === 'Presidente';
@@ -489,72 +511,119 @@ export default function ConfiguracionPage() {
     }
   };
 
-  const handleResetVotes = async () => {
+  const handleArchiveData = async () => {
     if (!db || !user) return;
     if (cardUnlockPassword !== 'ARKI2026') {
         toast({ title: "Acceso Denegado", description: "La contraseña de seguridad es incorrecta.", variant: "destructive" });
         return;
     }
-    setIsResetting(true);
+    setIsArchiving(true);
     try {
-        // 1. Limpiar en el Padrón Principal
-        const qSheet = query(
-            collection(db, SHEET_COLLECTION),
-            where('estado_votacion', '==', 'Ya Votó')
-        );
-        const snapshotSheet = await getDocs(qSheet);
-        
-        // 2. Limpiar en la lista de Votos Seguros
-        const qVotos = query(
-            collection(db, 'votos_confirmados'),
-            where('estado_votacion', '==', 'Ya Votó')
-        );
+        // 1. Obtener todos los Votos Seguros (votos_confirmados)
+        const qVotos = query(collection(db, 'votos_confirmados'));
         const snapshotVotos = await getDocs(qVotos);
         
-        const docs = [...snapshotSheet.docs, ...snapshotVotos.docs];
-        const total = docs.length;
+        // 2. Obtener todos los registros en sheet1 que tengan algún dato a archivar
+        // Usaremos getDocs general porque 'or' queries son complejas de iterar con grandes volúmenes,
+        // pero dado que es un script administrativo, vamos a hacer queries separadas y unirlas.
         
-        if (total === 0) {
-            toast({ title: "Operación Cancelada", description: "No se hallaron electores marcados como 'Votó' para reiniciar." });
-            setIsResetAlertOpen(false);
-            setIsResetting(false);
+        // Votos emitidos (Día D)
+        const qSheetDiaD = await getDocs(query(collection(db, SHEET_COLLECTION), where('estado_votacion', '==', 'Ya Votó')));
+        
+        // Votos Seguros captados en sheet1 (los que tienen registradoPor_id)
+        const qSheetVotoSeguro = await getDocs(query(collection(db, SHEET_COLLECTION), where('observacion', '==', 'VOTO SEGURO')));
+        
+        const sheetMap = new Map();
+        qSheetDiaD.forEach(d => sheetMap.set(d.id, d));
+        qSheetVotoSeguro.forEach(d => sheetMap.set(d.id, d));
+        
+        const sheetDocs = Array.from(sheetMap.values());
+        
+        const totalVotos = snapshotVotos.docs.length;
+        const totalSheet = sheetDocs.length;
+        
+        if (totalVotos === 0 && totalSheet === 0) {
+            toast({ title: "Operación Cancelada", description: "No se hallaron registros activos para archivar." });
+            setIsArchiveAlertOpen(false);
+            setIsArchiving(false);
             return;
         }
 
-        let processed = 0;
+        const totalItems = totalVotos + totalSheet;
+        setArchiveProgress({ current: 0, total: totalItems, text: 'Iniciando archivado...' });
 
-        while (processed < total) {
+        // Archivar votos_confirmados -> votos_confirmados_internas
+        let processedVotos = 0;
+        let globalProcessed = 0;
+        while (processedVotos < snapshotVotos.docs.length) {
             const batch = writeBatch(db);
-            const chunk = docs.slice(processed, processed + 500);
+            const chunk = snapshotVotos.docs.slice(processedVotos, processedVotos + 250);
             
             chunk.forEach(d => {
-                batch.update(d.ref, {
-                    estado_votacion: deleteField()
-                });
+                const docData = d.data();
+                // Escribir en _internas
+                batch.set(doc(db, 'votos_confirmados_internas', d.id), docData);
+                // Borrar el original
+                batch.delete(d.ref);
             });
-
             await batch.commit();
-            processed += chunk.length;
+            processedVotos += chunk.length;
+            globalProcessed += chunk.length;
+            setArchiveProgress({ current: globalProcessed, total: totalItems, text: `Archivando capturas (${processedVotos}/${totalVotos})...` });
         }
+
+        // Archivar datos en sheet1 (Mover a sufijos _internas)
+        let processedSheet = 0;
+        while (processedSheet < sheetDocs.length) {
+            const batch = writeBatch(db);
+            const chunk = sheetDocs.slice(processedSheet, processedSheet + 500);
+            
+            chunk.forEach(d => {
+                const data = d.data();
+                const updateData: any = {
+                    estado_votacion: deleteField(),
+                    registradoPor_id: deleteField(),
+                    registradoPor_nombre: deleteField(),
+                    observacion: deleteField(),
+                    delegadoPor_id: deleteField(),
+                    delegadoPor_nombre: deleteField(),
+                };
+                
+                if (data.estado_votacion) updateData.estado_votacion_internas = data.estado_votacion;
+                if (data.registradoPor_id) updateData.registradoPor_id_internas = data.registradoPor_id;
+                if (data.registradoPor_nombre) updateData.registradoPor_nombre_internas = data.registradoPor_nombre;
+                if (data.observacion) updateData.observacion_internas = data.observacion;
+                if (data.delegadoPor_id) updateData.delegadoPor_id_internas = data.delegadoPor_id;
+                if (data.delegadoPor_nombre) updateData.delegadoPor_nombre_internas = data.delegadoPor_nombre;
+                
+                batch.update(d.ref, updateData);
+            });
+            await batch.commit();
+            processedSheet += chunk.length;
+            globalProcessed += chunk.length;
+            setArchiveProgress({ current: globalProcessed, total: totalItems, text: `Limpiando padrón base (${processedSheet}/${totalSheet})...` });
+        }
+
+        setArchiveProgress({ current: totalItems, total: totalItems, text: '¡Proceso Completado!' });
 
         logAction(db, {
             userId: user.id,
             userName: user.name,
             module: 'CONFIGURACION',
-            action: 'REINICIÓ SEGUIMIENTO DE VOTACIÓN (DÍA D)',
-            details: { registros_afectados: total }
+            action: 'ARCHIVÓ DATOS A INTERNAS 2026',
+            details: { votos_archivados: totalVotos, padron_afectados: totalSheet }
         });
 
         toast({ 
-            title: "¡Reinicio Exitoso!", 
-            description: `Se han limpiado ${total} marcas de participación del sistema (Padrón y Votos Seguros).` 
+            title: "¡Archivado Exitoso!", 
+            description: `Se han archivado ${totalVotos} capturas y actualizado ${totalSheet} registros en el padrón.` 
         });
     } catch (error) {
         console.error(error);
-        toast({ title: "Error Crítico", description: "No se pudo completar el reinicio de participación.", variant: "destructive" });
+        toast({ title: "Error Crítico", description: "No se pudo completar el archivado.", variant: "destructive" });
     } finally {
-        setIsResetting(false);
-        setIsResetAlertOpen(false);
+        setIsArchiving(false);
+        setIsArchiveAlertOpen(false);
         setCardUnlockPassword('');
     }
   };
@@ -678,17 +747,41 @@ export default function ConfiguracionPage() {
             <CardContent className="pt-6 space-y-4">
                 <Button 
                     variant="outline" 
-                    onClick={openResetDialog}
+                    onClick={(e) => {
+                        if (isArchiving) {
+                            e.preventDefault();
+                            return;
+                        }
+                        openArchiveDialog();
+                    }}
                     className={cn(
-                        "w-full justify-start font-black text-[10px] uppercase h-11 rounded-xl transition-all",
-                        cardUnlockPassword === 'ARKI2026' 
+                        "w-full justify-start font-black text-[10px] uppercase h-11 rounded-xl transition-all relative overflow-hidden",
+                        cardUnlockPassword === 'ARKI2026' || isArchiving
                             ? "bg-destructive text-white hover:bg-destructive/90 border-transparent shadow-md" 
                             : "text-destructive border-destructive/20 hover:bg-destructive/10 bg-transparent cursor-not-allowed"
                     )}
-                    disabled={!isAdmin || isResetting || cardUnlockPassword !== 'ARKI2026'}
+                    disabled={(!isAdmin || cardUnlockPassword !== 'ARKI2026') && !isArchiving}
                 >
-                    {isResetting ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : <RefreshCw className="mr-2 h-4 w-4" />} 
-                    REINICIAR SEGUIMIENTO DE VOTACIÓN
+                    {isArchiving ? (
+                        <div className="w-full flex items-center justify-between px-2 relative z-10">
+                            <div className="flex items-center gap-2">
+                                <Loader2 className="animate-spin h-4 w-4" /> 
+                                <span>{archiveProgress.text}</span>
+                            </div>
+                            <span>{archiveProgress.total > 0 ? Math.round((archiveProgress.current / archiveProgress.total) * 100) : 0}%</span>
+                        </div>
+                    ) : (
+                        <>
+                            <RefreshCw className="mr-2 h-4 w-4" /> 
+                            ARCHIVAR DATOS A INTERNAS 2026
+                        </>
+                    )}
+                    {isArchiving && archiveProgress.total > 0 && (
+                        <div 
+                            className="absolute top-0 left-0 h-full bg-black/20 transition-all duration-300 z-0"
+                            style={{ width: `${(archiveProgress.current / archiveProgress.total) * 100}%` }}
+                        />
+                    )}
                 </Button>
 
                 <div className="space-y-1.5 pt-2 border-t border-destructive/10">
@@ -703,35 +796,51 @@ export default function ConfiguracionPage() {
                 </div>
 
                 <p className="text-[9px] font-bold text-destructive/60 uppercase text-center leading-normal">
-                    ESTA ACCIÓN BORRARÁ TODAS LAS MARCAS DE "YA VOTÓ" DEL DÍA D, REESTABLECIENDO EL PADRÓN A ESTADO PENDIENTE.
+                    ESTA ACCIÓN ARCHIVARÁ TODAS LAS MARCAS DE DÍA D Y VOTOS SEGUROS COMO "INTERNAS 2026" Y LIMPIARÁ EL PADRÓN PARA LAS GENERALES. LOS TELÉFONOS SE MANTENDRÁN.
                 </p>
             </CardContent>
         </Card>
       </div>
 
-      <AlertDialog open={isResetAlertOpen} onOpenChange={setIsResetAlertOpen}>
+      <AlertDialog open={isArchiveAlertOpen} onOpenChange={setIsArchiveAlertOpen}>
         <AlertDialogContent className="rounded-[2rem]">
             <AlertDialogHeader>
                 <AlertDialogTitle className="font-black uppercase tracking-tight text-xl flex items-center gap-3">
                     <AlertTriangle className="h-6 w-6 text-destructive animate-pulse" />
-                    ¿Confirmar Reinicio de Seguimiento?
+                    ¿Confirmar Archivado de Datos?
                 </AlertDialogTitle>
                 <AlertDialogDescription className="font-bold text-sm uppercase leading-relaxed pt-2 text-slate-600">
-                    Estás a punto de eliminar <strong>TODAS LAS MARCAS DE PARTICIPACIÓN</strong> registradas. 
+                    Estás a punto de archivar <strong>TODAS LAS CAPTURAS Y VOTOS</strong> actuales como datos históricos de las Internas 2026. 
                     <br/><br/>
-                    Esto reestablecerá el control de asistencia a las mesas para una nueva jornada electoral.
+                    Esto dejará el sistema principal limpio y listo para registrar las Elecciones Generales, sin perder los números de teléfono recolectados.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter className="gap-2 pt-4 border-t border-slate-100 mt-2">
-                <AlertDialogCancel className="font-black uppercase text-[10px] h-11 rounded-xl">CANCELAR</AlertDialogCancel>
-                <AlertDialogAction 
-                    onClick={handleResetVotes} 
-                    className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] h-11 px-8 rounded-xl shadow-lg flex items-center gap-2"
-                    disabled={isResetting}
+                <AlertDialogCancel disabled={isArchiving} className="font-black uppercase text-[10px] h-11 rounded-xl">CANCELAR</AlertDialogCancel>
+                <Button 
+                    onClick={(e) => {
+                        e.preventDefault(); // Prevent closing
+                        if (!isArchiving) handleArchiveData();
+                    }} 
+                    className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] h-11 px-8 rounded-xl shadow-lg flex items-center gap-2 relative overflow-hidden"
+                    disabled={isArchiving}
                 >
-                    {isResetting ? <Loader2 className="animate-spin h-4 w-4" /> : <Trash2 className="h-4 w-4" />} 
-                    REINICIAR AHORA
-                </AlertDialogAction>
+                    {isArchiving ? (
+                        <>
+                            <Loader2 className="animate-spin h-4 w-4 relative z-10" /> 
+                            <span className="relative z-10">{archiveProgress.text || 'ARCHIVANDO...'}</span>
+                            <div 
+                                className="absolute top-0 left-0 h-full bg-white/20 transition-all duration-300 z-0"
+                                style={{ width: `${archiveProgress.total > 0 ? (archiveProgress.current / archiveProgress.total) * 100 : 0}%` }}
+                            />
+                        </>
+                    ) : (
+                        <>
+                            <Trash2 className="h-4 w-4" /> 
+                            ARCHIVAR AHORA
+                        </>
+                    )}
+                </Button>
             </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

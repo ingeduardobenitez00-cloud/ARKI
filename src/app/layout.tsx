@@ -440,7 +440,7 @@ export default function RootLayout({
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
-        <title>{isConsulta ? 'ARKI - Consulta RCP' : 'ARKI CONCEJAL LISTA 1 OPCION 5'}</title>
+        <title>{isConsulta ? 'ARKI - Consulta Padrón' : 'ARKI CONCEJAL LISTA 1 OPCION 5'}</title>
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0" />
         <meta name="theme-color" content="#ef4444" />
         <meta name="mobile-web-app-capable" content="yes" />
@@ -449,7 +449,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-title" content={isConsulta ? "ARKI Consulta" : "ARKI 1"} />
         
         {/* Open Graph Meta Tags for Social Sharing (WhatsApp, etc.) */}
-        <meta property="og:title" content={isConsulta ? 'ARKI - Consulta RCP' : 'ARKI CONCEJAL LISTA 1 OPCION 5'} />
+        <meta property="og:title" content={isConsulta ? 'ARKI - Consulta Padrón' : 'ARKI CONCEJAL LISTA 1 OPCION 5'} />
         <meta property="og:description" content={isConsulta ? 'Verifica tu local y mesa de votación en Capital' : 'Sistema de Gestión LISTA 1 - OPCION 5 - Equipo Arki Sotomayor'} />
         <meta property="og:image" content="/logo.png" />
         <meta property="og:type" content="website" />
