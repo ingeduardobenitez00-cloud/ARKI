@@ -389,7 +389,12 @@ function LocalesAssignmentManager() {
   const filteredLocales = locales.filter(l => 
     l.total_electores > 0 && 
     l.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  ).sort((a, b) => {
+    const secA = parseInt(a.seccional_id) || 999;
+    const secB = parseInt(b.seccional_id) || 999;
+    if (secA !== secB) return secA - secB;
+    return (a.nombre || '').localeCompare(b.nombre || '');
+  });
 
   return (
     <Card className="border-primary/10 shadow-sm rounded-3xl overflow-hidden bg-white lg:col-span-3">

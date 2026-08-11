@@ -83,11 +83,25 @@ async function updateLocalesMesaOrdenDbf() {
             const cedulaStr = String(record[cedulaKey]).trim();
             const updateData = {};
 
-            // Solo mapeamos los campos si existen en el DBF
+            // Mapeamos ubicacion electoral obligatoria
             if (localKey && record[localKey]) updateData.LOCAL = String(record[localKey]).trim().toUpperCase();
             if (mesaKey && record[mesaKey]) updateData.MESA = String(record[mesaKey]).trim();
             if (ordenKey && record[ordenKey]) updateData.ORDEN = String(record[ordenKey]).trim();
             if (secKey && record[secKey]) updateData.CODIGO_SEC = String(record[secKey]).trim();
+            
+            // Extraer y forzar datos basicos perdidos (si la base no los tenia)
+            // Firebase con { merge: true } agregara esto si faltaba, o sobreescribira
+            // pero como los nombres vienen del DBF oficial, es seguro actualizarlos.
+            let nombreKey = Object.keys(record).find(k => k.trim().toUpperCase() === 'NOMBRE');
+            let apellidoKey = Object.keys(record).find(k => k.trim().toUpperCase() === 'APELLIDO');
+            let dirKey = Object.keys(record).find(k => k.trim().toUpperCase() === 'DIRECCION');
+            let fnKey = Object.keys(record).find(k => k.trim().toUpperCase() === 'FECHA_NACI' || k.trim().toUpperCase() === 'FEC_NAC');
+            
+            updateData.CEDULA = cedulaStr;
+            if (nombreKey && record[nombreKey]) updateData.NOMBRE = String(record[nombreKey]).trim().toUpperCase();
+            if (apellidoKey && record[apellidoKey]) updateData.APELLIDO = String(record[apellidoKey]).trim().toUpperCase();
+            if (dirKey && record[dirKey]) updateData.DIRECCION = String(record[dirKey]).trim().toUpperCase();
+            if (fnKey && record[fnKey]) updateData.FECHA_NACI = String(record[fnKey]).trim();
 
             // Si hay algo que actualizar
             if (Object.keys(updateData).length > 0) {

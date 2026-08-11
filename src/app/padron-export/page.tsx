@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { collection, getDocs, query, where } from 'firebase/firestore';
+import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -18,11 +18,21 @@ import { useAuth } from '@/hooks/use-auth';
 import { cn } from '@/lib/utils';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import JSZip from 'jszip';
 
 interface PadronDocument {
   id: string;
   [key: string]: any;
 }
+
+const loadImage = (url: string): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+    });
+};
 
 const PAGE_SIZE = 50;
 const COLLECTION_NAME = 'sheet1';
@@ -49,6 +59,8 @@ export default function PadronExportPage() {
   const [seccionales, setSeccionales] = useState<{id: string, nombre: string}[]>([]);
   
   const [selectedSeccional, setSelectedSeccional] = useState<string>('ALL');
+  const [locales, setLocales] = useState<string[]>([]);
+  const [selectedLocal, setSelectedLocal] = useState<string>('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
@@ -87,18 +99,60 @@ export default function PadronExportPage() {
     
     try {
         const cleanVal = String(selectedSeccional).trim();
-        const dataCollection = collection(db, COLLECTION_NAME);
-        
-        const qText = query(dataCollection, where('CODIGO_SEC', '==', cleanVal));
-        const snapshotText = await getDocs(qText);
-        let records = snapshotText.docs.map(d => ({ id: d.id, ...d.data() } as PadronDocument));
 
-        if (!isNaN(Number(cleanVal))) {
-            const qNum = query(dataCollection, where('CODIGO_SEC', '==', Number(cleanVal)));
-            const snapshotNum = await getDocs(qNum);
-            const numRecords = snapshotNum.docs.map(d => ({ id: d.id, ...d.data() } as PadronDocument));
-            const seenIds = new Set(records.map(r => r.id));
-            numRecords.forEach(r => { if (!seenIds.has(r.id)) records.push(r); });
+        let metadataLocales: string[] = [];
+        try {
+            const localesRef = collection(db, 'locales_votacion');
+            const qLocales = query(localesRef, where('seccional_id', '==', cleanVal));
+            const localesSnap = await getDocs(qLocales);
+            
+            metadataLocales = localesSnap.docs
+                .map(d => d.data().nombre || d.data().LOCAL)
+                .filter(Boolean)
+                .map(name => String(name).trim().toUpperCase());
+                
+            metadataLocales.sort();
+            setLocales(Array.from(new Set(metadataLocales)));
+        } catch (e) {
+            console.error("Error fetching locales:", e);
+            setLocales([]);
+        }
+        setSelectedLocal('ALL');
+
+        const dataCollection = collection(db, COLLECTION_NAME);
+        let records: PadronDocument[] = [];
+        
+        const uniqueLocales = Array.from(new Set(metadataLocales));
+
+        if (uniqueLocales.length > 0) {
+            const chunkSize = 30;
+            const chunks = [];
+            for (let i = 0; i < uniqueLocales.length; i += chunkSize) {
+                chunks.push(uniqueLocales.slice(i, i + chunkSize));
+            }
+            
+            const fetchPromises = chunks.map(async (chunk) => {
+                const q = query(dataCollection, where('LOCAL', 'in', chunk));
+                const snap = await getDocs(q);
+                return snap.docs.map(d => {
+                    const data = d.data();
+                    if (!data.CEDULA) {
+                        data.CEDULA = d.id;
+                    }
+                    return { id: d.id, ...data } as PadronDocument;
+                });
+            });
+            
+            const results = await Promise.all(fetchPromises);
+            const allFetched = results.flat();
+            
+            const seenIds = new Set();
+            for (const r of allFetched) {
+                if (!seenIds.has(r.id)) {
+                    seenIds.add(r.id);
+                    records.push(r);
+                }
+            }
         }
 
         records.sort((a, b) => {
@@ -114,6 +168,7 @@ export default function PadronExportPage() {
             toast({ title: "Sin registros", description: `No se hallaron datos para la seccional ${cleanVal}.` });
         }
     } catch (error: any) {
+        console.error(error);
         toast({ title: "Error técnico", variant: "destructive" });
     } finally {
         setIsLoading(false);
@@ -121,28 +176,69 @@ export default function PadronExportPage() {
   }, [db, selectedSeccional, toast]);
 
   useEffect(() => { 
-    if (selectedSeccional !== 'ALL') loadSeccionalData(); 
+    if (selectedSeccional !== 'ALL') {
+      loadSeccionalData(); 
+    } else {
+      setLocales([]);
+      setSelectedLocal('ALL');
+    }
   }, [selectedSeccional, loadSeccionalData]);
 
   const filteredData = useMemo(() => {
+    let data = allSeccionalData;
+    
+    if (selectedLocal !== 'ALL') {
+      const targetLocal = selectedLocal.trim().toUpperCase();
+      data = data.filter(p => {
+          const valLocal = String(p.LOCAL || '').trim().toUpperCase();
+          const valDesc1 = String(p.DESC_LOCAL || '').trim().toUpperCase();
+          const valDesc2 = String(p.LOCAL_DESC || '').trim().toUpperCase();
+          const valDesc3 = String(p.NOMBRE_LOCAL || '').trim().toUpperCase();
+          return valLocal === targetLocal || valDesc1 === targetLocal || valDesc2 === targetLocal || valDesc3 === targetLocal;
+      });
+    }
+
     const term = searchTerm.trim().toUpperCase();
-    if (!term) return allSeccionalData;
+    if (!term) return data;
     const searchWords = term.split(' ').filter(word => word.length > 0);
-    return allSeccionalData.filter(p => {
+    return data.filter(p => {
         const fullName = `${p.NOMBRE || ''} ${p.APELLIDO || ''}`.toUpperCase();
         const ci = String(p.CEDULA || '');
         return searchWords.every(word => fullName.includes(word)) || ci.includes(term);
     });
-  }, [allSeccionalData, searchTerm]);
+  }, [allSeccionalData, searchTerm, selectedLocal]);
 
   const displayData = useMemo(() => filteredData.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE), [filteredData, page]);
   const totalPages = useMemo(() => Math.ceil(filteredData.length / PAGE_SIZE), [filteredData]);
 
   const formatValue = (value: any, key: string): string => {
     if (value === null || typeof value === 'undefined' || String(value) === 'null') return '';
-    if (key === 'FECHA_NACI' && typeof value === 'number') {
-        const date = new Date(Math.round((value - 25569) * 86400 * 1000));
-        if (!isNaN(date.getTime())) return date.toLocaleDateString('es-ES', { timeZone: 'UTC' });
+    if (key === 'FECHA_NACI') {
+        if (typeof value === 'number') {
+            const date = new Date(Math.round((value - 25569) * 86400 * 1000));
+            if (!isNaN(date.getTime())) {
+                const day = String(date.getUTCDate()).padStart(2, '0');
+                const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                const year = date.getUTCFullYear();
+                return `${day}/${month}/${year}`;
+            }
+        } else if (typeof value === 'string') {
+            const valTrimmed = value.trim();
+            if (/^\d{4}-\d{2}-\d{2}$/.test(valTrimmed)) {
+                const parts = valTrimmed.split('-');
+                return `${parts[2]}/${parts[1]}/${parts[0]}`;
+            }
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(valTrimmed)) {
+                return valTrimmed;
+            }
+            const date = new Date(valTrimmed);
+            if (!isNaN(date.getTime())) {
+                const day = String(date.getDate()).padStart(2, '0');
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const year = date.getFullYear();
+                return `${day}/${month}/${year}`;
+            }
+        }
     }
     return String(value);
   };
@@ -203,22 +299,78 @@ export default function PadronExportPage() {
     try {
         const doc = new jsPDF('p', 'mm', 'a4');
         const pageWidth = doc.internal.pageSize.getWidth();
-        doc.setFontSize(14); doc.setTextColor(239, 68, 68); doc.setFont("helvetica", "bold");
-        doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 15, { align: 'center' });
-        doc.setFontSize(8); doc.setTextColor(80, 80, 80);
-        doc.text(`Padrón Electoral - SECCIONAL ${selectedSeccional}`, pageWidth / 2, 22, { align: 'center' });
+        
+        let logoIzquierdo: any = null;
+        let leftWidth = 0, leftHeight = 18;
+        let logoDerecho: any = null;
+        let rightWidth = 0, rightHeight = 18;
+
+        try {
+            logoIzquierdo = await loadImage('/logo_derecho.png');
+            leftWidth = leftHeight * (logoIzquierdo.width / logoIzquierdo.height);
+
+            logoDerecho = await loadImage('/logo_izquierdo.png');
+            rightWidth = rightHeight * (logoDerecho.width / logoDerecho.height);
+        } catch (e) {
+            console.log("No se pudieron cargar los logos", e);
+        }
+
+        const titleText = selectedLocal !== 'ALL' 
+            ? `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${selectedLocal}`
+            : `Padrón Electoral - SECCIONAL ${selectedSeccional}`;
         
         const tableColumn = columnsToDisplay.map(c => c.label);
         const tableRows = filteredData.map(row => columnsToDisplay.map(col => formatValue(row[col.key], col.key)));
         
+        const totalPagesExp = '{total_pages_count_string}';
+
         (doc as any).autoTable({ 
             head: [tableColumn], 
             body: tableRows, 
-            startY: 28, 
-            styles: { fontSize: 5, cellPadding: 0.5, halign: 'center' }, 
-            headStyles: { fillColor: [239, 68, 68] }, 
-            margin: { top: 28, left: 5, right: 5 } 
+            startY: 32,
+            theme: 'grid',
+            styles: { 
+                fontSize: 5, 
+                cellPadding: 0.8, 
+                halign: 'center',
+                textColor: [0, 0, 0],
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            }, 
+            headStyles: { 
+                fillColor: [239, 68, 68],
+                textColor: [255, 255, 255],
+                fontStyle: 'bold',
+                lineColor: [0, 0, 0],
+                lineWidth: 0.2
+            }, 
+            alternateRowStyles: {
+                fillColor: [245, 245, 245]
+            },
+            margin: { top: 32, left: 5, right: 5 },
+            didDrawPage: function (data: any) {
+                if (logoIzquierdo) doc.addImage(logoIzquierdo, 'PNG', 12, 10, leftWidth, leftHeight);
+                if (logoDerecho) doc.addImage(logoDerecho, 'PNG', pageWidth - 12 - rightWidth, 10, rightWidth, rightHeight);
+                
+                doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+                doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 18, { align: 'center' });
+                
+                doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+                doc.text(titleText, pageWidth / 2, 25, { align: 'center' });
+
+                let str = 'Página ' + doc.internal.getNumberOfPages();
+                if (typeof doc.putTotalPages === 'function') {
+                    str = str + ' de ' + totalPagesExp;
+                }
+                doc.setFontSize(7);
+                doc.setTextColor(100, 100, 100);
+                doc.text(str, pageWidth - 10, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+            }
         });
+        
+        if (typeof doc.putTotalPages === 'function') {
+            doc.putTotalPages(totalPagesExp);
+        }
         
         doc.save(`padron_vertical_secc_${selectedSeccional}.pdf`);
         toast({ title: "PDF Vertical Generado" });
@@ -229,12 +381,123 @@ export default function PadronExportPage() {
     }
   };
 
+  const handleExportAllLocalesZIP = async () => {
+    if (!canExportPDF) {
+        toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
+        return;
+    }
+    if (allSeccionalData.length === 0) return;
+    
+    setIsExporting(true);
+    toast({ title: "Generando paquete ZIP...", description: "Esto puede tardar unos momentos. Por favor espera." });
+    
+    try {
+        const zip = new JSZip();
+        
+        let logoIzquierdo: any = null;
+        let leftWidth = 0, leftHeight = 18;
+        let logoDerecho: any = null;
+        let rightWidth = 0, rightHeight = 18;
+
+        try {
+            logoIzquierdo = await loadImage('/logo_derecho.png');
+            leftWidth = leftHeight * (logoIzquierdo.width / logoIzquierdo.height);
+
+            logoDerecho = await loadImage('/logo_izquierdo.png');
+            rightWidth = rightHeight * (logoDerecho.width / logoDerecho.height);
+        } catch (e) {}
+
+        const uniqueLocalesInSeccional = Array.from(new Set(allSeccionalData.map(r => {
+            const loc = r.LOCAL || r.DESC_LOCAL || r.LOCAL_DESC || r.NOMBRE_LOCAL;
+            return String(loc || 'DESCONOCIDO').trim().toUpperCase();
+        })));
+
+        const tableColumn = columnsToDisplay.map(c => c.label);
+        
+        for (const local of uniqueLocalesInSeccional) {
+            const localData = allSeccionalData.filter(p => {
+                const loc = String(p.LOCAL || p.DESC_LOCAL || p.LOCAL_DESC || p.NOMBRE_LOCAL || '').trim().toUpperCase();
+                return loc === local;
+            });
+            
+            if (localData.length === 0) continue;
+            
+            const doc = new jsPDF('p', 'mm', 'a4');
+            const pageWidth = doc.internal.pageSize.getWidth();
+            const titleText = `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${local}`;
+            
+            const tableRows = localData.map(row => columnsToDisplay.map(col => formatValue(row[col.key], col.key)));
+            const totalPagesExp = '{total_pages_count_string}';
+
+            (doc as any).autoTable({ 
+                head: [tableColumn], 
+                body: tableRows, 
+                startY: 32,
+                theme: 'grid',
+                styles: { fontSize: 5, cellPadding: 0.8, halign: 'center', textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.2 }, 
+                headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.2 }, 
+                alternateRowStyles: { fillColor: [245, 245, 245] },
+                margin: { top: 32, left: 5, right: 5 },
+                didDrawPage: function (data: any) {
+                    if (logoIzquierdo) doc.addImage(logoIzquierdo, 'PNG', 12, 10, leftWidth, leftHeight);
+                    if (logoDerecho) doc.addImage(logoDerecho, 'PNG', pageWidth - 12 - rightWidth, 10, rightWidth, rightHeight);
+                    
+                    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+                    doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 18, { align: 'center' });
+                    
+                    doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+                    doc.text(titleText, pageWidth / 2, 25, { align: 'center' });
+
+                    let str = 'Página ' + doc.internal.getNumberOfPages();
+                    if (typeof doc.putTotalPages === 'function') {
+                        str = str + ' de ' + totalPagesExp;
+                    }
+                    doc.setFontSize(7);
+                    doc.setTextColor(100, 100, 100);
+                    doc.text(str, pageWidth - 10, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+                }
+            });
+            
+            if (typeof doc.putTotalPages === 'function') {
+                doc.putTotalPages(totalPagesExp);
+            }
+            
+            const pdfBlob = doc.output('blob');
+            const safeLocalName = local.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 30);
+            zip.file(`SECC_${selectedSeccional}_${safeLocalName}.pdf`, pdfBlob);
+            
+            await new Promise(resolve => setTimeout(resolve, 20));
+        }
+
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipBlob);
+        const link = document.body.appendChild(document.createElement('a'));
+        link.href = url;
+        link.download = `TODOS_LOS_LOCALES_SECCIONAL_${selectedSeccional}.zip`;
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        
+        toast({ title: "¡Paquete ZIP descargado exitosamente!" });
+    } catch (e) {
+        console.error(e);
+        toast({ title: "Error al generar ZIP", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
   const openFilenameDialog = () => {
     if (!canExportExcel) {
         toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
         return;
     }
-    setCustomFilename(`PADRON_SECC_${selectedSeccional}_${new Date().getTime()}`);
+    let filenameBase = `PADRON_SECC_${selectedSeccional}`;
+    if (selectedLocal !== 'ALL') {
+        const sanitizedLocal = selectedLocal.replace(/[^a-zA-Z0-9]/g, '_').substring(0, 20);
+        filenameBase += `_${sanitizedLocal}`;
+    }
+    setCustomFilename(`${filenameBase}_${new Date().getTime()}`);
     setIsFilenameDialogOpen(true);
   };
 
@@ -258,6 +521,21 @@ export default function PadronExportPage() {
                     </SelectContent>
                 </Select>
             </div>
+            
+            {selectedSeccional !== 'ALL' && locales.length > 0 && (
+                <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
+                    <Select value={selectedLocal} onValueChange={setSelectedLocal}>
+                        <SelectTrigger className="w-[220px] h-9 border-none bg-transparent font-medium truncate">
+                            <SelectValue placeholder="Elegir Local" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="ALL">TODOS (SECC. {selectedSeccional})</SelectItem>
+                            {locales.map(l => <SelectItem key={l} value={l}>{l}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button variant="default" className="h-11 font-medium shadow-lg uppercase" disabled={isExporting || selectedSeccional === 'ALL'}>
@@ -272,6 +550,11 @@ export default function PadronExportPage() {
                     <DropdownMenuItem onClick={handleExportPDF} disabled={!canExportPDF} className={cn("cursor-pointer font-bold", canExportPDF ? "text-red-600" : "text-muted-foreground")}>
                         {canExportPDF ? <FileText className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} PDF (.pdf)
                     </DropdownMenuItem>
+                    {selectedLocal === 'ALL' && locales.length > 0 && (
+                        <DropdownMenuItem onClick={handleExportAllLocalesZIP} disabled={!canExportPDF} className={cn("cursor-pointer font-bold border-t mt-1 pt-2", canExportPDF ? "text-blue-600" : "text-muted-foreground")}>
+                            {canExportPDF ? <Database className="mr-2 h-4 w-4" /> : <Lock className="mr-2 h-4 w-4" />} TODOS LOS LOCALES (ZIP)
+                        </DropdownMenuItem>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
         </div>
@@ -281,7 +564,7 @@ export default function PadronExportPage() {
         <CardHeader className="bg-muted/30 border-b pb-6">
             <div className="space-y-2 pt-4">
                 <Label className="text-[10px] font-medium uppercase text-muted-foreground tracking-widest">
-                    Búsqueda rápida en vista previa {selectedSeccional !== 'ALL' ? `(Seccional ${selectedSeccional})` : '...'}
+                    Búsqueda rápida en vista previa {selectedSeccional !== 'ALL' ? `(Seccional ${selectedSeccional}${selectedLocal !== 'ALL' ? ` - ${selectedLocal}` : ''})` : '...'}
                 </Label>
                 <div className="flex gap-2">
                     <div className="relative w-full md:w-1/2">
