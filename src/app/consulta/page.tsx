@@ -448,6 +448,7 @@ export default function ConsultaPage() {
         }
         const dataToSave: any = {
             ...selectedPerson,
+            CODIGO_SEC: electorSec, // <-- GUARDAMOS LA SECCIONAL RESUELTA
             observacion: "VOTO SEGURO",
             TELEFONO: telefono,
             registradoPor_id: user.id,
@@ -468,7 +469,7 @@ export default function ConsultaPage() {
 
         Promise.all([
             setDoc(capturaRef, dataToSave),
-            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono }),
+            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono, CODIGO_SEC: electorSec }), // <-- ACTUALIZAMOS EN EL PADRON MAESTRO TAMBIEN
             updateDoc(userRef, { votosCargados: increment(1) }).catch(() => {}) // Ignore if field doesn't exist yet
         ]).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'REGISTRÓ VOTO SEGURO', targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}` });
