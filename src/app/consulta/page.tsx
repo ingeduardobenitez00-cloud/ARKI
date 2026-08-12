@@ -407,14 +407,14 @@ export default function ConsultaPage() {
                 const dptoStr = String(selectedPerson.COD_DPTO || selectedPerson.DEPART || '');
                 const distStr = String(selectedPerson.COD_DIST || selectedPerson.DISTRITO || '');
                 const zonaStr = String(selectedPerson.ZONA || '');
-                const localStr = String(selectedPerson.LOCAL || '');
+                const localStr = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '');
                 
                 const localesQuery = query(
                     collection(db, 'locales_votacion'),
                     where('dpto', '==', dptoStr),
                     where('distrito', '==', distStr),
                     where('zona', '==', zonaStr),
-                    where('local', '==', localStr),
+                    where('nombre', '==', localStr),
                     limit(1)
                 );
                 const locSnap = await getDocs(localesQuery);
