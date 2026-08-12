@@ -404,9 +404,11 @@ export default function ConsultaPage() {
         // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SI ESTÁ VACÍO
         if (!electorSec) {
             try {
-                const dptoStr = String(selectedPerson.COD_DPTO || selectedPerson.DEPART || '');
-                const distStr = String(selectedPerson.COD_DIST || selectedPerson.DISTRITO || '');
-                const zonaStr = String(selectedPerson.ZONA || '');
+                const dptoVal = selectedPerson.COD_DPTO !== undefined && selectedPerson.COD_DPTO !== '' ? selectedPerson.COD_DPTO : selectedPerson.DEPART;
+                const dptoStr = String(dptoVal ?? '');
+                const distVal = selectedPerson.COD_DIST !== undefined && selectedPerson.COD_DIST !== '' ? selectedPerson.COD_DIST : selectedPerson.DISTRITO;
+                const distStr = String(distVal ?? '');
+                const zonaStr = String(selectedPerson.ZONA ?? '');
                 const localStr = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '');
                 
                 const localesQuery = query(
