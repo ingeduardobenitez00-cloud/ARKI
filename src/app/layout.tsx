@@ -148,7 +148,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   // OPTIMIZACIÓN: Las rutas públicas no deben ser bloqueadas por el cargador de autenticación
   const publicRoutes = ['/login', '/inscripcion', '/consulta-publica', '/simulador'];
-  const isPublicRoute = publicRoutes.includes(pathname);
+  const isPublicRoute = publicRoutes.some(route => pathname === route || pathname === route + '/');
 
   if (isLoading && !isPublicRoute) {
     return (

@@ -105,12 +105,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     
     const publicRoutes = ['/login', '/inscripcion', '/consulta-publica', '/simulador'];
 
-    if (!appUser && !publicRoutes.includes(pathname)) {
+    const isPublic = publicRoutes.some(route => pathname === route || pathname === route + '/');
+
+    if (!appUser && !isPublic) {
         router.replace('/login');
     } else if (appUser) {
-        if (pathname === '/login') {
+        if (pathname === '/login' || pathname === '/login/') {
             router.replace('/');
-        } else if (pathname !== '/' && !publicRoutes.includes(pathname) && appUser.permissions && !appUser.permissions.includes(pathname)) {
+        } else if (pathname !== '/' && !isPublic && appUser.permissions && !appUser.permissions.includes(pathname)) {
             router.replace('/');
         }
     }
