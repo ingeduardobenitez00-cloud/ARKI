@@ -394,17 +394,58 @@ export default function ConsultaPage() {
     const handleSave = async () => {
         if (!selectedPerson || !user || !db) return;
 
+        setIsSaving(true);
+
         // VALIDACIÓN DE JURISDICCIÓN
         const role = user.role;
         const isAdmin = role === 'Super-Admin' || role === 'Admin' || role === 'Presidente';
-        const electorSec = String(selectedPerson.CODIGO_SEC || '');
+        let electorSec = String(selectedPerson.CODIGO_SEC || '');
 
-        if (!isAdmin && userSeccionales.length > 0 && !userSeccionales.includes(electorSec)) {
+        // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SI ESTÁ VACÍO
+        if (!electorSec) {
+            try {
+                const dptoStr = String(selectedPerson.COD_DPTO || selectedPerson.DEPART || '');
+                const distStr = String(selectedPerson.COD_DIST || selectedPerson.DISTRITO || '');
+                const zonaStr = String(selectedPerson.ZONA || '');
+                const localStr = String(selectedPerson.LOCAL || '');
+                
+                const localesQuery = query(
+                    collection(db, 'locales_votacion'),
+                    where('dpto', '==', dptoStr),
+                    where('distrito', '==', distStr),
+                    where('zona', '==', zonaStr),
+                    where('local', '==', localStr),
+                    limit(1)
+                );
+                const locSnap = await getDocs(localesQuery);
+                if (!locSnap.empty) {
+                    const locData = locSnap.docs[0].data();
+                    if (locData.seccional_id) {
+                        electorSec = String(locData.seccional_id);
+                    }
+                }
+            } catch (err) {
+                console.error("Error resolviendo seccional del local:", err);
+            }
+        }
+
+        let hasPermission = false;
+        if (electorSec === '') {
+            hasPermission = true; // Si el elector no tiene seccional asignada, se permite guardar
+        } else if (userSeccionales.includes(electorSec)) {
+            hasPermission = true; // Si coincide con la seccional del operador/admin, se permite guardar
+        }
+
+        if (!hasPermission) {
+            setIsSaving(false);
+            if (!selectedPerson.CODIGO_SEC && electorSec) {
+                // Actualizamos al elector seleccionado para que el modal de delegación 
+                // pueda filtrar y sugerir a los operadores de esta seccional.
+                setSelectedPerson({ ...selectedPerson, CODIGO_SEC: electorSec });
+            }
             setIsRestrictedAlertOpen(true);
             return;
         }
-
-        setIsSaving(true);
         const dataToSave: any = {
             ...selectedPerson,
             observacion: "VOTO SEGURO",
