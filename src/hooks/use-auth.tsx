@@ -102,8 +102,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const isLoadingCombined = isAuthLoading || isUserLoading;
     if (isLoadingCombined) return;
-
-    const publicRoutes = ['/login', '/inscripcion', '/consulta-publica'];
+    
+    const publicRoutes = ['/login', '/inscripcion', '/consulta-publica', '/simulador'];
 
     if (!appUser && !publicRoutes.includes(pathname)) {
         router.replace('/login');
