@@ -157,7 +157,7 @@ export default function LoginPage() {
               className="w-full h-11 rounded-2xl border border-red-500/30 bg-red-50 hover:bg-red-100/80 text-red-600 font-bold uppercase tracking-[0.15em] text-[9px] flex items-center justify-center gap-2 transition-all active:scale-95 shadow-sm"
             >
               <span className="text-xs">🗳️</span>
-              SIMULADOR DE VOTACIÓN TSJE
+              SIMULADOR DE MÁQUINA DE VOTACIÓN
             </a>
             
             <div className="space-y-3">

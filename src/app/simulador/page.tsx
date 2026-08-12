@@ -41,9 +41,15 @@ export default function SimuladorPage() {
     window.addEventListener("resize", checkOrientation);
     window.addEventListener("orientationchange", checkOrientation);
 
+    // Timeout de respaldo para ocultar el cargador rápido
+    const fallbackTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
+
     return () => {
       window.removeEventListener("resize", checkOrientation);
       window.removeEventListener("orientationchange", checkOrientation);
+      clearTimeout(fallbackTimer);
     };
   }, []);
 
@@ -52,6 +58,9 @@ export default function SimuladorPage() {
     if (iframeRef.current) {
       iframeRef.current.src = localSimuladorPath;
     }
+    setTimeout(() => {
+      setIsLoading(false);
+    }, 800);
   };
 
   const toggleFullscreen = () => {
@@ -72,7 +81,7 @@ export default function SimuladorPage() {
 
   const handleShareWhatsApp = () => {
     const url = typeof window !== "undefined" ? `${window.location.origin}/simulador` : "https://arki-concejal.web.app/simulador";
-    const text = encodeURIComponent(`🗳️ *Practica tu voto en el Simulador Oficial TSJE*\n\n✅ *LISTA 1 - OPCIÓN 5*\n🏛️ *EL ARKI SOTOMAYOR CONCEJAL*\n👤 *CAMILO PÉREZ INTENDENTE*\n\n👉 Accede aquí y prueba la máquina de votación:\n${url}`);
+    const text = encodeURIComponent(`🗳️ *Practica tu voto en el Simulador de Máquina de Votación*\n\n👉 Accede aquí y prueba la máquina de votación:\n${url}`);
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
 
@@ -107,15 +116,9 @@ export default function SimuladorPage() {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-white">
-                  Simulador de Votación TSJE
+                  Simulador de Máquina de Votación
                 </h1>
-                <span className="hidden md:inline-flex px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-red-600 text-white tracking-widest shadow-sm">
-                  Lista 1 • Opción 5
-                </span>
               </div>
-              <p className="text-[10px] text-slate-400 font-medium tracking-wide leading-tight hidden sm:block">
-                Asunción 2026 • El Arki Sotomayor Concejal
-              </p>
             </div>
           </div>
         </div>
@@ -217,10 +220,7 @@ export default function SimuladorPage() {
             />
             <div className="text-center space-y-1">
               <p className="text-slate-200 font-bold uppercase tracking-widest text-xs animate-pulse">
-                Cargando Simulador de Votación...
-              </p>
-              <p className="text-slate-500 text-[10px] uppercase tracking-widest">
-                Lista 1 • Opción 5 • Asunción
+                Cargando Simulador de Máquina de Votación...
               </p>
             </div>
           </div>
