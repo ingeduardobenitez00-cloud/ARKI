@@ -469,7 +469,7 @@ export default function ConsultaPage() {
 
         Promise.all([
             setDoc(capturaRef, dataToSave),
-            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono, CODIGO_SEC: electorSec }), // <-- ACTUALIZAMOS EN EL PADRON MAESTRO TAMBIEN
+            updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono }), // <-- YA NO ACTUALIZAMOS CODIGO_SEC AQUÍ PARA NO MODIFICAR SU AFILIACIÓN REAL
             updateDoc(userRef, { votosCargados: increment(1) }).catch(() => {}) // Ignore if field doesn't exist yet
         ]).then(() => {
             logAction(db, { userId: user.id, userName: user.name, module: 'REGISTRO VOTOS', action: 'REGISTRÓ VOTO SEGURO', targetName: `${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}` });
