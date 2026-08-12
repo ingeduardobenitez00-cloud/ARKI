@@ -156,10 +156,13 @@ export default function PadronExportPage() {
         }
 
         records.sort((a, b) => {
-            const apellidoA = String(a.APELLIDO || '').toUpperCase();
-            const apellidoB = String(b.APELLIDO || '').toUpperCase();
-            if (apellidoA !== apellidoB) return apellidoA.localeCompare(apellidoB);
-            return String(a.NOMBRE || '').toUpperCase().localeCompare(String(b.NOMBRE || '').toUpperCase());
+            const mesaA = parseInt(a.MESA || '0', 10);
+            const mesaB = parseInt(b.MESA || '0', 10);
+            if (mesaA !== mesaB) return mesaA - mesaB;
+            
+            const ordenA = parseInt(a.ORDEN || '0', 10);
+            const ordenB = parseInt(b.ORDEN || '0', 10);
+            return ordenA - ordenB;
         });
 
         setAllSeccionalData(records);

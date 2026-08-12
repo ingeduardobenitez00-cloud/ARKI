@@ -3,7 +3,12 @@ const fs = require('fs');
 const serviceAccount = JSON.parse(fs.readFileSync('scripts/serviceAccountKey.json'));
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
-db.collection('locales_votacion').limit(5).get().then(snap => {
-    snap.forEach(doc => console.log(doc.id, doc.data()));
+
+async function run() {
+    const snap = await db.collection('votos_seguros').limit(5).get();
+    snap.forEach(doc => {
+        console.log(doc.id, doc.data());
+    });
     process.exit(0);
-});
+}
+run();

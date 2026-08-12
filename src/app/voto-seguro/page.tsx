@@ -242,7 +242,7 @@ export default function VotoSeguroPage() {
     filteredList.forEach(voto => {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
-        const itemSecc = String(voto.CODIGO_SEC || 'SIN SECCIONAL');
+        const itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
         const normalized = userName
@@ -585,7 +585,7 @@ export default function VotoSeguroPage() {
                       <TableRow key={p.id} className="hover:bg-muted/20">
                           <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
                           <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
-                          <TableCell className="text-center"><Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge></TableCell>
+                          <TableCell className="text-center">{p.CODIGO_SEC ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                           <TableCell className="text-[10px] uppercase">
                               <div>{p.LOCAL}</div>
                               <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>

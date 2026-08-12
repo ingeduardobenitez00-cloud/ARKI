@@ -3,7 +3,11 @@ const fs = require('fs');
 const serviceAccount = JSON.parse(fs.readFileSync('scripts/serviceAccountKey.json'));
 admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
-db.collection('locales_votacion').limit(5).get().then(snap => {
-    snap.forEach(doc => console.log(doc.id, doc.data()));
+
+async function run() {
+    const docRef = db.collection('votos_confirmados').doc('5743775');
+    await docRef.update({ CODIGO_SEC: '39' });
+    console.log("Updated 5743775 to have CODIGO_SEC: '39'");
     process.exit(0);
-});
+}
+run();

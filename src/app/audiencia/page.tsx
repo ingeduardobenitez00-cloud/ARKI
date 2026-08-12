@@ -280,7 +280,7 @@ export default function AudienciaPage() {
         if (!rawList) return groups;
         
         rawList.forEach(item => {
-            const itemSecc = String(item.CODIGO_SEC || 'SIN SECCIONAL');
+            const itemSecc = String(item.seccional_jurisdiccion || item.CODIGO_SEC || 'SIN SECCIONAL');
             
             if (!groups[itemSecc]) {
                 groups[itemSecc] = { seccional: itemSecc, totalPedidos: 0, pedidos: [] };
@@ -357,7 +357,7 @@ export default function AudienciaPage() {
                         <CardContent className="pt-6">
                             {isSearching ? <div className="space-y-2"><Skeleton className="h-14 w-full rounded-xl" /><Skeleton className="h-14 w-full rounded-xl" /></div> : 
                             searchResults.length > 0 ? <RadioGroup onValueChange={(id) => setSelectedPerson(searchResults.find(p => p.id === id) || null)} value={selectedPerson?.id || ''}><div className="space-y-2 max-h-[400px] overflow-y-auto pr-2">
-                                {searchResults.map(p => (<div key={p.id} className={cn("flex items-center space-x-3 border rounded-2xl p-4 cursor-pointer", selectedPerson?.id === p.id ? "border-primary bg-primary/[0.02]" : "border-slate-100")} onClick={() => setSelectedPerson(p)}><RadioGroupItem value={p.id} className="sr-only" /><div className="flex-1 text-left"><p className="font-black text-xs uppercase text-slate-900">{p.NOMBRE} {p.APELLIDO}</p><div className="flex items-center gap-2 mt-1"><span className="text-[10px] text-muted-foreground font-bold uppercase">C.I. {p.CEDULA}</span><Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-none font-black text-[9px] h-5 px-2 rounded-full ring-1 ring-primary/20">SECC {p.CODIGO_SEC}</Badge></div></div></div>))}</div></RadioGroup> : 
+                                {searchResults.map(p => (<div key={p.id} className={cn("flex items-center space-x-3 border rounded-2xl p-4 cursor-pointer", selectedPerson?.id === p.id ? "border-primary bg-primary/[0.02]" : "border-slate-100")} onClick={() => setSelectedPerson(p)}><RadioGroupItem value={p.id} className="sr-only" /><div className="flex-1 text-left"><p className="font-black text-xs uppercase text-slate-900">{p.NOMBRE} {p.APELLIDO}</p><div className="flex items-center gap-2 mt-1"><span className="text-[10px] text-muted-foreground font-bold uppercase">C.I. {p.CEDULA}</span>{p.CODIGO_SEC ? <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 border-none font-black text-[9px] h-5 px-2 rounded-full ring-1 ring-primary/20">SECC {p.CODIGO_SEC}</Badge> : null}</div></div></div>))}</div></RadioGroup> : 
                             <div className="text-center py-12 opacity-20"><Zap className="h-12 w-12 mx-auto mb-2" /><p className="text-[10px] font-black uppercase">Esperando Búsqueda</p></div>}
                         </CardContent>
                     </Card>

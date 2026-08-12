@@ -1158,7 +1158,7 @@ export default function DifusionPage() {
                                                                 )}>
                                                                     {p.NOMBRE} {p.APELLIDO}
                                                                 </span>
-                                                                <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA} • SECC {p.CODIGO_SEC}</span>
+                                                                <span className="text-[9px] text-muted-foreground font-black uppercase">C.I. {p.CEDULA}{p.CODIGO_SEC ? ` • SECC ${p.CODIGO_SEC}` : ''}</span>
                                                                 {includeVotingData && (
                                                                     <span className="text-[8px] text-blue-600 font-bold uppercase mt-0.5">
                                                                         Mesa: {p.MESA} / Orden: {p.ORDEN}
