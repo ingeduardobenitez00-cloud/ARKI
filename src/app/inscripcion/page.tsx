@@ -214,7 +214,7 @@ export default function PublicRegistrationPage() {
             <div className="relative z-10 w-full max-w-2xl space-y-8 mt-10">
                 <div className="text-center space-y-6 animate-in fade-in slide-in-from-top-4 duration-700">
                     <div className="relative h-80 sm:h-[450px] md:h-[500px] w-full max-w-lg mx-auto drop-shadow-2xl">
-                        <img src={flyerUrl} alt="Logo" className="w-full h-full object-contain" />
+                        <img src={flyerUrl} alt="Flyer del evento" className="w-full h-full object-contain" />
                     </div>
                     <div className="space-y-2">
                         <div className="flex items-center justify-center gap-2 text-primary">
@@ -273,8 +273,9 @@ export default function PublicRegistrationPage() {
                             {step === 'lookup' ? (
                                 <form onSubmit={handleLookup} className="space-y-6">
                                     <div className="space-y-3">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Cédula de Identidad</Label>
+                                        <Label htmlFor="cedula" className="text-[10px] font-black uppercase text-slate-400 tracking-widest">Cédula de Identidad</Label>
                                         <Input 
+                                            id="cedula"
                                             placeholder="EJ: 4567890" 
                                             value={cedula} 
                                             onChange={(e) => setCedula(e.target.value.replace(/\D/g, ''))}
@@ -284,8 +285,8 @@ export default function PublicRegistrationPage() {
                                             autoFocus
                                         />
                                     </div>
-                                    <Button type="submit" disabled={isSearching || !cedula} className="w-full h-14 rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl">
-                                        {isSearching ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <ChevronRight className="mr-2 h-5 w-5" />}
+                                    <Button type="submit" disabled={isSearching || !cedula} aria-label="Buscar mi ficha" className="w-full h-14 rounded-[2rem] font-black text-base uppercase tracking-widest shadow-xl">
+                                        {isSearching ? <Loader2 className="animate-spin mr-2 h-5 w-5" aria-hidden="true" /> : <ChevronRight className="mr-2 h-5 w-5" aria-hidden="true" />}
                                         BUSCAR MI FICHA
                                     </Button>
                                 </form>
@@ -296,8 +297,9 @@ export default function PublicRegistrationPage() {
                                         <p className="text-xs font-bold text-primary">C.I. {electorData.CEDULA}</p>
                                     </div>
                                     <div className="space-y-2">
-                                        <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest">WhatsApp (XXXX-XXX-XXX)</Label>
+                                        <Label htmlFor="telefono" className="text-[10px] font-black uppercase text-slate-400 tracking-widest">WhatsApp (XXXX-XXX-XXX)</Label>
                                         <Input 
+                                            id="telefono"
                                             placeholder="09XX-XXX-XXX" 
                                             value={telefono} 
                                             onChange={(e) => handlePhoneMask(e.target.value)}
@@ -307,9 +309,9 @@ export default function PublicRegistrationPage() {
                                         />
                                     </div>
                                     <div className="flex gap-3">
-                                        <Button type="button" variant="outline" onClick={() => setStep('lookup')} className="h-14 rounded-2xl px-6 font-black uppercase text-[10px]">ATRÁS</Button>
-                                        <Button type="submit" disabled={isSubmitting} className="flex-1 h-14 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl">
-                                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <UserPlus className="mr-2 h-5 w-5" />}
+                                        <Button type="button" variant="outline" onClick={() => setStep('lookup')} aria-label="Volver atrás" className="h-14 rounded-2xl px-6 font-black uppercase text-[10px]">ATRÁS</Button>
+                                        <Button type="submit" disabled={isSubmitting} aria-label="Confirmar datos de inscripción" className="flex-1 h-14 rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl">
+                                            {isSubmitting ? <Loader2 className="animate-spin mr-2 h-5 w-5" aria-hidden="true" /> : <UserPlus className="mr-2 h-5 w-5" aria-hidden="true" />}
                                             CONFIRMAR
                                         </Button>
                                     </div>

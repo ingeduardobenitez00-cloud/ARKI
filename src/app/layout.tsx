@@ -173,9 +173,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
     <div className="flex flex-col h-full bg-white font-medium">
       <Link 
         href="/" 
+        aria-label="Ir a la página de inicio"
         className="p-8 flex flex-col items-center border-b bg-slate-50/50 hover:bg-slate-100/50 transition-all group"
       >
-        <div className="relative h-24 w-24 drop-shadow-sm transition-transform group-hover:scale-105 duration-500">
+        <div className="relative h-24 w-24 drop-shadow-sm transition-transform group-hover:scale-105 duration-500" aria-hidden="true">
           <Image 
             src="/logo.png?v=4" 
             alt="Logo Arki" 
@@ -252,6 +253,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
               variant="outline" 
               size="sm" 
               onClick={() => router.push('/')}
+              aria-label="Volver al inicio"
               className="h-10 gap-2 font-black text-[10px] uppercase border bg-white hover:bg-slate-50 flex rounded-xl shrink-0"
             >
               <ChevronLeft className="h-4 w-4" />
@@ -261,8 +263,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
           <Sheet open={isMenuOpen} onOpenChange={setIsMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-slate-100 transition-all border bg-white">
-                <Menu className="h-5 w-5 text-slate-600" />
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-slate-100 transition-all border bg-white" aria-label="Abrir menú principal">
+                <Menu className="h-5 w-5 text-slate-600" aria-hidden="true" />
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-[320px] sm:w-[360px] border-r shadow-xl">
@@ -270,7 +272,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
             </SheetContent>
           </Sheet>
 
-          <div className="flex items-center gap-3 overflow-hidden">
+          <div className="flex items-center gap-3 overflow-hidden" aria-hidden="true">
               <div className="relative h-10 w-10 shrink-0">
                   <Image src="/logo.png?v=4" alt="Logo" fill className="object-contain" />
               </div>
@@ -296,8 +298,10 @@ function AppContent({ children }: { children: React.ReactNode }) {
                     size="icon" 
                     onClick={() => setIsNotificationsOpen(!isNotificationsOpen)}
                     className="h-10 w-10 rounded-full text-slate-500 hover:bg-slate-100 transition-all relative shrink-0"
+                    aria-label={unreadCount > 0 ? `Notificaciones, tienes ${unreadCount} sin leer` : "Notificaciones"}
+                    aria-expanded={isNotificationsOpen}
                  >
-                    <Bell className="h-4.5 w-4.5" />
+                    <Bell className="h-4.5 w-4.5" aria-hidden="true" />
                     {unreadCount > 0 && (
                         <span className="absolute top-1 right-1 h-4 min-w-4 px-1 rounded-full bg-primary text-white text-[8px] font-black flex items-center justify-center border-2 border-white animate-pulse">
                             {unreadCount}
@@ -310,13 +314,19 @@ function AppContent({ children }: { children: React.ReactNode }) {
                          {/* Overlay transparente para cerrar al hacer click afuera */}
                          <div className="fixed inset-0 z-40" onClick={() => setIsNotificationsOpen(false)} />
                          
-                         <div className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-[2rem] shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+                         <div 
+                             className="absolute right-0 mt-3 w-80 sm:w-96 bg-white border border-slate-200 rounded-[2rem] shadow-xl z-50 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300"
+                             role="dialog"
+                             aria-label="Panel de notificaciones"
+                             aria-live="polite"
+                         >
                              <div className="p-5 border-b border-slate-100 bg-slate-50/50 flex items-center justify-between">
                                  <span className="text-[11px] font-black uppercase text-slate-700 tracking-wider">Notificaciones</span>
                                  {unreadCount > 0 && (
                                      <button 
                                         onClick={markAllAsRead}
                                         className="text-[9px] font-black uppercase text-primary hover:underline"
+                                        aria-label="Marcar todas las notificaciones como leídas"
                                      >
                                          Marcar todas
                                      </button>
@@ -361,6 +371,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
                                                      <button 
                                                         onClick={() => markAsRead(n.id)}
                                                         className="h-6 px-2 text-[8px] font-black uppercase text-slate-400 hover:text-primary hover:bg-slate-50 border rounded-lg shrink-0 transition-all"
+                                                        aria-label={`Marcar notificación "${n.title}" como leída`}
                                                      >
                                                          Leído
                                                      </button>
@@ -395,8 +406,9 @@ function AppContent({ children }: { children: React.ReactNode }) {
                     className="h-9 w-9 rounded-full text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors" 
                     onClick={logout}
                     title="Cerrar Sesión"
+                    aria-label="Cerrar Sesión"
                 >
-                    <LogOut className="h-4 w-4" />
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
                 </Button>
              </div>
           </div>

@@ -67,7 +67,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-[0_30px_60px_-15px_rgba(0,0,0,0.1)] border-slate-200/60 rounded-[2.5rem] overflow-hidden bg-white/80 backdrop-blur-xl relative z-10 animate-in fade-in zoom-in-95 duration-700">
         <CardHeader className="text-center pt-8 pb-4 space-y-4">
            <div className="flex flex-col items-center justify-center">
-                <div className="relative w-32 h-32 transition-transform duration-700 hover:scale-110 drop-shadow-2xl">
+                <div className="relative w-32 h-32 transition-transform duration-700 hover:scale-110 drop-shadow-2xl" aria-hidden="true">
                     <Image 
                       src={`/logo.png?v=${logoVersion}`} 
                       alt="Logo Arki" 
@@ -135,8 +135,9 @@ export default function LoginPage() {
                   size="icon"
                   className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-transparent"
                   onClick={() => setShowPassword(!showPassword)}
+                  aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
                 >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
                 </Button>
               </div>
             </div>

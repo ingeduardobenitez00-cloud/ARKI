@@ -112,7 +112,7 @@ export default function ConsultaPublicaPage() {
       {/* HEADER PÚBLICO */}
       <div className="bg-white border-b shadow-sm sticky top-0 z-10">
         <div className="max-w-md mx-auto p-4 flex flex-col items-center justify-center space-y-2">
-            <div className="relative h-16 w-16 mb-1">
+            <div className="relative h-16 w-16 mb-1" aria-hidden="true">
                 <Image src="/logo.png?v=4" alt="Logo Arki" fill className="object-contain" priority />
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-900 text-center">LISTA 1 - OPCIÓN 5</p>
@@ -150,14 +150,14 @@ export default function ConsultaPublicaPage() {
                               autoComplete="off"
                           />
                       </div>
-                      <Button type="submit" disabled={isSearching} className="h-14 w-full font-black text-sm uppercase rounded-2xl shadow-lg active:scale-95 transition-all">
-                          {isSearching ? <Loader2 className="animate-spin mr-2 h-5 w-5" /> : <Search className="mr-2 h-5 w-5" />}
+                      <Button type="submit" disabled={isSearching} aria-label="Consultar Ahora" className="h-14 w-full font-black text-sm uppercase rounded-2xl shadow-lg active:scale-95 transition-all">
+                          {isSearching ? <Loader2 className="animate-spin mr-2 h-5 w-5" aria-hidden="true" /> : <Search className="mr-2 h-5 w-5" aria-hidden="true" />}
                           Consultar Ahora
                       </Button>
                   </div>
              </form>
           </CardHeader>
-          <CardContent className="p-0 bg-slate-50/30">
+          <CardContent className="p-0 bg-slate-50/30" aria-live="polite" aria-atomic="true">
             {isSearching ? (
                 <div className="p-6 space-y-4">
                     <Skeleton className="h-32 w-full rounded-2xl" />
@@ -174,8 +174,12 @@ export default function ConsultaPublicaPage() {
                 </div>
             ) : data.length > 0 ? (
                 <div className="divide-y divide-slate-100">
-                    {data.map((row) => (
-                        <div key={row.id} className="p-6 hover:bg-white transition-colors flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2">
+                    {data.map((row) => {
+                        const seccionalValue = (row.CODIGO_SEC || row.SECCIONAL || row.SECC || '').toString().trim().toUpperCase();
+                        const hasSeccional = seccionalValue && seccionalValue !== 'SIN SECCIONAL' && seccionalValue !== '-';
+
+                        return (
+                        <div key={row.id} className="p-6 hover:bg-white transition-colors flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2" role="article" aria-label={`Datos de padrón de ${row.NOMBRE} ${row.APELLIDO}`}>
                             {/* Cabecera Tarjeta */}
                             <div className="flex items-start justify-between gap-4">
                                 <div className="flex-1">
@@ -195,6 +199,10 @@ export default function ConsultaPublicaPage() {
                                 </div>
                                 <div className="flex items-center gap-3">
                                     <div className="flex-1 bg-white border rounded-lg p-2 flex flex-col items-center shadow-sm">
+                                        <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Secc</span>
+                                        <span className="text-base font-black text-primary">{hasSeccional ? seccionalValue : '-'}</span>
+                                    </div>
+                                    <div className="flex-1 bg-white border rounded-lg p-2 flex flex-col items-center shadow-sm">
                                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mesa</span>
                                         <span className="text-base font-black text-primary">{row.MESA}</span>
                                     </div>
@@ -203,9 +211,16 @@ export default function ConsultaPublicaPage() {
                                         <span className="text-base font-black text-primary">{row.ORDEN}</span>
                                     </div>
                                 </div>
+                                
+                                {!hasSeccional && (
+                                    <div className="mt-2 bg-red-50 text-red-600 text-xs font-black uppercase tracking-wider p-2.5 rounded-lg text-center border border-red-100 flex items-center justify-center gap-2">
+                                        <UserIcon className="h-4 w-4" />
+                                        No se encuentra afiliada/o
+                                    </div>
+                                )}
                             </div>
                         </div>
-                    ))}
+                    )})}
                 </div>
             ) : (
                 <div className="p-12 flex flex-col items-center justify-center gap-3 opacity-40">
@@ -219,7 +234,7 @@ export default function ConsultaPublicaPage() {
         </Card>
         
         {data.length > 0 && (
-            <p className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 mt-6">
+            <p className="text-center text-[10px] font-black uppercase tracking-widest text-slate-400 mt-6" aria-live="polite">
                 Mostrando {data.length} resultados encontrados
             </p>
         )}
