@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
+import { HistoricoVotos } from '@/components/HistoricoVotos';
 
 interface PadronDocument {
   id: string;
@@ -218,6 +219,15 @@ export default function ConsultaPublicaPage() {
                                         No se encuentra afiliada/o
                                     </div>
                                 )}
+                                
+                                {/* HISTORICO DE VOTOS */}
+                                <HistoricoVotos 
+                                    voto1={row.VOTO1} 
+                                    voto2={row.VOTO2} 
+                                    voto3={row.VOTO3} 
+                                    voto4={row.VOTO4} 
+                                    voto5={row.VOTO5} 
+                                />
                             </div>
                         </div>
                     )})}

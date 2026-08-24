@@ -48,6 +48,12 @@ const columnsToDisplay = [
     { key: 'DIRECCION', label: 'DIRECCION' },
     { key: 'FECHA_NACI', label: 'FECHA NACI' },
     { key: 'TELEFONO', label: 'TELEFONO' },
+    { key: 'N_PARTIDO', label: 'PARTIDO' },
+    { key: 'VOTO1', label: 'JUN 2021' },
+    { key: 'VOTO2', label: 'OCT 2021' },
+    { key: 'VOTO3', label: 'DIC 2022' },
+    { key: 'VOTO4', label: 'ABR 2023' },
+    { key: 'VOTO5', label: 'JUN 2026' }
 ];
 
 export default function PadronExportPage() {
@@ -292,6 +298,95 @@ export default function PadronExportPage() {
     }
   };
 
+  const formatCedula = (ced: any) => {
+      if (!ced) return '';
+      const num = Number(String(ced).replace(/\D/g, ''));
+      if (isNaN(num)) return String(ced);
+      return num.toLocaleString('en-US');
+  };
+
+  const getPdfHeaders = () => [
+      [
+          { content: 'Ord', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Mesa', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Cedula', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Apellido(s) y Nombre(s)', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
+          { content: 'Direccion', rowSpan: 2, styles: { halign: 'left', valign: 'middle' } },
+          { content: 'Partido(s)', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Secc.', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+          { content: 'Histórico de voto', colSpan: 5, styles: { halign: 'center' } }
+      ],
+      [
+          { content: 'Jun\n2021', styles: { halign: 'center' } },
+          { content: 'Oct\n2021', styles: { halign: 'center' } },
+          { content: 'Dic\n2022', styles: { halign: 'center' } },
+          { content: 'Abr\n2023', styles: { halign: 'center' } },
+          { content: 'Jun\n2026', styles: { halign: 'center' } }
+      ]
+  ];
+
+  const mapRowToPdfArray = (row: any, index: number) => {
+      return [
+          (index + 1).toString(),
+          row.MESA || '',
+          formatCedula(row.CEDULA),
+          `${row.APELLIDO || ''}, ${row.NOMBRE || ''}`.trim().replace(/^,|,$/g, '').trim(),
+          row.DIRECCION || '',
+          row.N_PARTIDO ? `/${row.N_PARTIDO}` : '',
+          row.CODIGO_SEC || '',
+          row.VOTO1 || '',
+          row.VOTO2 || '',
+          row.VOTO3 || '',
+          row.VOTO4 || '',
+          row.VOTO5 || ''
+      ];
+  };
+
+  const getPdfAutoTableOptions = (doc: any, titleText: string, tableRows: any[], logoIzquierdo: any, leftWidth: number, leftHeight: number, logoDerecho: any, rightWidth: number, rightHeight: number, pageWidth: number, totalPagesExp: string) => {
+      return { 
+          head: getPdfHeaders(), 
+          body: tableRows, 
+          startY: 32,
+          theme: 'grid',
+          styles: { 
+              fontSize: 5, 
+              cellPadding: 1, 
+              textColor: [0, 0, 0],
+              lineColor: [0, 0, 0],
+              lineWidth: 0.2
+          }, 
+          headStyles: { 
+              fillColor: [255, 255, 255],
+              textColor: [0, 0, 0],
+              fontStyle: 'bold',
+              lineColor: [0, 0, 0],
+              lineWidth: 0.5
+          }, 
+          alternateRowStyles: {
+              fillColor: [255, 255, 255]
+          },
+          margin: { top: 32, left: 10, right: 10 },
+          didDrawPage: function (data: any) {
+              if (logoIzquierdo) doc.addImage(logoIzquierdo, 'PNG', 15, 10, leftWidth, leftHeight);
+              if (logoDerecho) doc.addImage(logoDerecho, 'PNG', pageWidth - 15 - rightWidth, 10, rightWidth, rightHeight);
+              
+              doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+              doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 18, { align: 'center' });
+              
+              doc.setFontSize(10); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
+              doc.text(titleText, pageWidth / 2, 25, { align: 'center' });
+
+              let str = 'Página ' + doc.internal.getNumberOfPages();
+              if (typeof doc.putTotalPages === 'function') {
+                  str = str + ' de ' + totalPagesExp;
+              }
+              doc.setFontSize(8);
+              doc.setTextColor(100, 100, 100);
+              doc.text(str, pageWidth - 15, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
+          }
+      };
+  };
+
   const handleExportPDF = async () => {
     if (!canExportPDF) {
         toast({ title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive" });
@@ -322,61 +417,17 @@ export default function PadronExportPage() {
             ? `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${selectedLocal}`
             : `Padrón Electoral - SECCIONAL ${selectedSeccional}`;
         
-        const tableColumn = columnsToDisplay.map(c => c.label);
-        const tableRows = filteredData.map(row => columnsToDisplay.map(col => formatValue(row[col.key], col.key)));
-        
+        const tableRows = filteredData.map((row, idx) => mapRowToPdfArray(row, idx));
         const totalPagesExp = '{total_pages_count_string}';
 
-        (doc as any).autoTable({ 
-            head: [tableColumn], 
-            body: tableRows, 
-            startY: 32,
-            theme: 'grid',
-            styles: { 
-                fontSize: 5, 
-                cellPadding: 0.8, 
-                halign: 'center',
-                textColor: [0, 0, 0],
-                lineColor: [0, 0, 0],
-                lineWidth: 0.2
-            }, 
-            headStyles: { 
-                fillColor: [239, 68, 68],
-                textColor: [255, 255, 255],
-                fontStyle: 'bold',
-                lineColor: [0, 0, 0],
-                lineWidth: 0.2
-            }, 
-            alternateRowStyles: {
-                fillColor: [245, 245, 245]
-            },
-            margin: { top: 32, left: 5, right: 5 },
-            didDrawPage: function (data: any) {
-                if (logoIzquierdo) doc.addImage(logoIzquierdo, 'PNG', 12, 10, leftWidth, leftHeight);
-                if (logoDerecho) doc.addImage(logoDerecho, 'PNG', pageWidth - 12 - rightWidth, 10, rightWidth, rightHeight);
-                
-                doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-                doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 18, { align: 'center' });
-                
-                doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-                doc.text(titleText, pageWidth / 2, 25, { align: 'center' });
-
-                let str = 'Página ' + doc.internal.getNumberOfPages();
-                if (typeof doc.putTotalPages === 'function') {
-                    str = str + ' de ' + totalPagesExp;
-                }
-                doc.setFontSize(7);
-                doc.setTextColor(100, 100, 100);
-                doc.text(str, pageWidth - 10, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
-            }
-        });
+        (doc as any).autoTable(getPdfAutoTableOptions(doc, titleText, tableRows, logoIzquierdo, leftWidth, leftHeight, logoDerecho, rightWidth, rightHeight, pageWidth, totalPagesExp));
         
         if (typeof doc.putTotalPages === 'function') {
             doc.putTotalPages(totalPagesExp);
         }
         
         doc.save(`padron_vertical_secc_${selectedSeccional}.pdf`);
-        toast({ title: "PDF Vertical Generado" });
+        toast({ title: "PDF Generado" });
     } catch (e) {
         toast({ title: "Error al generar PDF", variant: "destructive" });
     } finally { 
@@ -415,8 +466,6 @@ export default function PadronExportPage() {
             return String(loc || 'DESCONOCIDO').trim().toUpperCase();
         })));
 
-        const tableColumn = columnsToDisplay.map(c => c.label);
-        
         for (const local of uniqueLocalesInSeccional) {
             const localData = allSeccionalData.filter(p => {
                 const loc = String(p.LOCAL || p.DESC_LOCAL || p.LOCAL_DESC || p.NOMBRE_LOCAL || '').trim().toUpperCase();
@@ -429,37 +478,10 @@ export default function PadronExportPage() {
             const pageWidth = doc.internal.pageSize.getWidth();
             const titleText = `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${local}`;
             
-            const tableRows = localData.map(row => columnsToDisplay.map(col => formatValue(row[col.key], col.key)));
+            const tableRows = localData.map((row, idx) => mapRowToPdfArray(row, idx));
             const totalPagesExp = '{total_pages_count_string}';
 
-            (doc as any).autoTable({ 
-                head: [tableColumn], 
-                body: tableRows, 
-                startY: 32,
-                theme: 'grid',
-                styles: { fontSize: 5, cellPadding: 0.8, halign: 'center', textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.2 }, 
-                headStyles: { fillColor: [239, 68, 68], textColor: [255, 255, 255], fontStyle: 'bold', lineColor: [0, 0, 0], lineWidth: 0.2 }, 
-                alternateRowStyles: { fillColor: [245, 245, 245] },
-                margin: { top: 32, left: 5, right: 5 },
-                didDrawPage: function (data: any) {
-                    if (logoIzquierdo) doc.addImage(logoIzquierdo, 'PNG', 12, 10, leftWidth, leftHeight);
-                    if (logoDerecho) doc.addImage(logoDerecho, 'PNG', pageWidth - 12 - rightWidth, 10, rightWidth, rightHeight);
-                    
-                    doc.setFontSize(14); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-                    doc.text("LISTA 1 - OPCIÓN 5", pageWidth / 2, 18, { align: 'center' });
-                    
-                    doc.setFontSize(8); doc.setTextColor(0, 0, 0); doc.setFont("helvetica", "bold");
-                    doc.text(titleText, pageWidth / 2, 25, { align: 'center' });
-
-                    let str = 'Página ' + doc.internal.getNumberOfPages();
-                    if (typeof doc.putTotalPages === 'function') {
-                        str = str + ' de ' + totalPagesExp;
-                    }
-                    doc.setFontSize(7);
-                    doc.setTextColor(100, 100, 100);
-                    doc.text(str, pageWidth - 10, doc.internal.pageSize.getHeight() - 10, { align: 'right' });
-                }
-            });
+            (doc as any).autoTable(getPdfAutoTableOptions(doc, titleText, tableRows, logoIzquierdo, leftWidth, leftHeight, logoDerecho, rightWidth, rightHeight, pageWidth, totalPagesExp));
             
             if (typeof doc.putTotalPages === 'function') {
                 doc.putTotalPages(totalPagesExp);
@@ -588,8 +610,26 @@ export default function PadronExportPage() {
             <div className="relative w-full overflow-auto max-h-[600px] min-h-[300px]">
                 <Table>
                     <TableHeader>
-                        <TableRow className="bg-muted/50 text-[10px] font-medium uppercase sticky top-0 z-10">
-                            {columnsToDisplay.map(col => <TableHead key={col.key} className="text-center py-4">{col.label}</TableHead>)}
+                        <TableRow className="bg-muted/50 text-[10px] font-medium uppercase sticky top-0 z-20">
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">SECC</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">LOCAL</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">MESA</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">ORDEN</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">CEDULA</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">NOMBRE</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">APELLIDO</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">DIRECCION</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">FECHA NACI</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">TELEFONO</TableHead>
+                            <TableHead rowSpan={2} className="text-center py-2 border-r border-b bg-muted/95 backdrop-blur">PARTIDO</TableHead>
+                            <TableHead colSpan={5} className="text-center py-1 border-b bg-muted/95 backdrop-blur">HISTÓRICO DE VOTO</TableHead>
+                        </TableRow>
+                        <TableRow className="bg-muted/50 text-[10px] font-medium uppercase sticky top-[32px] z-10 shadow-sm">
+                            <TableHead className="text-center py-1 border-r border-b bg-muted/95 backdrop-blur">JUN 2021</TableHead>
+                            <TableHead className="text-center py-1 border-r border-b bg-muted/95 backdrop-blur">OCT 2021</TableHead>
+                            <TableHead className="text-center py-1 border-r border-b bg-muted/95 backdrop-blur">DIC 2022</TableHead>
+                            <TableHead className="text-center py-1 border-r border-b bg-muted/95 backdrop-blur">ABR 2023</TableHead>
+                            <TableHead className="text-center py-1 border-b bg-muted/95 backdrop-blur">JUN 2026</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>

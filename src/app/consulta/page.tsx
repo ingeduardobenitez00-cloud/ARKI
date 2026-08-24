@@ -46,6 +46,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { logAction } from '@/lib/audit';
+import { HistoricoVotos } from '@/components/HistoricoVotos';
 
 const MapPicker = dynamic(() => import('@/components/MapPicker'), {
   ssr: false,
@@ -738,6 +739,16 @@ export default function ConsultaPage() {
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
                                     <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
                                 </div>
+                                
+                                {/* HISTORICO DE VOTOS */}
+                                <HistoricoVotos 
+                                    voto1={selectedPerson.VOTO1} 
+                                    voto2={selectedPerson.VOTO2} 
+                                    voto3={selectedPerson.VOTO3} 
+                                    voto4={selectedPerson.VOTO4} 
+                                    voto5={selectedPerson.VOTO5} 
+                                />
+
                                 {isCheckingCapture ? (
                                     <div className="flex items-center justify-center py-4 text-muted-foreground text-xs font-bold uppercase animate-pulse">
                                         <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Verificando estado...

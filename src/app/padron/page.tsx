@@ -154,6 +154,8 @@ export default function PadronPage() {
                   <TableHead className="py-4">Elector</TableHead>
                   <TableHead className="text-center py-4">SECC</TableHead>
                   <TableHead className="py-4">Local / Mesa / Orden</TableHead>
+                  <TableHead className="py-4">Dirección</TableHead>
+                  <TableHead className="py-4 text-center">Partido e Historial</TableHead>
                   <TableHead className="py-4">Teléfono</TableHead>
                 </TableRow>
               </TableHeader>
@@ -161,7 +163,7 @@ export default function PadronPage() {
                 {isSearching ? (
                   Array.from({ length: 10 }).map((_, i) => (
                     <TableRow key={i}>
-                      <TableCell colSpan={5} className="py-4"><Skeleton className="h-10 w-full" /></TableCell>
+                      <TableCell colSpan={7} className="py-4"><Skeleton className="h-10 w-full" /></TableCell>
                     </TableRow>
                   ))
                 ) : displayData.length > 0 ? (
@@ -173,7 +175,6 @@ export default function PadronPage() {
                       <TableCell className="py-6">
                         <div className="flex flex-col">
                           <span className="text-[13px] font-medium uppercase tracking-tight text-foreground">{row.NOMBRE} {row.APELLIDO}</span>
-                          <span className="text-[10px] text-muted-foreground font-medium uppercase mt-1">{row.DIRECCION || 'SIN DIRECCIÓN DECLARADA'}</span>
                         </div>
                       </TableCell>
                       <TableCell className="text-center py-6">
@@ -195,6 +196,42 @@ export default function PadronPage() {
                         </div>
                       </TableCell>
                       <TableCell className="py-6">
+                        <div className="flex items-start gap-1.5 max-w-[200px]">
+                          <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
+                          <span className="text-[10px] text-muted-foreground font-medium uppercase leading-tight">
+                            {row.DIRECCION || 'SIN DIRECCIÓN DECLARADA'}
+                          </span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-4">
+                        <div className="flex flex-col items-center justify-center gap-1.5">
+                           {row.N_PARTIDO && (
+                             <Badge variant="secondary" className="text-[8px] font-bold uppercase bg-slate-100 text-slate-700 tracking-wider">
+                               {row.N_PARTIDO}
+                             </Badge>
+                           )}
+                           <div className="flex gap-1 items-center justify-center bg-white p-1 rounded-md border shadow-sm">
+                             {[
+                               { label: 'INT 21', val: row.VOTO1, bg: 'bg-[#e2f0d9]', text: 'text-red-700' },
+                               { label: 'MUN 21', val: row.VOTO2, bg: 'bg-[#f7f6da]', text: 'text-slate-700' },
+                               { label: 'INT 22', val: row.VOTO3, bg: 'bg-[#e2f0d9]', text: 'text-red-700' },
+                               { label: 'GEN 23', val: row.VOTO4, bg: 'bg-[#f7f6da]', text: 'text-slate-700' },
+                               { label: 'INT 26', val: row.VOTO5, bg: 'bg-[#e2f0d9]', text: 'text-red-700' },
+                             ].map((v, idx) => {
+                               const voted = v.val?.toUpperCase() === 'S';
+                               return (
+                                 <div key={idx} className={`flex flex-col items-center justify-center border border-slate-200 rounded w-9 h-9 ${v.bg}`}>
+                                   <span className={`text-[6px] font-black ${v.text} leading-none tracking-tighter`}>{v.label}</span>
+                                   <span className={cn("text-[9px] font-black mt-0.5", voted ? "text-red-600" : "text-slate-300")}>
+                                     {voted ? 'S' : '-'}
+                                   </span>
+                                 </div>
+                               );
+                             })}
+                           </div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="py-6">
                         {row.TELEFONO ? (
                           <div className="flex items-center gap-1.5 text-green-600 font-medium">
                             <Smartphone className="h-3.5 w-3.5" />
@@ -208,7 +245,7 @@ export default function PadronPage() {
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={5} className="h-80 text-center">
+                    <TableCell colSpan={7} className="h-80 text-center">
                       <div className={cn("flex flex-col items-center justify-center gap-3", hasSearched ? "opacity-100" : "opacity-30")}>
                         <UserIcon className={cn("w-16 h-16", hasSearched ? "text-red-500" : "text-primary")} />
                         <p className={cn("font-medium uppercase text-xs tracking-[0.2em] text-center max-w-[300px]", hasSearched && "text-red-600 font-black text-sm")}>

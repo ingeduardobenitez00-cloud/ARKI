@@ -306,6 +306,12 @@ function LocalesAssignmentManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedSeccionales, setSelectedSeccionales] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState<Record<string, boolean>>({});
+
+  // Nuevos estados para crear manuales
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [newLocalName, setNewLocalName] = useState('');
+  const [newSeccionalId, setNewSeccionalId] = useState('');
+  const [customSeccionalesOptions, setCustomSeccionalesOptions] = useState<string[]>(Array.from({length: 45}, (_, i) => String(i + 1)));
   const [filter, setFilter] = useState<'pending' | 'asignado' | 'todos'>('pending');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -330,7 +336,23 @@ function LocalesAssignmentManager() {
     }
   };
 
-  useEffect(() => { fetchLocales(); }, [db, filter]);
+  const fetchCustomSeccionales = async () => {
+    if (!db) return;
+    try {
+      const snap = await getDocs(collection(db, 'seccionales_metadata'));
+      const secIds = snap.docs.map(d => d.id).filter(id => !isNaN(Number(id)));
+      const baseOptions = Array.from({length: 45}, (_, i) => String(i + 1));
+      const combined = Array.from(new Set([...baseOptions, ...secIds])).sort((a, b) => Number(a) - Number(b));
+      setCustomSeccionalesOptions(combined);
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => { 
+      fetchLocales(); 
+      fetchCustomSeccionales();
+  }, [db, filter]);
 
   const handleAssign = async (localId: string, localName: string) => {
     const secId = selectedSeccionales[localId];
@@ -385,7 +407,59 @@ function LocalesAssignmentManager() {
     }
   };
 
-  const seccionalesOptions = Array.from({length: 45}, (_, i) => String(i + 1));
+  const handleCreateCustom = async () => {
+    if (!newLocalName || !newSeccionalId || !db) {
+        toast({ title: 'Completa los campos', variant: 'destructive' });
+        return;
+    }
+    setIsSubmitting(prev => ({...prev, 'custom': true}));
+    try {
+        const cleanName = newLocalName.toUpperCase().trim();
+        const secId = newSeccionalId.trim();
+        
+        // 1. Create in locales_votacion
+        const localId = 'local_' + Date.now();
+        const batch = writeBatch(db);
+        
+        batch.set(doc(db, 'locales_votacion', localId), {
+            nombre: cleanName,
+            seccional_id: secId,
+            status: 'asignado',
+            total_electores: 0,
+            createdAt: new Date().toISOString()
+        });
+
+        // 2. Update seccionales_metadata
+        const metaRef = doc(db, 'seccionales_metadata', secId);
+        const metaSnap = await getDoc(metaRef);
+        let localesList: string[] = [];
+        let mesasPorLocal: any[] = [];
+        if(metaSnap.exists()) {
+           localesList = metaSnap.data().locales || [];
+           mesasPorLocal = metaSnap.data().mesas_por_local || [];
+        }
+        if(!localesList.includes(cleanName)) {
+            localesList.push(cleanName);
+            mesasPorLocal.push({ localName: cleanName, mesas: [] });
+        }
+        batch.set(metaRef, { locales: localesList, mesas_por_local: mesasPorLocal, updatedAt: new Date().toISOString() }, { merge: true });
+
+        await batch.commit();
+        
+        toast({ title: "Local Creado", description: `Se creó ${cleanName} en la Seccional ${secId}` });
+        setNewLocalName('');
+        setIsCreateDialogOpen(false);
+        fetchLocales();
+        fetchCustomSeccionales();
+    } catch(e) {
+        console.error(e);
+        toast({ title: "Error al crear", variant: "destructive" });
+    } finally {
+        setIsSubmitting(prev => ({...prev, 'custom': false}));
+    }
+  };
+
+  const seccionalesOptions = customSeccionalesOptions;
   const filteredLocales = locales.filter(l => 
     l.total_electores > 0 && 
     l.nombre?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -404,6 +478,14 @@ function LocalesAssignmentManager() {
           Gestión de Locales y Seccionales
         </CardTitle>
         <div className="flex items-center gap-2 w-full sm:w-auto">
+            <Button 
+                onClick={() => setIsCreateDialogOpen(true)}
+                variant="outline" 
+                size="sm" 
+                className="h-8 text-[9px] font-black uppercase bg-primary text-white hover:bg-primary/90 border-transparent whitespace-nowrap"
+            >
+                + AGREGAR LOCAL MANUAL
+            </Button>
             <Input 
                 placeholder="BUSCAR LOCAL..." 
                 className="h-8 text-xs font-bold w-full sm:w-64"
@@ -462,6 +544,46 @@ function LocalesAssignmentManager() {
           }
         </div>
       </CardContent>
+
+      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
+          <DialogContent className="sm:max-w-[425px] rounded-3xl border-primary/20">
+              <DialogHeader>
+                  <DialogTitle className="font-black uppercase text-lg text-primary tracking-tight">Agregar Local Manualmente</DialogTitle>
+              </DialogHeader>
+              <div className="grid gap-4 py-4">
+                  <div className="grid gap-2">
+                      <Label htmlFor="new-local" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Nombre del Local</Label>
+                      <Input 
+                          id="new-local" 
+                          placeholder="EJ: COLEGIO NACIONAL..." 
+                          className="uppercase font-bold"
+                          value={newLocalName}
+                          onChange={(e) => setNewLocalName(e.target.value)}
+                      />
+                  </div>
+                  <div className="grid gap-2">
+                      <Label htmlFor="new-seccional" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Número de Seccional</Label>
+                      <Input 
+                          id="new-seccional" 
+                          placeholder="EJ: 34" 
+                          className="font-bold"
+                          value={newSeccionalId}
+                          onChange={(e) => setNewSeccionalId(e.target.value)}
+                      />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold leading-relaxed bg-primary/5 p-3 rounded-xl border border-primary/10">
+                      Al agregar manualmente, el sistema creará este local en la base de datos y lo asignará directamente a la seccional indicada, permitiéndote usarlo para corregir votos en otros módulos.
+                  </p>
+              </div>
+              <DialogFooter>
+                  <Button variant="outline" className="font-black uppercase text-[10px] h-10 rounded-xl" onClick={() => setIsCreateDialogOpen(false)}>Cancelar</Button>
+                  <Button onClick={handleCreateCustom} disabled={isSubmitting['custom'] || !newLocalName || !newSeccionalId} className="font-black uppercase text-[10px] h-10 rounded-xl bg-primary hover:bg-primary/90 text-white">
+                      {isSubmitting['custom'] ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : null}
+                      Guardar Local
+                  </Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
     </Card>
   );
 }

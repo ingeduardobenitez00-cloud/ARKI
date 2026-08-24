@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Input } from '@/components/ui/input';
 import { 
     FileSpreadsheet, 
     UploadCloud, 
@@ -29,7 +30,8 @@ import {
     UserCircle,
     ShieldAlert,
     Users,
-    ArrowRight
+    ArrowRight,
+    MapPin
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
@@ -73,7 +75,12 @@ export default function MigrarVotosPage() {
     // Almacén en memoria de electores pre-consultados
     const [fetchedElectors, setFetchedElectors] = useState<Record<string, any>>({});
     const [operatorMapping, setOperatorMapping] = useState<Record<string, string>>({});
+    const [operatorLocalMapping, setOperatorLocalMapping] = useState<Record<string, string>>({});
     
+    // Anulaciones manuales (Corrección de Padrón)
+    const [overrideSeccional, setOverrideSeccional] = useState('');
+    const [overrideLocal, setOverrideLocal] = useState('');
+
     // Estados del procesamiento
     const [status, setStatus] = useState<'idle' | 'reading' | 'checking' | 'mapping' | 'confirming_overwrite' | 'migrating' | 'done' | 'error'>('idle');
     const [isDragging, setIsDragging] = useState(false);
@@ -98,6 +105,31 @@ export default function MigrarVotosPage() {
     }, [db]);
 
     const { data: allUsers } = useCollection<any>(usersQuery);
+
+    // Consulta de locales_votacion para resolver la seccional correcta
+    const localesQuery = useMemoFirebase(() => {
+        if (!db) return null;
+        return query(collection(db, 'locales_votacion'));
+    }, [db]);
+    
+    const { data: allLocales } = useCollection<any>(localesQuery);
+    
+    const localToSeccionalMap = useMemo(() => {
+        const map: Record<string, string[]> = {};
+        if (allLocales) {
+            allLocales.forEach((l: any) => {
+                const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+                if (normLocal && l.seccional_id) {
+                    const secId = String(l.seccional_id).trim();
+                    if (!map[normLocal]) map[normLocal] = [];
+                    if (!map[normLocal].includes(secId)) {
+                        map[normLocal].push(secId);
+                    }
+                }
+            });
+        }
+        return map;
+    }, [allLocales]);
 
     // Auto-scroll para la consola de logs
     useEffect(() => {
@@ -307,39 +339,113 @@ export default function MigrarVotosPage() {
         }
     };
 
-    // Identificar qué seccionales externas están representadas en el Excel
-    const externalSeccionales = useMemo(() => {
+    // Identificar destinos externos (electores que no pertenecen a mi local o que son de otra seccional)
+    const externalDestinations = useMemo(() => {
         if (sheetData.length === 0 || !mapping.cedula) return [];
-        const secs = new Set<string>();
+        const destMap = new Map<string, { seccional: string, local: string, count: number }>();
+        const userLocal = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
+
         sheetData.forEach(row => {
             const rawCed = row[mapping.cedula];
             if (!rawCed) return;
             const cedulaStr = String(rawCed).replace(/\D/g, '');
             const elector = fetchedElectors[cedulaStr];
+            
             if (elector && elector.CODIGO_SEC) {
-                const electorSec = String(elector.CODIGO_SEC).trim();
-                // Si la seccional del elector no está entre las del usuario
-                if (electorSec && !userSeccionales.includes(electorSec)) {
-                    secs.add(electorSec);
+                const electorLocalRaw = String(elector.LOCAL || elector.DESC_LOCAL || 'SIN LOCAL').trim().toUpperCase();
+                const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+                
+                // Usamos la seccional configurada en el sistema para ese local si existe.
+                // Si no, recaemos en la del padrón.
+                let electorSec = String(elector.CODIGO_SEC || '').trim();
+                if (!electorSec && localToSeccionalMap[normLocal]) {
+                    const possibleSecs = localToSeccionalMap[normLocal];
+                    const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                    electorSec = matchingUserSec || possibleSecs[0];
+                }
+                
+                const electorLocal = electorLocalRaw;
+                
+                let isMyLocal = false;
+                if (userSeccionales.includes(electorSec)) {
+                    if (userLocal) {
+                        const normElectorLocal = normLocal;
+                        if (userLocal === normElectorLocal || userLocal.includes(normElectorLocal) || normElectorLocal.includes(userLocal)) {
+                            isMyLocal = true;
+                        } else {
+                            const wordsUser = userLocal.split(/\s+/).filter(w => w.length > 3);
+                            const wordsElector = normElectorLocal.split(/\s+/).filter(w => w.length > 3);
+                            const commonWords = wordsUser.filter(w => wordsElector.includes(w));
+                            if (commonWords.length >= 2 || (wordsUser.length === 1 && commonWords.length === 1)) {
+                                isMyLocal = true;
+                            }
+                        }
+                    }
+                }
+
+                if (!isMyLocal) {
+                    const key = `${electorSec}_${electorLocal}`;
+                    if (!destMap.has(key)) {
+                        destMap.set(key, { seccional: electorSec, local: electorLocal, count: 0 });
+                    }
+                    destMap.get(key)!.count++;
                 }
             }
         });
-        return Array.from(secs).sort((a, b) => parseInt(a, 10) - parseInt(b, 10));
-    }, [sheetData, mapping, fetchedElectors, userSeccionales]);
+        
+        return Array.from(destMap.values()).sort((a, b) => {
+            if (a.seccional !== b.seccional) return parseInt(a.seccional) - parseInt(b.seccional);
+            return a.local.localeCompare(b.local);
+        });
+    }, [sheetData, mapping, fetchedElectors, userSeccionales, user]);
 
-    // Obtener los operadores dirigentes de una seccional específica
-    const getOperatorsForSeccional = (secCode: string) => {
-        if (!allUsers) return [];
-        return allUsers.filter(u => {
-            if (u.role === 'Admin' || u.role === 'Super-Admin') return true;
-            
+    // Obtener los operadores dirigentes para un local y seccional específicos, separados por coincidencia
+    const getOperatorsForLocal = (localName: string, seccionalName: string) => {
+        const matching: any[] = [];
+        const others: any[] = [];
+        if (!allUsers) return { matching, others };
+
+        allUsers.forEach(u => {
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
             const userSecs = rawSecc.map((s: any) => 
                 String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "")
                 .replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim()
             );
-            return userSecs.includes(secCode) && (u.role === 'Dirigente' || u.role === 'Coordinador' || u.role === 'Presidente');
+            
+            const targetSec = String(seccionalName).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
+            const hasMatchingSec = userSecs.includes(targetSec);
+            
+            if (!hasMatchingSec || !['Dirigente', 'Coordinador', 'Presidente', 'Admin', 'Super-Admin'].includes(u.role)) {
+                return;
+            }
+            
+            // Filtro inteligente de local (intersección de palabras clave)
+            const norm1 = String(u.local || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            const norm2 = String(localName).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            
+            let hasMatchingLocal = false;
+            if (norm1 && norm2) {
+                const words1 = norm1.split(/\s+/).filter(w => w.length > 3);
+                const words2 = norm2.split(/\s+/).filter(w => w.length > 3);
+                
+                if (norm1 === norm2 || norm1.includes(norm2) || norm2.includes(norm1)) {
+                    hasMatchingLocal = true;
+                } else if (words1.length > 0 && words2.length > 0) {
+                    const commonWords = words1.filter(w => words2.includes(w));
+                    if (commonWords.length >= 2 || (words1.length === 1 && commonWords.length === 1)) {
+                        hasMatchingLocal = true;
+                    }
+                }
+            }
+            
+            if (hasMatchingLocal) {
+                matching.push(u);
+            } else {
+                others.push(u);
+            }
         });
+
+        return { matching, others };
     };
 
     const previewData = useMemo(() => {
@@ -360,12 +466,15 @@ export default function MigrarVotosPage() {
     // Estadísticas calculadas dinámicamente sobre el Excel analizado
     const statistics = useMemo(() => {
         if (sheetData.length === 0 || !mapping.cedula) {
-            return { total: 0, valid: 0, local: 0, external: 0, omitted: 0 };
+            return { total: 0, valid: 0, myLocalCount: 0, otrosLocalesCount: 0, externalSecCount: 0, omitted: 0 };
         }
         let valid = 0;
-        let local = 0;
-        let external = 0;
+        let myLocalCount = 0;
+        let otrosLocalesCount = 0;
+        let externalSecCount = 0;
         let omitted = 0;
+
+        const userLocal = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
 
         sheetData.forEach(row => {
             const rawCed = row[mapping.cedula];
@@ -384,17 +493,38 @@ export default function MigrarVotosPage() {
                 valid++;
                 const electorSec = String(elector.CODIGO_SEC || '').trim();
                 if (userSeccionales.includes(electorSec)) {
-                    local++;
+                    // Está en mi seccional, ahora vemos si es de mi local
+                    const electorLocalStr = String(elector.LOCAL || elector.DESC_LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+                    
+                    let isMyLocal = false;
+                    if (userLocal && electorLocalStr) {
+                        const wordsUser = userLocal.split(/\s+/).filter(w => w.length > 3);
+                        const wordsElector = electorLocalStr.split(/\s+/).filter(w => w.length > 3);
+                        if (userLocal === electorLocalStr || userLocal.includes(electorLocalStr) || electorLocalStr.includes(userLocal)) {
+                            isMyLocal = true;
+                        } else if (wordsUser.length > 0 && wordsElector.length > 0) {
+                            const commonWords = wordsUser.filter(w => wordsElector.includes(w));
+                            if (commonWords.length >= 2 || (wordsUser.length === 1 && commonWords.length === 1)) {
+                                isMyLocal = true;
+                            }
+                        }
+                    }
+
+                    if (userLocal && isMyLocal) {
+                        myLocalCount++;
+                    } else {
+                        otrosLocalesCount++;
+                    }
                 } else {
-                    external++;
+                    externalSecCount++;
                 }
             } else if (elector === null) {
                 omitted++;
             }
         });
 
-        return { total: sheetData.length, valid, local, external, omitted };
-    }, [sheetData, mapping, fetchedElectors, userSeccionales]);
+        return { total: sheetData.length, valid, myLocalCount, otrosLocalesCount, externalSecCount, omitted };
+    }, [sheetData, mapping, fetchedElectors, userSeccionales, user]);
 
     const resetProcess = () => {
         setFile(null);
@@ -403,6 +533,7 @@ export default function MigrarVotosPage() {
         setMapping({ cedula: '', telefono: '' });
         setFetchedElectors({});
         setOperatorMapping({});
+        setOperatorLocalMapping({});
         setStatus('idle');
         setProgress(0);
         setProcessedCount(0);
@@ -411,6 +542,8 @@ export default function MigrarVotosPage() {
         setNotFoundCount(0);
         setSkippedCount(0);
         setLogs([]);
+        setOverrideSeccional('');
+        setOverrideLocal('');
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -531,29 +664,43 @@ export default function MigrarVotosPage() {
             if (telClean === '595') telClean = '';
 
             // 3. Determinar Operador (Delegación) para este elector
-            const electorSec = String(electorData.CODIGO_SEC || '').trim();
-            const isLocal = userSeccionales.includes(electorSec);
+            const electorLocalRaw = String(electorData.LOCAL || electorData.DESC_LOCAL || 'SIN LOCAL').trim().toUpperCase();
+            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            
+            let electorSec = String(electorData.CODIGO_SEC || '').trim();
+            if (!electorSec && localToSeccionalMap[normLocal]) {
+                const possibleSecs = localToSeccionalMap[normLocal];
+                const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                electorSec = matchingUserSec || possibleSecs[0];
+            }
+            const electorLocal = electorLocalRaw;
             
             let assignedOperatorId = user.id;
             let assignedOperatorName = user.name;
             let isDelegated = false;
 
-            if (!isLocal && electorSec) {
-                const mappedOpId = operatorMapping[electorSec];
-                if (mappedOpId && mappedOpId !== 'user_me') {
-                    const opUser = allUsers?.find(u => u.id === mappedOpId);
-                    if (opUser) {
-                        assignedOperatorId = opUser.id;
-                        assignedOperatorName = opUser.name;
-                        isDelegated = true;
-                    }
+            const destKey = `${electorSec}_${electorLocal}`;
+            const mappedOpId = operatorLocalMapping[destKey];
+            
+            if (mappedOpId && mappedOpId !== 'user_me') {
+                const opUser = allUsers?.find(u => u.id === mappedOpId);
+                if (opUser) {
+                    assignedOperatorId = opUser.id;
+                    assignedOperatorName = opUser.name;
+                    isDelegated = true;
                 }
             }
 
             // 4. Preparación de guardado en Votos Seguros (votos_confirmados)
             const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
+            
+            const finalSec = overrideSeccional || electorData.CODIGO_SEC || '';
+            const finalLocal = overrideLocal || electorData.LOCAL || '';
+
             const vsObj: any = {
                 ...electorData,
+                CODIGO_SEC: finalSec,
+                LOCAL: finalLocal,
                 observacion: "VOTO SEGURO",
                 TELEFONO: telClean || electorData.TELEFONO || '',
                 registradoPor_id: assignedOperatorId,
@@ -589,6 +736,8 @@ export default function MigrarVotosPage() {
             // 5. Actualización en Padrón (sheet1)
             const padronRef = doc(db, COLLECTION_PADRON, docId);
             const padronObj: any = {
+                CODIGO_SEC: finalSec,
+                LOCAL: finalLocal,
                 observacion: "VOTO SEGURO",
                 votoSeguroUpdatedBy_id: user.id,
                 votoSeguroUpdatedBy_nombre: user.name,
@@ -997,53 +1146,59 @@ export default function MigrarVotosPage() {
 
                 {/* Panel Central de Previsualización y Control */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Panel de Delegación Inteligente por Seccionales */}
-                    {status === 'mapping' && externalSeccionales.length > 0 && (
-                        <Card className="border-amber-200/50 bg-amber-50/10 shadow-md overflow-hidden rounded-3xl animate-in fade-in duration-300">
-                            <CardHeader className="bg-amber-500/10 border-b border-amber-100 py-4">
-                                <CardTitle className="text-xs font-black uppercase text-amber-800 flex items-center gap-2">
-                                    <Users className="h-4 w-4" />
-                                    Mapeo Inteligente: Seccionales de Capital Detectadas
+                    {/* Panel Consolidado de Delegación por Destinos Externos */}
+                    {status === 'mapping' && externalDestinations.length > 0 && (
+                        <Card className="border-indigo-200/50 bg-indigo-50/10 shadow-md overflow-hidden rounded-3xl animate-in fade-in duration-300">
+                            <CardHeader className="bg-indigo-500/10 border-b border-indigo-100 py-4">
+                                <CardTitle className="text-xs font-black uppercase text-indigo-800 flex items-center gap-2">
+                                    <MapPin className="h-4 w-4" />
+                                    Delegación de Votos (Otros Locales / Seccionales)
                                 </CardTitle>
-                                <CardDescription className="text-[9px] uppercase font-bold text-amber-600">
-                                    Se detectaron electores que pertenecen a otras jurisdicciones. Selecciona a qué operador asignar cada seccional.
+                                <CardDescription className="text-[9px] uppercase font-bold text-indigo-600">
+                                    Se detectaron electores que no pertenecen a tu área asignada. Te sugerimos dirigentes correspondientes a la seccional y local de cada elector para facilitar la derivación.
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="pt-6 space-y-4">
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {externalSeccionales.map(sec => {
-                                        const ops = getOperatorsForSeccional(sec);
+                                    {externalDestinations.map(dest => {
+                                        const ops = getOperatorsForLocal(dest.local, dest.seccional);
+                                        const hasAnyOps = ops.matching.length > 0;
+                                        const destKey = `${dest.seccional}_${dest.local}`;
+                                        
                                         return (
-                                            <div key={sec} className="p-4 border rounded-2xl bg-white space-y-2 shadow-sm">
+                                            <div key={destKey} className="p-4 border rounded-2xl bg-white space-y-2 shadow-sm">
                                                 <div className="flex items-center justify-between">
-                                                    <span className="text-xs font-black uppercase text-slate-800">SECCIONAL {sec}</span>
-                                                    <Badge variant="outline" className="text-[8px] font-bold border-amber-200 text-amber-700 bg-amber-50 px-2">
-                                                        {sheetData.filter(row => {
-                                                            const rawCed = row[mapping.cedula];
-                                                            if (!rawCed) return false;
-                                                            const cedulaStr = String(rawCed).replace(/\D/g, '');
-                                                            return fetchedElectors[cedulaStr]?.CODIGO_SEC == sec;
-                                                        }).length} Electores
+                                                    <div className="flex flex-col">
+                                                        <span className="text-[10px] font-black uppercase text-slate-800 truncate pr-2">{dest.local}</span>
+                                                        <span className="text-[8px] font-bold text-slate-500">SECCIONAL {dest.seccional}</span>
+                                                    </div>
+                                                    <Badge variant="outline" className="text-[8px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 px-2 shrink-0">
+                                                        {dest.count} Electores
                                                     </Badge>
                                                 </div>
                                                 
                                                 <select
-                                                    value={operatorMapping[sec] || ''}
-                                                    onChange={(e) => setOperatorMapping(prev => ({ ...prev, [sec]: e.target.value }))}
-                                                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white font-bold text-[11px] uppercase focus:outline-none"
+                                                    value={operatorLocalMapping[destKey] || ''}
+                                                    onChange={(e) => setOperatorLocalMapping(prev => ({ ...prev, [destKey]: e.target.value }))}
+                                                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white font-bold text-[11px] uppercase focus:outline-none focus:border-indigo-300"
                                                 >
                                                     <option value="user_me">-- Registrar a mi Nombre --</option>
-                                                    {ops.map(op => (
-                                                        <option key={op.id} value={op.id}>
-                                                            {op.name} ({op.role})
-                                                        </option>
-                                                    ))}
+                                                    
+                                                    {ops.matching.length > 0 && (
+                                                        <optgroup label="Dirigentes de este Local">
+                                                            {ops.matching.map(op => (
+                                                                <option key={op.id} value={op.id}>
+                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
                                                 </select>
                                                 
-                                                {ops.length === 0 && (
-                                                    <p className="text-[8px] font-bold text-red-500 uppercase flex items-center gap-1">
+                                                {!hasAnyOps && (
+                                                    <p className="text-[8px] font-bold text-amber-500 uppercase flex items-center gap-1">
                                                         <AlertTriangle className="h-3 w-3 shrink-0" />
-                                                        Sin operadores registrados para esta seccional.
+                                                        Sin dirigentes para esta área.
                                                     </p>
                                                 )}
                                             </div>
@@ -1056,13 +1211,29 @@ export default function MigrarVotosPage() {
 
                     {/* Consola principal de control y previsualización */}
                     <Card className="border-primary/10 shadow-lg overflow-hidden min-h-[400px] rounded-3xl flex flex-col">
-                        <CardHeader className="bg-muted/30 border-b py-4 flex flex-row items-center justify-between">
+                        <CardHeader className="bg-muted/30 border-b py-4 flex flex-col md:flex-row items-center justify-between gap-4">
                             <CardTitle className="text-xs font-black uppercase flex items-center gap-2">
                                 <BookHeart className="h-4 w-4 text-primary" />
                                 Paso 3: Previsualización e Inicio
                             </CardTitle>
                             {status === 'mapping' && mapping.cedula && (
-                                <div className="flex gap-2">
+                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full md:w-auto">
+                                    <div className="flex items-center gap-2 bg-amber-50 p-1.5 rounded-xl border border-amber-200">
+                                        <Input 
+                                            placeholder="FORZAR SECCIONAL..." 
+                                            className="h-8 text-[10px] font-bold w-32 uppercase bg-white"
+                                            value={overrideSeccional}
+                                            onChange={(e) => setOverrideSeccional(e.target.value)}
+                                            title="Si el padrón tiene locales incorrectos, escribe tu seccional aquí para forzarla a todos los del Excel."
+                                        />
+                                        <Input 
+                                            placeholder="FORZAR LOCAL..." 
+                                            className="h-8 text-[10px] font-bold w-48 uppercase bg-white"
+                                            value={overrideLocal}
+                                            onChange={(e) => setOverrideLocal(e.target.value)}
+                                            title="Si el padrón tiene locales incorrectos, escribe el nombre del local aquí para forzarlo a todos los del Excel."
+                                        />
+                                    </div>
                                     <Button 
                                         onClick={handleStartMigration} 
                                         className="bg-primary hover:bg-primary/95 text-white font-black text-xs uppercase h-10 px-5 rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
@@ -1184,14 +1355,31 @@ export default function MigrarVotosPage() {
                                             <span className="text-[9px] font-black uppercase text-slate-400 tracking-widest">Total en Excel</span>
                                             <span className="text-2xl font-black text-slate-850 mt-1.5">{statistics.total} <span className="text-[10px] text-slate-400 font-bold uppercase tracking-normal">Filas</span></span>
                                         </div>
-                                        <div className="p-4 rounded-2xl bg-green-50/40 border border-green-100/50 flex flex-col justify-between shadow-sm">
-                                            <span className="text-[9px] font-black uppercase text-green-600 tracking-widest">Mi Seccional</span>
-                                            <span className="text-2xl font-black text-green-700 mt-1.5">{statistics.local} <span className="text-[10px] text-green-500 font-bold uppercase tracking-normal">Votos</span></span>
-                                        </div>
-                                        <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-100/50 flex flex-col justify-between shadow-sm">
-                                            <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Otras Seccionales</span>
-                                            <span className="text-2xl font-black text-amber-700 mt-1.5">{statistics.external} <span className="text-[10px] text-amber-500 font-bold uppercase tracking-normal">Votos</span></span>
-                                        </div>
+                                        
+                                        {user?.local ? (
+                                            <>
+                                                <div className="p-4 rounded-2xl bg-green-50/40 border border-green-100/50 flex flex-col justify-between shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase text-green-600 tracking-widest">Mi Local</span>
+                                                    <span className="text-2xl font-black text-green-700 mt-1.5">{statistics.myLocalCount} <span className="text-[10px] text-green-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                                </div>
+                                                <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-100/50 flex flex-col justify-between shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Otros Locales</span>
+                                                    <span className="text-2xl font-black text-amber-700 mt-1.5">{statistics.otrosLocalesCount} <span className="text-[10px] text-amber-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                                </div>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="p-4 rounded-2xl bg-green-50/40 border border-green-100/50 flex flex-col justify-between shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase text-green-600 tracking-widest">Mi Seccional</span>
+                                                    <span className="text-2xl font-black text-green-700 mt-1.5">{statistics.myLocalCount + statistics.otrosLocalesCount} <span className="text-[10px] text-green-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                                </div>
+                                                <div className="p-4 rounded-2xl bg-amber-50/40 border border-amber-100/50 flex flex-col justify-between shadow-sm">
+                                                    <span className="text-[9px] font-black uppercase text-amber-600 tracking-widest">Otras Seccionales</span>
+                                                    <span className="text-2xl font-black text-amber-700 mt-1.5">{statistics.externalSecCount} <span className="text-[10px] text-amber-500 font-bold uppercase tracking-normal">Votos</span></span>
+                                                </div>
+                                            </>
+                                        )}
+
                                         <div className="p-4 rounded-2xl bg-red-50/40 border border-red-100/50 flex flex-col justify-between shadow-sm">
                                             <span className="text-[9px] font-black uppercase text-red-600 tracking-widest">No en Padrón</span>
                                             <span className="text-2xl font-black text-red-700 mt-1.5">{statistics.omitted} <span className="text-[10px] text-red-500 font-bold uppercase tracking-normal">Omitidos</span></span>
