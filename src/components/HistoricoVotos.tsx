@@ -6,10 +6,11 @@ interface HistoricoVotosProps {
   voto3?: string;
   voto4?: string;
   voto5?: string;
+  partido?: string;
   className?: string;
 }
 
-export const HistoricoVotos: React.FC<HistoricoVotosProps> = ({ voto1, voto2, voto3, voto4, voto5, className = '' }) => {
+export const HistoricoVotos: React.FC<HistoricoVotosProps> = ({ voto1, voto2, voto3, voto4, voto5, partido, className = '' }) => {
   const elections = [
     { title: 'Int.Municip.', date: '20.Jun.21', val: voto1, bg: 'bg-[#c2e5b3]', titleColor: 'text-red-600' },
     { title: 'Elec.Municipal', date: '30.Oct.21', val: voto2, bg: 'bg-[#ebeab4]', titleColor: 'text-slate-900' },
@@ -20,12 +21,15 @@ export const HistoricoVotos: React.FC<HistoricoVotosProps> = ({ voto1, voto2, vo
 
   return (
     <div className={`mt-2 flex flex-col items-center border border-slate-300 p-2 rounded-xl bg-[#e2f0d9]/50 shadow-inner ${className}`}>
-      <h3 className="text-red-600 font-black text-sm mb-2 uppercase tracking-tight">Historico de Votos</h3>
-      <div className="flex flex-wrap justify-center gap-1">
+      <div className="flex items-center gap-2 mb-2">
+        <h3 className="text-red-600 font-black text-sm uppercase tracking-tight">Historico de Votos</h3>
+        {partido && <span className="bg-white border border-slate-300 text-slate-800 text-[9px] px-2 py-0.5 rounded-full font-black uppercase shadow-sm">{partido}</span>}
+      </div>
+      <div className="flex flex-nowrap justify-center gap-1 w-full overflow-hidden">
         {elections.map((elec, idx) => {
           const voted = elec.val?.toUpperCase() === 'S';
           return (
-            <div key={idx} className={`${elec.bg} border border-slate-500/50 p-1 flex flex-col items-center justify-between w-[4.2rem] h-[4.5rem] rounded shadow-sm`}>
+            <div key={idx} className={`${elec.bg} border border-slate-500/50 p-1 flex flex-col items-center justify-between w-16 shrink rounded shadow-sm`}>
               <div className="text-center w-full">
                 <p className={`text-[8px] font-black ${elec.titleColor} leading-tight tracking-tighter truncate w-full`}>{elec.title}</p>
                 <p className="text-[8px] font-bold text-slate-900 mt-[1px] tracking-tighter">{elec.date}</p>

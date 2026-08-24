@@ -357,11 +357,14 @@ export default function MigrarVotosPage() {
                 
                 // Usamos la seccional configurada en el sistema para ese local si existe.
                 // Si no, recaemos en la del padrón.
-                let electorSec = String(elector.CODIGO_SEC || '').trim();
-                if (!electorSec && localToSeccionalMap[normLocal]) {
+                let electorSec = '';
+                if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
                     const possibleSecs = localToSeccionalMap[normLocal];
                     const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
                     electorSec = matchingUserSec || possibleSecs[0];
+                }
+                if (!electorSec) {
+                    electorSec = String(elector.CODIGO_SEC || '').trim();
                 }
                 
                 const electorLocal = electorLocalRaw;
@@ -667,11 +670,14 @@ export default function MigrarVotosPage() {
             const electorLocalRaw = String(electorData.LOCAL || electorData.DESC_LOCAL || 'SIN LOCAL').trim().toUpperCase();
             const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
             
-            let electorSec = String(electorData.CODIGO_SEC || '').trim();
-            if (!electorSec && localToSeccionalMap[normLocal]) {
+            let electorSec = '';
+            if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
                 const possibleSecs = localToSeccionalMap[normLocal];
                 const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
                 electorSec = matchingUserSec || possibleSecs[0];
+            }
+            if (!electorSec) {
+                electorSec = String(electorData.CODIGO_SEC || '').trim();
             }
             const electorLocal = electorLocalRaw;
             
@@ -1162,7 +1168,7 @@ export default function MigrarVotosPage() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {externalDestinations.map(dest => {
                                         const ops = getOperatorsForLocal(dest.local, dest.seccional);
-                                        const hasAnyOps = ops.matching.length > 0;
+                                        const hasAnyOps = ops.matching.length > 0 || ops.others.length > 0;
                                         const destKey = `${dest.seccional}_${dest.local}`;
                                         
                                         return (
@@ -1187,6 +1193,16 @@ export default function MigrarVotosPage() {
                                                     {ops.matching.length > 0 && (
                                                         <optgroup label="Dirigentes de este Local">
                                                             {ops.matching.map(op => (
+                                                                <option key={op.id} value={op.id}>
+                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
+                                                                </option>
+                                                            ))}
+                                                        </optgroup>
+                                                    )}
+                                                    
+                                                    {ops.others.length > 0 && (
+                                                        <optgroup label="Otros Dirigentes de la Seccional">
+                                                            {ops.others.map(op => (
                                                                 <option key={op.id} value={op.id}>
                                                                     {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
                                                                 </option>

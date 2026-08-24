@@ -199,7 +199,7 @@ export default function ConsultaPage() {
 
         if (role === 'Coordinador') {
             return rawList.filter(item => {
-                const itemSec = String(item.CODIGO_SEC || '');
+                const itemSec = String(item.SECCIONAL || item.CODIGO_SEC || '');
                 const isFromMySeccional = userSeccionales.includes(itemSec);
                 
                 if (isFromMySeccional) return true;
@@ -230,7 +230,7 @@ export default function ConsultaPage() {
         
         registeredList.forEach(item => {
             let userName = item.registradoPor_nombre || 'USUARIO DESCONOCIDO';
-            const itemSecc = String(item.seccional_jurisdiccion || item.CODIGO_SEC || 'SIN SECCIONAL');
+            const itemSecc = String(item.seccional_jurisdiccion || item.SECCIONAL || item.CODIGO_SEC || 'SIN SECCIONAL');
             
             // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
             const normalized = userName
@@ -400,7 +400,7 @@ export default function ConsultaPage() {
         // VALIDACIÓN DE JURISDICCIÓN
         const role = user.role;
         const isAdmin = role === 'Super-Admin' || role === 'Admin' || role === 'Presidente';
-        let electorSec = String(selectedPerson.CODIGO_SEC || '');
+        let electorSec = String(selectedPerson.SECCIONAL || selectedPerson.CODIGO_SEC || '');
 
         // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SI ESTÁ VACÍO
         if (!electorSec) {
@@ -441,10 +441,10 @@ export default function ConsultaPage() {
 
         if (!hasPermission) {
             setIsSaving(false);
-            if (!selectedPerson.CODIGO_SEC && electorSec) {
+            if (!selectedPerson.SECCIONAL && !selectedPerson.CODIGO_SEC && electorSec) {
                 // Actualizamos al elector seleccionado para que el modal de delegación 
                 // pueda filtrar y sugerir a los operadores de esta seccional.
-                setSelectedPerson({ ...selectedPerson, CODIGO_SEC: electorSec });
+                setSelectedPerson({ ...selectedPerson, SECCIONAL: electorSec });
             }
             setIsRestrictedAlertOpen(true);
             return;
@@ -599,7 +599,7 @@ export default function ConsultaPage() {
                         <TableRow key={p.id} className="hover:bg-muted/20">
                             <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
-                            <TableCell className="text-center">{p.CODIGO_SEC ? <Badge variant="outline" className="text-[9px]">SECC {p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
+                            <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px]">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                             <TableCell className="text-[10px] uppercase">
                                 <div>{p.DESC_LOCAL || p.LOCAL}</div>
                                 <div className="text-primary font-bold">MESA: {p.MESA} / ORDEN: {p.ORDEN}</div>

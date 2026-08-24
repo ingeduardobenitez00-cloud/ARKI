@@ -150,6 +150,31 @@ export default function VotoSeguroPage() {
 
   const { data: allUsers } = useCollection<any>(usersQuery);
 
+  // Consulta de locales_votacion para resolver la seccional correcta
+  const localesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, 'locales_votacion'));
+  }, [db]);
+
+  const { data: allLocales } = useCollection<any>(localesQuery);
+
+  const localToSeccionalMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    if (allLocales) {
+      allLocales.forEach((l: any) => {
+        const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+        if (normLocal && l.seccional_id) {
+          const secId = String(l.seccional_id).trim();
+          if (!map[normLocal]) map[normLocal] = [];
+          if (!map[normLocal].includes(secId)) {
+            map[normLocal].push(secId);
+          }
+        }
+      });
+    }
+    return map;
+  }, [allLocales]);
+
   const userSeccionalesMap = useMemo(() => {
     if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
     const map = new Map<string, string[]>();
@@ -242,7 +267,19 @@ export default function VotoSeguroPage() {
     filteredList.forEach(voto => {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
-        const itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
+        
+        let itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
+        
+        // Priorizar el local que le corresponde
+        const electorLocalRaw = String(voto.LOCAL || voto.DESC_LOCAL || '').trim().toUpperCase();
+        if (electorLocalRaw) {
+            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
+                const possibleSecs = localToSeccionalMap[normLocal];
+                const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                itemSecc = matchingUserSec || possibleSecs[0];
+            }
+        }
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
         const normalized = userName
@@ -295,7 +332,7 @@ export default function VotoSeguroPage() {
             sortedGroups[secKey] = { ...secGroup, dirigentes: sortedDirigentes };
         });
     return sortedGroups;
-  }, [filteredList]);
+  }, [filteredList, localToSeccionalMap, userSeccionales]);
 
   const executeExportCSV = async (filename: string) => {
     if (filteredList.length === 0) return;

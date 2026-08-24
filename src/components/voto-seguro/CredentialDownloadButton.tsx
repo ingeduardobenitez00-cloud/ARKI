@@ -122,7 +122,7 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
             >
                 {/* Background image - User should place their image at public/credencial.png */}
                 <img 
-                    src="/credencial.png" 
+                    src="/credencial.png?v=2" 
                     alt="Fondo Credencial" 
                     style={{
                         position: 'absolute', 

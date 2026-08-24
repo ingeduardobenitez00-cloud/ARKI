@@ -176,8 +176,8 @@ export default function ConsultaPublicaPage() {
             ) : data.length > 0 ? (
                 <div className="divide-y divide-slate-100">
                     {data.map((row) => {
-                        const seccionalValue = (row.CODIGO_SEC || row.SECCIONAL || row.SECC || '').toString().trim().toUpperCase();
-                        const hasSeccional = seccionalValue && seccionalValue !== 'SIN SECCIONAL' && seccionalValue !== '-';
+                        const seccionalValue = (row.SECCIONAL || row.CODIGO_SEC || row.SECC || '').toString().trim().toUpperCase();
+                        const hasSeccional = seccionalValue && seccionalValue !== 'SIN SECCIONAL' && seccionalValue !== '-' && seccionalValue !== '0';
 
                         return (
                         <div key={row.id} className="p-6 hover:bg-white transition-colors flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-2" role="article" aria-label={`Datos de padrón de ${row.NOMBRE} ${row.APELLIDO}`}>
@@ -227,6 +227,7 @@ export default function ConsultaPublicaPage() {
                                     voto3={row.VOTO3} 
                                     voto4={row.VOTO4} 
                                     voto5={row.VOTO5} 
+                                    partido={row.N_PARTIDO}
                                 />
                             </div>
                         </div>

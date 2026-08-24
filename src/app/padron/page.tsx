@@ -181,7 +181,7 @@ export default function PadronPage() {
                         <div className="flex justify-center">
                           <div className="h-10 w-10 rounded-full border-2 border-primary/10 flex flex-col items-center justify-center bg-white shadow-sm">
                             <span className="text-[7px] font-medium text-primary leading-none uppercase">SECC</span>
-                            <span className="text-[11px] font-medium text-slate-900 leading-tight">{row.CODIGO_SEC}</span>
+                            <span className="text-[11px] font-medium text-slate-900 leading-tight">{row.SECCIONAL || row.CODIGO_SEC || row.SECC || ''}</span>
                           </div>
                         </div>
                       </TableCell>

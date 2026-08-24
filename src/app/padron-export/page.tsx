@@ -395,7 +395,7 @@ export default function PadronExportPage() {
     if (filteredData.length === 0) return;
     setIsExporting(true);
     try {
-        const doc = new jsPDF('p', 'mm', 'a4');
+        const doc = new jsPDF('p', 'mm', 'legal');
         const pageWidth = doc.internal.pageSize.getWidth();
         
         let logoIzquierdo: any = null;
@@ -474,7 +474,7 @@ export default function PadronExportPage() {
             
             if (localData.length === 0) continue;
             
-            const doc = new jsPDF('p', 'mm', 'a4');
+            const doc = new jsPDF('p', 'mm', 'legal');
             const pageWidth = doc.internal.pageSize.getWidth();
             const titleText = `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${local}`;
             
