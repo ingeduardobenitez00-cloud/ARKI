@@ -297,6 +297,9 @@ export default function CompararPadronPage() {
             let telefono = "";
             let yaRegistradoPor = "";
             
+            let partido = "";
+            let v1 = "", v2 = "", v3 = "", v4 = "", v5 = "";
+            
             const cedulaStr = rawCed ? String(rawCed).replace(/\D/g, '') : '';
             
             if (!cedulaStr) {
@@ -319,6 +322,13 @@ export default function CompararPadronPage() {
                     apellidos = elector?.APELLIDO || voto?.APELLIDO || "";
                     nombreCompleto = `${nombres} ${apellidos}`.trim();
                     telefono = elector?.TELEFONO || elector?.TELEFONO_MIGRADO || voto?.TELEFONO || "";
+                    partido = elector?.N_PARTIDO || voto?.N_PARTIDO || "";
+                    
+                    v1 = (elector?.VOTO1 || voto?.VOTO1 || "").toUpperCase() === 'S' ? 'S' : '-';
+                    v2 = (elector?.VOTO2 || voto?.VOTO2 || "").toUpperCase() === 'S' ? 'S' : '-';
+                    v3 = (elector?.VOTO3 || voto?.VOTO3 || "").toUpperCase() === 'S' ? 'S' : '-';
+                    v4 = (elector?.VOTO4 || voto?.VOTO4 || "").toUpperCase() === 'S' ? 'S' : '-';
+                    v5 = (elector?.VOTO5 || voto?.VOTO5 || "").toUpperCase() === 'S' ? 'S' : '-';
                     
                     if (voto || elector?.observacion === "VOTO SEGURO") {
                         estado = "YA ES VOTO SEGURO";
@@ -343,6 +353,12 @@ export default function CompararPadronPage() {
             rowData["Estado"] = estado;
             rowData["Seccional"] = seccional;
             rowData["Teléfono (Padrón)"] = telefono;
+            rowData["Partido"] = partido;
+            rowData["INT 21"] = v1;
+            rowData["MUN 21"] = v2;
+            rowData["INT 22"] = v3;
+            rowData["GEN 23"] = v4;
+            rowData["INT 26"] = v5;
             rowData["Ya Registrado Por"] = yaRegistradoPor;
             rowData["Dirigente"] = dirigenteNombre || "";
 

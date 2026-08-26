@@ -428,6 +428,102 @@ export default function VotoSeguroPage() {
     }
   };
 
+  const executeExportUserCredentialsPDF = async (userName: string, userVotos: VotoSeguroData[]) => {
+    if (userVotos.length === 0) return;
+    toast({ title: "Generando credenciales...", description: "Por favor espere..." });
+    setIsExporting(true);
+    try {
+        const { jsPDF } = await import('jspdf');
+        
+        // Load background image
+        const img = new Image();
+        img.src = '/credencial.png?v=2';
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = () => reject(new Error('No se pudo cargar la imagen de la credencial'));
+        });
+        
+        // Create an A4 PDF
+        const doc = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+        
+        // We want exactly 8 credentials per page (2 columns, 4 rows)
+        const forcedCardWidth = 90;
+        const forcedCardHeight = 90 / 1.6; // 56.25
+        const actMarginX = (210 - (forcedCardWidth * 2)) / 3;
+        const actMarginY = (297 - (forcedCardHeight * 4)) / 5;
+
+        const scaleX = forcedCardWidth / 800;
+        const scaleY = forcedCardHeight / 500;
+        
+        let count = 0;
+        
+        for (let i = 0; i < userVotos.length; i++) {
+            const voto = userVotos[i];
+            
+            if (count > 0 && count % 8 === 0) {
+                doc.addPage();
+            }
+            
+            const posOnPage = count % 8;
+            const col = posOnPage % 2;
+            const row = Math.floor(posOnPage / 2);
+            
+            const x = actMarginX + col * (forcedCardWidth + actMarginX);
+            const y = actMarginY + row * (forcedCardHeight + actMarginY);
+            
+            doc.addImage(img, 'PNG', x, y, forcedCardWidth, forcedCardHeight);
+            
+            // Draw a subtle border
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.1);
+            doc.rect(x, y, forcedCardWidth, forcedCardHeight);
+
+            // Draw text
+            doc.setFont('helvetica', 'bold');
+            doc.setTextColor(0, 0, 0);
+            
+            const fullName = `${String(voto.NOMBRE || '').trim()} ${String(voto.APELLIDO || '').trim()}`.toUpperCase();
+            
+            // NOMBRES Y APELLIDOS
+            doc.setFontSize(6);
+            let drawName = fullName;
+            if (drawName.length > 40) drawName = drawName.substring(0, 40) + '...';
+            doc.text(drawName, x + 180 * scaleX, y + 380 * scaleY + 2.5);
+            
+            // DIRECCION
+            let drawDir = String(voto.DIRECCION || '').trim().toUpperCase();
+            if (drawDir.length > 40) drawDir = drawDir.substring(0, 40) + '...';
+            doc.text(drawDir, x + 190 * scaleX, y + 402 * scaleY + 2.5);
+            
+            // LOCAL
+            let drawLocal = String(voto.LOCAL || '').trim().toUpperCase();
+            if (drawLocal.length > 30) drawLocal = drawLocal.substring(0, 30) + '...';
+            doc.text(drawLocal, x + 400 * scaleX, y + 424 * scaleY + 2.5);
+            
+            // MESA y ORDEN
+            doc.setFontSize(7);
+            doc.text(String(voto.MESA || '').trim(), x + 290 * scaleX, y + 446 * scaleY + 3);
+            doc.text(String(voto.ORDEN || '').trim(), x + 170 * scaleX, y + 468 * scaleY + 3);
+            
+            count++;
+        }
+        
+        const filename = `CREDENCIALES_${userName.replace(/[^a-zA-Z0-9]/g, '_').trim() || 'USUARIO'}.pdf`;
+        doc.save(filename);
+        toast({ title: `Credenciales de ${userName} exportadas` });
+    } catch (error) {
+        console.error(error);
+        toast({ title: "Error al generar credenciales", variant: "destructive" });
+    } finally {
+        setIsExporting(false);
+    }
+  };
+
+
   const handleDelete = async () => {
     if (!votoToDelete || !db || !user) return;
     setIsDeleting(true);
@@ -800,13 +896,22 @@ export default function VotoSeguroPage() {
                                                                         </div>
                                                                     )}
                                                                     {canExportPdf && (
-                                                                        <div 
-                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
-                                                                            onPointerDown={(e) => { e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
-                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
-                                                                        >
-                                                                            <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF
-                                                                        </div>
+                                                                        <>
+                                                                            <div 
+                                                                                className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                                onPointerDown={(e) => { e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                            >
+                                                                                <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF LISTA
+                                                                            </div>
+                                                                            <div 
+                                                                                className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-200 rounded-full hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                                onPointerDown={(e) => { e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
+                                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
+                                                                            >
+                                                                                <FileText className="h-3.5 w-3.5 mr-1 text-amber-600" /> CREDENCIALES
+                                                                            </div>
+                                                                        </>
                                                                     )}
                                                                     {isAdmin && userData.votos.length > 0 && viewMode !== 'internas' && (
                                                                         <div 

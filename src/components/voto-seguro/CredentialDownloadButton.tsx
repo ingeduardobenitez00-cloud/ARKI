@@ -141,28 +141,28 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
                  
                 {/* Overlay text */}
                 <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
-                    {/* NOMBRES */}
-                    <div style={{ position: 'absolute', top: '236px', left: '285px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
-                        {voto.NOMBRE?.trim()}
+                    {/* NOMBRES Y APELLIDOS */}
+                    <div style={{ position: 'absolute', top: '380px', left: '180px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', width: '600px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                        {voto.NOMBRE?.trim()} {voto.APELLIDO?.trim()}
                     </div>
                     
-                    {/* APELLIDOS */}
-                    <div style={{ position: 'absolute', top: '296px', left: '285px', fontSize: '28px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000' }}>
-                        {voto.APELLIDO?.trim()}
+                    {/* DIRECCION */}
+                    <div style={{ position: 'absolute', top: '402px', left: '190px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '580px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
+                        {voto.DIRECCION?.trim()}
                     </div>
                     
                     {/* LOCAL DE VOTACIÓN */}
-                    <div style={{ position: 'absolute', top: '354px', left: '310px', fontSize: '16px', fontWeight: 'bold', textTransform: 'uppercase', width: '400px', whiteSpace: 'nowrap', color: '#000', lineHeight: '1.2' }}>
+                    <div style={{ position: 'absolute', top: '424px', left: '400px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '380px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
                         {voto.LOCAL?.trim()}
                     </div>
                     
                     {/* MESA N° */}
-                    <div style={{ position: 'absolute', top: '418px', left: '275px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '446px', left: '290px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
                         {String(voto.MESA || '').trim()}
                     </div>
                     
                     {/* ORDEN */}
-                    <div style={{ position: 'absolute', top: '418px', left: '640px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '468px', left: '170px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
                         {String(voto.ORDEN || '').trim()}
                     </div>
                 </div>
