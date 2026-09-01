@@ -6,8 +6,9 @@ import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { FileText, Filter, Loader2, Database, LayoutList, FileSpreadsheet } from 'lucide-react';
+import { FileText, Filter, Loader2, Database, LayoutList, FileSpreadsheet, Search } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import jsPDF from 'jspdf';
@@ -65,6 +66,7 @@ export default function ResumenSeccionalPage() {
   const [selectedSeccional, setSelectedSeccional] = useState<string>('ALL');
   
   const [localesSummary, setLocalesSummary] = useState<LocalSummary[]>([]);
+  const [searchLocal, setSearchLocal] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [exportingLocal, setExportingLocal] = useState<string | null>(null);
 
@@ -426,6 +428,10 @@ export default function ResumenSeccionalPage() {
     }
   };
 
+  const filteredLocales = localesSummary.filter(summary => 
+      summary.localName.toLowerCase().includes(searchLocal.toLowerCase())
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -433,7 +439,16 @@ export default function ResumenSeccionalPage() {
             <h1 className="text-3xl font-medium uppercase tracking-tight flex items-center gap-3"><LayoutList className="h-8 w-8 text-primary" /> Resumen Seccional</h1>
             <p className="text-muted-foreground font-medium uppercase text-xs">VISTA RESUMIDA DE LOCALES POR SECCIONAL CON EXPORTACIÓN DIRECTA.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-center gap-2">
+            <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
+                <Search className="h-4 w-4 ml-2 text-muted-foreground" />
+                <Input 
+                    placeholder="Buscar local..." 
+                    value={searchLocal}
+                    onChange={(e) => setSearchLocal(e.target.value)}
+                    className="w-[200px] h-9 border-none bg-transparent font-medium focus-visible:ring-0"
+                />
+            </div>
             <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
                 <Filter className="h-4 w-4 ml-2 text-muted-foreground" />
                 <Select value={selectedSeccional} onValueChange={setSelectedSeccional}>
@@ -474,8 +489,8 @@ export default function ResumenSeccionalPage() {
                             Array.from({ length: 3 }).map((_, i) => (
                                 <TableRow key={i}><TableCell colSpan={4} className="p-4"><div className="h-10 bg-muted/50 rounded-md animate-pulse" /></TableCell></TableRow>
                             ))
-                        ) : localesSummary.length > 0 ? (
-                            localesSummary.map((summary, idx) => (
+                        ) : filteredLocales.length > 0 ? (
+                            filteredLocales.map((summary, idx) => (
                                 <TableRow key={idx} className="hover:bg-muted/20 transition-colors border-b">
                                     <TableCell className="text-[13px] font-bold uppercase py-4 px-4">
                                         <div className="flex flex-col">
