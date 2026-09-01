@@ -22,6 +22,7 @@ interface LocalSummary {
     localName: string;
     electoresCount: number;
     mesasCount: number;
+    isVinculado: boolean;
     data: PadronDocument[];
 }
 
@@ -115,37 +116,18 @@ export default function ResumenSeccionalPage() {
         const dataCollection = collection(db, COLLECTION_NAME);
         let records: PadronDocument[] = [];
         
-        const uniqueLocales = Array.from(new Set(metadataLocales));
-
-        if (uniqueLocales.length > 0) {
-            const chunkSize = 30;
-            const chunks = [];
-            for (let i = 0; i < uniqueLocales.length; i += chunkSize) {
-                chunks.push(uniqueLocales.slice(i, i + chunkSize));
-            }
-            
-            const fetchPromises = chunks.map(async (chunk) => {
-                const q = query(dataCollection, where('LOCAL', 'in', chunk));
-                const snap = await getDocs(q);
-                return snap.docs.map(d => {
-                    const data = d.data();
-                    if (!data.CEDULA) {
-                        data.CEDULA = d.id;
-                    }
-                    return { id: d.id, ...data } as PadronDocument;
-                });
-            });
-            
-            const results = await Promise.all(fetchPromises);
-            const allFetched = results.flat();
-            
-            const seenIds = new Set();
-            for (const r of allFetched) {
-                if (!seenIds.has(r.id)) {
-                    seenIds.add(r.id);
-                    records.push(r);
+        try {
+            const qData = query(dataCollection, where('CODIGO_SEC', '==', cleanVal));
+            const snap = await getDocs(qData);
+            records = snap.docs.map(d => {
+                const data = d.data();
+                if (!data.CEDULA) {
+                    data.CEDULA = d.id;
                 }
-            }
+                return { id: d.id, ...data } as PadronDocument;
+            });
+        } catch (err) {
+            console.error("Error fetching by CODIGO_SEC:", err);
         }
 
         records.sort((a, b) => {
@@ -189,18 +171,27 @@ export default function ResumenSeccionalPage() {
                     localName: locName,
                     electoresCount: 0,
                     mesasCount: 0,
+                    isVinculado: false,
                     data: []
                 });
             }
             groupedMap.get(locName)!.data.push(row);
         }
 
+        const uniqueLocalesSet = new Set(metadataLocales);
         const summaryArray = Array.from(groupedMap.values());
         for (const summary of summaryArray) {
             summary.electoresCount = summary.data.length;
             const uniqueMesas = new Set(summary.data.map(r => String(r.MESA || '').trim()));
             summary.mesasCount = uniqueMesas.size;
+            summary.isVinculado = uniqueLocalesSet.has(summary.localName);
         }
+
+        summaryArray.sort((a, b) => {
+            if (a.isVinculado && !b.isVinculado) return -1;
+            if (!a.isVinculado && b.isVinculado) return 1;
+            return a.localName.localeCompare(b.localName);
+        });
 
         setLocalesSummary(summaryArray);
         
@@ -487,7 +478,12 @@ export default function ResumenSeccionalPage() {
                             localesSummary.map((summary, idx) => (
                                 <TableRow key={idx} className="hover:bg-muted/20 transition-colors border-b">
                                     <TableCell className="text-[13px] font-bold uppercase py-4 px-4">
-                                        {summary.localName}
+                                        <div className="flex flex-col">
+                                            <span>{summary.localName}</span>
+                                            {!summary.isVinculado && (
+                                                <span className="text-[9px] text-orange-600 bg-orange-100 px-2 py-0.5 rounded-full w-fit mt-1">VOTAN EN OTRO LOCAL</span>
+                                            )}
+                                        </div>
                                     </TableCell>
                                     <TableCell className="text-[12px] font-medium py-4 text-center">
                                         {summary.mesasCount} Mesas
