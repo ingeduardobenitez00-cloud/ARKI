@@ -150,6 +150,31 @@ export default function ConsultaPage() {
 
     const { data: allUsers } = useCollection<any>(usersQuery);
 
+    // Consulta de locales_votacion para resolver la seccional correcta
+    const localesQuery = useMemoFirebase(() => {
+        if (!db) return null;
+        return query(collection(db, 'locales_votacion'));
+    }, [db]);
+
+    const { data: allLocales } = useCollection<any>(localesQuery);
+
+    const localToSeccionalMap = useMemo(() => {
+        const map: Record<string, string[]> = {};
+        if (allLocales) {
+            allLocales.forEach((l: any) => {
+                const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+                if (normLocal && l.seccional_id) {
+                    const secId = String(l.seccional_id).trim();
+                    if (!map[normLocal]) map[normLocal] = [];
+                    if (!map[normLocal].includes(secId)) {
+                        map[normLocal].push(secId);
+                    }
+                }
+            });
+        }
+        return map;
+    }, [allLocales]);
+
     const userSeccionalesMap = useMemo(() => {
         if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
         const map = new Map<string, string[]>();
@@ -230,7 +255,35 @@ export default function ConsultaPage() {
         
         registeredList.forEach(item => {
             let userName = item.registradoPor_nombre || 'USUARIO DESCONOCIDO';
-            const itemSecc = String(item.seccional_jurisdiccion || item.SECCIONAL || item.CODIGO_SEC || 'SIN SECCIONAL');
+            let itemSecc = String(item.seccional_jurisdiccion || item.SECCIONAL || item.CODIGO_SEC || 'SIN SECCIONAL');
+            
+            // Priorizar el local que le corresponde
+            const electorLocalRaw = String(item.LOCAL || item.DESC_LOCAL || '').trim().toUpperCase();
+            if (electorLocalRaw) {
+                const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+                if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
+                    const possibleSecs = localToSeccionalMap[normLocal];
+                    const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                    itemSecc = matchingUserSec || possibleSecs[0];
+                } else {
+                    // Si no hay match exacto, intentamos match parcial
+                    const partialMatchKey = Object.keys(localToSeccionalMap).find(k => k.includes(normLocal) || normLocal.includes(k));
+                    if (partialMatchKey) {
+                        const possibleSecs = localToSeccionalMap[partialMatchKey];
+                        const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                        itemSecc = matchingUserSec || possibleSecs[0];
+                    }
+                }
+            }
+            
+            const numSec = parseInt(itemSecc, 10);
+            if (isNaN(numSec) || numSec <= 0 || numSec > 45) {
+                if (userSeccionales.length === 1) {
+                    itemSecc = userSeccionales[0];
+                } else {
+                    itemSecc = 'SIN SECCIONAL';
+                }
+            }
             
             // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
             const normalized = userName
@@ -401,9 +454,20 @@ export default function ConsultaPage() {
         const role = user.role;
         const isAdmin = role === 'Super-Admin' || role === 'Admin' || role === 'Presidente';
         let electorSec = String(selectedPerson.SECCIONAL || selectedPerson.CODIGO_SEC || '');
+        const originalElectorSec = electorSec; // Guardar la original para no modificarla
 
-        // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SI ESTÁ VACÍO
-        if (!electorSec) {
+        let isInvalidSeccional = false;
+        if (!electorSec || electorSec === '') {
+            isInvalidSeccional = true;
+        } else {
+            const numSec = parseInt(electorSec, 10);
+            if (isNaN(numSec) || numSec <= 0 || numSec > 45) {
+                isInvalidSeccional = true;
+            }
+        }
+
+        // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SÓLO PARA VALIDAR PERMISO
+        if (isInvalidSeccional) {
             try {
                 const dptoVal = selectedPerson.COD_DPTO !== undefined && selectedPerson.COD_DPTO !== '' ? selectedPerson.COD_DPTO : selectedPerson.DEPART;
                 const dptoStr = String(dptoVal ?? '');
@@ -433,25 +497,23 @@ export default function ConsultaPage() {
         }
 
         let hasPermission = false;
-        if (electorSec === '') {
-            hasPermission = true; // Si el elector no tiene seccional asignada, se permite guardar
+        if (isAdmin) {
+            hasPermission = true;
         } else if (userSeccionales.includes(electorSec)) {
-            hasPermission = true; // Si coincide con la seccional del operador/admin, se permite guardar
+            hasPermission = true;
+        } else if (isInvalidSeccional && electorSec === originalElectorSec) {
+            // Si era inválida y no se pudo resolver, permitimos guardar por defecto (o según regla de negocio)
+            hasPermission = true; 
         }
 
         if (!hasPermission) {
             setIsSaving(false);
-            if (!selectedPerson.SECCIONAL && !selectedPerson.CODIGO_SEC && electorSec) {
-                // Actualizamos al elector seleccionado para que el modal de delegación 
-                // pueda filtrar y sugerir a los operadores de esta seccional.
-                setSelectedPerson({ ...selectedPerson, SECCIONAL: electorSec });
-            }
             setIsRestrictedAlertOpen(true);
             return;
         }
+
         const dataToSave: any = {
             ...selectedPerson,
-            seccional_jurisdiccion: electorSec, // <-- GUARDAMOS LA SECCIONAL RESUELTA AQUÍ SIN ALTERAR EL PADRÓN
             observacion: "VOTO SEGURO",
             TELEFONO: telefono,
             registradoPor_id: user.id,

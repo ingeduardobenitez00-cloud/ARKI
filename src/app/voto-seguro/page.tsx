@@ -162,7 +162,7 @@ export default function VotoSeguroPage() {
     const map: Record<string, string[]> = {};
     if (allLocales) {
       allLocales.forEach((l: any) => {
-        const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+        const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
         if (normLocal && l.seccional_id) {
           const secId = String(l.seccional_id).trim();
           if (!map[normLocal]) map[normLocal] = [];
@@ -273,12 +273,26 @@ export default function VotoSeguroPage() {
         // Priorizar el local que le corresponde
         const electorLocalRaw = String(voto.LOCAL || voto.DESC_LOCAL || '').trim().toUpperCase();
         if (electorLocalRaw) {
-            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
             if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
                 const possibleSecs = localToSeccionalMap[normLocal];
                 const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
                 itemSecc = matchingUserSec || possibleSecs[0];
+            } else {
+                // Si no hay match exacto, intentamos match parcial
+                const partialMatchKey = Object.keys(localToSeccionalMap).find(k => k.includes(normLocal) || normLocal.includes(k));
+                if (partialMatchKey) {
+                    const possibleSecs = localToSeccionalMap[partialMatchKey];
+                    const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                    itemSecc = matchingUserSec || possibleSecs[0];
+                }
             }
+        }
+
+        // Si después de todo la seccional es mayor a 45 o 0, la agrupamos bajo SIN SECCIONAL
+        const numSec = parseInt(itemSecc, 10);
+        if (isNaN(numSec) || numSec <= 0 || numSec > 45) {
+            itemSecc = 'SIN SECCIONAL';
         }
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
@@ -489,25 +503,27 @@ export default function VotoSeguroPage() {
             const fullName = `${String(voto.NOMBRE || '').trim()} ${String(voto.APELLIDO || '').trim()}`.toUpperCase();
             
             // NOMBRES Y APELLIDOS
-            doc.setFontSize(6);
+            doc.setFontSize(6.5);
             let drawName = fullName;
             if (drawName.length > 40) drawName = drawName.substring(0, 40) + '...';
-            doc.text(drawName, x + 180 * scaleX, y + 380 * scaleY + 2.5);
+            doc.text(drawName, x + 225 * scaleX, y + 225 * scaleY);
             
             // DIRECCION
+            doc.setFontSize(6);
             let drawDir = String(voto.DIRECCION || '').trim().toUpperCase();
             if (drawDir.length > 40) drawDir = drawDir.substring(0, 40) + '...';
-            doc.text(drawDir, x + 190 * scaleX, y + 402 * scaleY + 2.5);
+            doc.text(drawDir, x + 245 * scaleX, y + 275 * scaleY);
             
             // LOCAL
+            doc.setFontSize(5.5);
             let drawLocal = String(voto.LOCAL || '').trim().toUpperCase();
             if (drawLocal.length > 30) drawLocal = drawLocal.substring(0, 30) + '...';
-            doc.text(drawLocal, x + 400 * scaleX, y + 424 * scaleY + 2.5);
+            doc.text(drawLocal, x + 485 * scaleX, y + 340 * scaleY);
             
             // MESA y ORDEN
-            doc.setFontSize(7);
-            doc.text(String(voto.MESA || '').trim(), x + 290 * scaleX, y + 446 * scaleY + 3);
-            doc.text(String(voto.ORDEN || '').trim(), x + 170 * scaleX, y + 468 * scaleY + 3);
+            doc.setFontSize(7.5);
+            doc.text(String(voto.MESA || '').trim(), x + 405 * scaleX, y + 400 * scaleY);
+            doc.text(String(voto.ORDEN || '').trim(), x + 205 * scaleX, y + 450 * scaleY);
             
             count++;
         }
@@ -912,6 +928,16 @@ export default function VotoSeguroPage() {
                                                                                 <FileText className="h-3.5 w-3.5 mr-1 text-amber-600" /> CREDENCIALES
                                                                             </div>
                                                                         </>
+                                                                    )}
+                                                                    {user?.role === 'Super-Admin' && (
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
+                                                                            title="Eliminar todos los votos de este dirigente"
+                                                                        >
+                                                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> BORRAR TODO
+                                                                        </div>
                                                                     )}
                                                                     {isAdmin && userData.votos.length > 0 && viewMode !== 'internas' && (
                                                                         <div 

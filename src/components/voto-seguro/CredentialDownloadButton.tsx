@@ -14,52 +14,52 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
         try {
             // Un-hide the container temporarily
             containerRef.current.style.display = 'block';
-            
+
             // Dynamically import html2canvas to avoid SSR window issues
             const html2canvasModule = await import('html2canvas');
             const html2canvas = html2canvasModule.default;
-            
+
             const canvas = await html2canvas(containerRef.current, {
                 scale: 2, // higher resolution
                 useCORS: true,
                 backgroundColor: '#ffffff'
             });
-            
+
             // Re-hide
             containerRef.current.style.display = 'none';
 
             const dataUrl = canvas.toDataURL('image/png');
-            
+
             const safeMesa = String(voto.MESA || 'SIN_MESA').trim();
             const fileNameBase = `MESA_${safeMesa}_${voto.CEDULA}`;
-            
+
             if (format === 'pdf') {
                 // Dynamically import jsPDF
                 const { jsPDF } = await import('jspdf');
-                
+
                 // Create an A4 PDF
                 const pdf = new jsPDF({
                     orientation: 'portrait',
                     unit: 'mm',
                     format: 'a4'
                 });
-                
+
                 // Standard ID card size (Credit Card / Credential) is ~85.6mm x 54mm
                 // Since our aspect ratio is 800x500 (1.6), we use 86.4mm x 54mm
                 const cardWidth = 86.4;
                 const cardHeight = 54;
-                
+
                 // Place it at the top-left to save paper (10mm margins)
                 const xPos = 10;
                 const yPos = 10;
-                
+
                 pdf.addImage(dataUrl, 'PNG', xPos, yPos, cardWidth, cardHeight);
-                
+
                 // Draw a subtle border around it as a cutting guide
                 pdf.setDrawColor(200, 200, 200);
                 pdf.setLineWidth(0.1);
                 pdf.rect(xPos, yPos, cardWidth, cardHeight);
-                
+
                 pdf.save(`${fileNameBase}.pdf`);
             } else {
                 // Download as PNG
@@ -82,20 +82,20 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
     return (
         <>
             <div className="flex items-center gap-1">
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50" 
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-50"
                     onClick={() => handleDownload('pdf')}
                     disabled={isGeneratingFormat !== null}
                     title="Descargar PDF (Para imprimir A4)"
                 >
                     {isGeneratingFormat === 'pdf' ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
                 </Button>
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50" 
+                <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 text-blue-600 hover:text-blue-800 hover:bg-blue-50"
                     onClick={() => handleDownload('png')}
                     disabled={isGeneratingFormat !== null}
                     title="Descargar PNG (Formato Imagen)"
@@ -105,8 +105,8 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
             </div>
 
             {/* Hidden template for the credential */}
-            <div 
-                ref={containerRef} 
+            <div
+                ref={containerRef}
                 style={{
                     display: 'none',
                     position: 'absolute',
@@ -121,48 +121,48 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
                 }}
             >
                 {/* Background image - User should place their image at public/credencial.png */}
-                <img 
-                    src="/credencial.png?v=2" 
-                    alt="Fondo Credencial" 
+                <img
+                    src="/credencial.png?v=2"
+                    alt="Fondo Credencial"
                     style={{
-                        position: 'absolute', 
-                        top: 0, 
-                        left: 0, 
-                        width: '100%', 
-                        height: '100%', 
-                        zIndex: 0, 
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        width: '100%',
+                        height: '100%',
+                        zIndex: 0,
                         objectFit: 'cover'
-                    }} 
-                    onError={(e) => { 
+                    }}
+                    onError={(e) => {
                         // If image fails to load, just hide it so we see a white background
-                        e.currentTarget.style.display = 'none'; 
-                    }} 
+                        e.currentTarget.style.display = 'none';
+                    }}
                 />
-                 
+
                 {/* Overlay text */}
                 <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                     {/* NOMBRES Y APELLIDOS */}
-                    <div style={{ position: 'absolute', top: '380px', left: '180px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', width: '600px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: '210px', left: '225px', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', width: '560px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                         {voto.NOMBRE?.trim()} {voto.APELLIDO?.trim()}
                     </div>
-                    
+
                     {/* DIRECCION */}
-                    <div style={{ position: 'absolute', top: '402px', left: '190px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '580px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: '260px', left: '245px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '540px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
                         {voto.DIRECCION?.trim()}
                     </div>
-                    
+
                     {/* LOCAL DE VOTACIÓN */}
-                    <div style={{ position: 'absolute', top: '424px', left: '400px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '380px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
+                    <div style={{ position: 'absolute', top: '320px', left: '485px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', width: '290px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
                         {voto.LOCAL?.trim()}
                     </div>
-                    
+
                     {/* MESA N° */}
-                    <div style={{ position: 'absolute', top: '446px', left: '290px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '380px', left: '405px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
                         {String(voto.MESA || '').trim()}
                     </div>
-                    
+
                     {/* ORDEN */}
-                    <div style={{ position: 'absolute', top: '468px', left: '170px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
+                    <div style={{ position: 'absolute', top: '430px', left: '205px', fontSize: '16px', fontWeight: 'bold', color: '#000' }}>
                         {String(voto.ORDEN || '').trim()}
                     </div>
                 </div>

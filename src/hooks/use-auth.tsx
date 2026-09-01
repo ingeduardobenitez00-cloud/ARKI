@@ -67,9 +67,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
            const mandatory = ['/', '/perfil'];
           if (userData.role === 'Admin' || userData.role === 'Super-Admin') {
             mandatory.push('/laboratorio-qr', '/admin/config-setup');
+            // Force all available permissions for Admins so new routes appear automatically
+            const allPerms = userRoles[userData.role]?.permissions || [];
+            allPerms.forEach(p => {
+                if (!mandatory.includes(p)) mandatory.push(p);
+            });
           }
-          if (['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente'].includes(userData.role || '')) {
+          if (['Super-Admin', 'Admin', 'Presidente', 'Coordinador', 'Dirigente', 'Comunicaciones'].includes(userData.role || '')) {
             mandatory.push('/migrar-votos');
+            mandatory.push('/whatsapp-excel'); // Ensure these roles get the new module automatically
           }
           mandatory.forEach(p => {
               if (!permissions.includes(p)) permissions.push(p);

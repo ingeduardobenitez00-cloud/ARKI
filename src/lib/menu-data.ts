@@ -48,6 +48,7 @@ export const allMenuItems = [
   { href: '/biblioteca', label: 'Biblioteca Multimedia', icon: Film, tooltip: 'GESTIONA LA BIBLIOTECA DE IMÁGENES Y VIDEOS DEL SISTEMA.' },
   { href: '/difusion', label: 'Difusión WhatsApp', icon: MessageSquare, tooltip: 'ENVÍA INVITACIONES, VIDEOS Y FLYERS PERSONALIZADOS POR WHATSAPP.' },
   { href: '/difusion-masiva', label: 'Co-Piloto Masivo', icon: Share2, tooltip: 'ENVÍA CAMPAÑAS EN AUTOMÁTICO REUTILIZANDO PESTAÑAS (ANTI-BAN).' },
+  { href: '/whatsapp-excel', label: 'Difusión Excel', icon: FileSpreadsheet, tooltip: 'ENVÍA MENSAJES MASIVOS DIRECTAMENTE DESDE UN ARCHIVO EXCEL.' },
   { href: '/inscripciones-eventos', label: 'Inscripciones Públicas', icon: UserPlus, tooltip: 'GESTIONA LAS PERSONAS QUE SE INSCRIBIERON DESDE EL LINK PÚBLICO.' },
   { href: '/inscripciones-archivadas', label: 'Historial Inscripciones', icon: History, tooltip: 'CONSULTA LAS LISTAS DE INSCRIPCIONES PÚBLICAS ARCHIVADAS.' },
   { href: '/ajustes-inscripcion', label: 'Ajustes Portal Público', icon: AppWindow, tooltip: 'CONFIGURA EL NOMBRE, FLYER Y ESTADO DEL PORTAL DE INSCRIPCIÓN.' },
@@ -100,7 +101,7 @@ export const menuCategories = [
   {
     label: 'Comunicación',
     icon: Share2,
-    items: ['/telefonos', '/seguimiento-llamadas', '/migrar-celulares', '/biblioteca', '/difusion', '/difusion-masiva']
+    items: ['/telefonos', '/seguimiento-llamadas', '/migrar-celulares', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel']
   },
   {
     label: 'Operación Día D',
@@ -130,10 +131,10 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas']
   },
   'Dirigente': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/voto-seguro', '/audiencia', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
   },
   'Mesario': {
     permissions: ['/', '/control-votacion', '/escaner-actas', '/perfil', '/simulador']
@@ -142,7 +143,7 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/reuniones', '/reuniones-archivadas', '/perfil']
   },
   'Comunicaciones': {
-    permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/migrar-celulares', '/perfil']
+    permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/migrar-celulares', '/perfil']
   },
   'Vista': {
     permissions: ['/', '/padron', '/resultados-electorales', '/resultados-por-local', '/reporte-mesas', '/perfil', '/simulador']
