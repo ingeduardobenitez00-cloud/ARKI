@@ -162,6 +162,10 @@ export default function PadronExportPage() {
         }
 
         records.sort((a, b) => {
+            const localA = String(a.LOCAL || '').trim().toUpperCase();
+            const localB = String(b.LOCAL || '').trim().toUpperCase();
+            if (localA !== localB) return localA.localeCompare(localB);
+
             const mesaA = parseInt(a.MESA || '0', 10);
             const mesaB = parseInt(b.MESA || '0', 10);
             if (mesaA !== mesaB) return mesaA - mesaB;
@@ -170,6 +174,25 @@ export default function PadronExportPage() {
             const ordenB = parseInt(b.ORDEN || '0', 10);
             return ordenA - ordenB;
         });
+
+        // Recalcular ORDEN por LOCAL y MESA
+        let currentLocal = '';
+        let currentMesa = '';
+        let mesaCounter = 1;
+
+        for (const row of records) {
+            const loc = String(row.LOCAL || '').trim().toUpperCase();
+            const mesa = String(row.MESA || '').trim();
+
+            if (loc !== currentLocal || mesa !== currentMesa) {
+                currentLocal = loc;
+                currentMesa = mesa;
+                mesaCounter = 1;
+            }
+
+            row.ORDEN = mesaCounter.toString();
+            mesaCounter++;
+        }
 
         setAllSeccionalData(records);
         
@@ -325,9 +348,9 @@ export default function PadronExportPage() {
       ]
   ];
 
-  const mapRowToPdfArray = (row: any, index: number) => {
+  const mapRowToPdfArray = (row: any) => {
       return [
-          (index + 1).toString(),
+          row.ORDEN || '',
           row.MESA || '',
           formatCedula(row.CEDULA),
           `${row.APELLIDO || ''}, ${row.NOMBRE || ''}`.trim().replace(/^,|,$/g, '').trim(),
@@ -417,7 +440,7 @@ export default function PadronExportPage() {
             ? `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${selectedLocal}`
             : `Padrón Electoral - SECCIONAL ${selectedSeccional}`;
         
-        const tableRows = filteredData.map((row, idx) => mapRowToPdfArray(row, idx));
+        const tableRows = filteredData.map((row) => mapRowToPdfArray(row));
         const totalPagesExp = '{total_pages_count_string}';
 
         (doc as any).autoTable(getPdfAutoTableOptions(doc, titleText, tableRows, logoIzquierdo, leftWidth, leftHeight, logoDerecho, rightWidth, rightHeight, pageWidth, totalPagesExp));
@@ -478,7 +501,7 @@ export default function PadronExportPage() {
             const pageWidth = doc.internal.pageSize.getWidth();
             const titleText = `Padrón Electoral - SECCIONAL ${selectedSeccional} - ${local}`;
             
-            const tableRows = localData.map((row, idx) => mapRowToPdfArray(row, idx));
+            const tableRows = localData.map((row) => mapRowToPdfArray(row));
             const totalPagesExp = '{total_pages_count_string}';
 
             (doc as any).autoTable(getPdfAutoTableOptions(doc, titleText, tableRows, logoIzquierdo, leftWidth, leftHeight, logoDerecho, rightWidth, rightHeight, pageWidth, totalPagesExp));
