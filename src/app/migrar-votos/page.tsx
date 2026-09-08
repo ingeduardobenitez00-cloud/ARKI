@@ -1152,78 +1152,7 @@ export default function MigrarVotosPage() {
 
                 {/* Panel Central de Previsualización y Control */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Panel Consolidado de Delegación por Destinos Externos */}
-                    {status === 'mapping' && externalDestinations.length > 0 && (
-                        <Card className="border-indigo-200/50 bg-indigo-50/10 shadow-md overflow-hidden rounded-3xl animate-in fade-in duration-300">
-                            <CardHeader className="bg-indigo-500/10 border-b border-indigo-100 py-4">
-                                <CardTitle className="text-xs font-black uppercase text-indigo-800 flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
-                                    Delegación de Votos (Otros Locales / Seccionales)
-                                </CardTitle>
-                                <CardDescription className="text-[9px] uppercase font-bold text-indigo-600">
-                                    Se detectaron electores que no pertenecen a tu área asignada. Te sugerimos dirigentes correspondientes a la seccional y local de cada elector para facilitar la derivación.
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent className="pt-6 space-y-4">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {externalDestinations.map(dest => {
-                                        const ops = getOperatorsForLocal(dest.local, dest.seccional);
-                                        const hasAnyOps = ops.matching.length > 0 || ops.others.length > 0;
-                                        const destKey = `${dest.seccional}_${dest.local}`;
-                                        
-                                        return (
-                                            <div key={destKey} className="p-4 border rounded-2xl bg-white space-y-2 shadow-sm">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="flex flex-col">
-                                                        <span className="text-[10px] font-black uppercase text-slate-800 truncate pr-2">{dest.local}</span>
-                                                        <span className="text-[8px] font-bold text-slate-500">SECCIONAL {dest.seccional}</span>
-                                                    </div>
-                                                    <Badge variant="outline" className="text-[8px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 px-2 shrink-0">
-                                                        {dest.count} Electores
-                                                    </Badge>
-                                                </div>
-                                                
-                                                <select
-                                                    value={operatorLocalMapping[destKey] || ''}
-                                                    onChange={(e) => setOperatorLocalMapping(prev => ({ ...prev, [destKey]: e.target.value }))}
-                                                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white font-bold text-[11px] uppercase focus:outline-none focus:border-indigo-300"
-                                                >
-                                                    <option value="user_me">-- Registrar a mi Nombre --</option>
-                                                    
-                                                    {ops.matching.length > 0 && (
-                                                        <optgroup label="Dirigentes de este Local">
-                                                            {ops.matching.map(op => (
-                                                                <option key={op.id} value={op.id}>
-                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    )}
-                                                    
-                                                    {ops.others.length > 0 && (
-                                                        <optgroup label="Otros Dirigentes de la Seccional">
-                                                            {ops.others.map(op => (
-                                                                <option key={op.id} value={op.id}>
-                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
-                                                                </option>
-                                                            ))}
-                                                        </optgroup>
-                                                    )}
-                                                </select>
-                                                
-                                                {!hasAnyOps && (
-                                                    <p className="text-[8px] font-bold text-amber-500 uppercase flex items-center gap-1">
-                                                        <AlertTriangle className="h-3 w-3 shrink-0" />
-                                                        Sin dirigentes para esta área.
-                                                    </p>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    )}
+
 
                     {/* Consola principal de control y previsualización */}
                     <Card className="border-primary/10 shadow-lg overflow-hidden min-h-[400px] rounded-3xl flex flex-col">
@@ -1232,33 +1161,6 @@ export default function MigrarVotosPage() {
                                 <BookHeart className="h-4 w-4 text-primary" />
                                 Paso 3: Previsualización e Inicio
                             </CardTitle>
-                            {status === 'mapping' && mapping.cedula && (
-                                <div className="flex flex-col sm:flex-row gap-3 items-center w-full md:w-auto">
-                                    <div className="flex items-center gap-2 bg-amber-50 p-1.5 rounded-xl border border-amber-200">
-                                        <Input 
-                                            placeholder="FORZAR SECCIONAL..." 
-                                            className="h-8 text-[10px] font-bold w-32 uppercase bg-white"
-                                            value={overrideSeccional}
-                                            onChange={(e) => setOverrideSeccional(e.target.value)}
-                                            title="Si el padrón tiene locales incorrectos, escribe tu seccional aquí para forzarla a todos los del Excel."
-                                        />
-                                        <Input 
-                                            placeholder="FORZAR LOCAL..." 
-                                            className="h-8 text-[10px] font-bold w-48 uppercase bg-white"
-                                            value={overrideLocal}
-                                            onChange={(e) => setOverrideLocal(e.target.value)}
-                                            title="Si el padrón tiene locales incorrectos, escribe el nombre del local aquí para forzarlo a todos los del Excel."
-                                        />
-                                    </div>
-                                    <Button 
-                                        onClick={handleStartMigration} 
-                                        className="bg-primary hover:bg-primary/95 text-white font-black text-xs uppercase h-10 px-5 rounded-xl shadow-md flex items-center gap-2 transition-transform active:scale-95"
-                                    >
-                                        <Play className="h-3.5 w-3.5 fill-white/20" />
-                                        Iniciar Migración
-                                    </Button>
-                                </div>
-                            )}
                         </CardHeader>
                         
                         <CardContent className="pt-6 flex-1 flex flex-col space-y-6">
@@ -1460,6 +1362,108 @@ export default function MigrarVotosPage() {
                                             </TableBody>
                                         </Table>
                                     </div>
+
+                                    {/* Panel Consolidado de Delegación por Destinos Externos */}
+                                    {status === 'mapping' && externalDestinations.length > 0 && (
+                                        <Card className="border-indigo-200/50 bg-indigo-50/10 shadow-md overflow-hidden rounded-3xl animate-in fade-in duration-300 mt-4">
+                                            <CardHeader className="bg-indigo-500/10 border-b border-indigo-100 py-4">
+                                                <CardTitle className="text-xs font-black uppercase text-indigo-800 flex items-center gap-2">
+                                                    <MapPin className="h-4 w-4" />
+                                                    Delegación de Votos (Otros Locales / Seccionales)
+                                                </CardTitle>
+                                                <CardDescription className="text-[9px] uppercase font-bold text-indigo-600">
+                                                    Se detectaron electores que no pertenecen a tu área asignada. Te sugerimos dirigentes correspondientes a la seccional y local de cada elector para facilitar la derivación.
+                                                </CardDescription>
+                                            </CardHeader>
+                                            <CardContent className="pt-6 space-y-4">
+                                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                    {externalDestinations.map(dest => {
+                                                        const ops = getOperatorsForLocal(dest.local, dest.seccional);
+                                                        const hasAnyOps = ops.matching.length > 0 || ops.others.length > 0;
+                                                        const destKey = `${dest.seccional}_${dest.local}`;
+                                                        
+                                                        return (
+                                                            <div key={destKey} className="p-4 border rounded-2xl bg-white space-y-2 shadow-sm">
+                                                                <div className="flex items-center justify-between">
+                                                                    <div className="flex flex-col">
+                                                                        <span className="text-[10px] font-black uppercase text-slate-800 truncate pr-2">{dest.local}</span>
+                                                                        <span className="text-[8px] font-bold text-slate-500">SECCIONAL {dest.seccional}</span>
+                                                                    </div>
+                                                                    <Badge variant="outline" className="text-[8px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 px-2 shrink-0">
+                                                                        {dest.count} Electores
+                                                                    </Badge>
+                                                                </div>
+                                                                
+                                                                <select
+                                                                    value={operatorLocalMapping[destKey] || ''}
+                                                                    onChange={(e) => setOperatorLocalMapping(prev => ({ ...prev, [destKey]: e.target.value }))}
+                                                                    className="w-full h-10 px-2 rounded-xl border border-slate-200 bg-white font-bold text-[11px] uppercase focus:outline-none focus:border-indigo-300"
+                                                                >
+                                                                    <option value="user_me">-- Registrar a mi Nombre --</option>
+                                                                    
+                                                                    {ops.matching.length > 0 && (
+                                                                        <optgroup label="Dirigentes de este Local">
+                                                                            {ops.matching.map(op => (
+                                                                                <option key={op.id} value={op.id}>
+                                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    )}
+                                                                    
+                                                                    {ops.others.length > 0 && (
+                                                                        <optgroup label="Otros Dirigentes de la Seccional">
+                                                                            {ops.others.map(op => (
+                                                                                <option key={op.id} value={op.id}>
+                                                                                    {op.name} ({op.role}{op.local ? ` - Local: ${op.local}` : ''})
+                                                                                </option>
+                                                                            ))}
+                                                                        </optgroup>
+                                                                    )}
+                                                                </select>
+                                                                
+                                                                {!hasAnyOps && (
+                                                                    <p className="text-[8px] font-bold text-amber-500 uppercase flex items-center gap-1">
+                                                                        <AlertTriangle className="h-3 w-3 shrink-0" />
+                                                                        Sin dirigentes para esta área.
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Action Buttons at the bottom of preview */}
+                                    {mapping.cedula && (
+                                        <div className="flex flex-col sm:flex-row gap-4 items-center justify-end w-full pt-6 border-t border-slate-100/50 mt-4">
+                                            <div className="flex items-center gap-2 bg-amber-50/50 p-1.5 rounded-xl border border-amber-100">
+                                                <Input 
+                                                    placeholder="FORZAR SECCIONAL..." 
+                                                    className="h-9 text-[10px] font-bold w-40 uppercase bg-white"
+                                                    value={overrideSeccional}
+                                                    onChange={(e) => setOverrideSeccional(e.target.value)}
+                                                    title="Si el padrón tiene locales incorrectos, escribe tu seccional aquí para forzarla a todos los del Excel."
+                                                />
+                                                <Input 
+                                                    placeholder="FORZAR LOCAL..." 
+                                                    className="h-9 text-[10px] font-bold w-48 uppercase bg-white"
+                                                    value={overrideLocal}
+                                                    onChange={(e) => setOverrideLocal(e.target.value)}
+                                                    title="Si el padrón tiene locales incorrectos, escribe el nombre del local aquí para forzarlo a todos los del Excel."
+                                                />
+                                            </div>
+                                            <Button 
+                                                onClick={handleStartMigration} 
+                                                className="bg-primary hover:bg-primary/95 text-white font-black text-[11px] uppercase h-11 px-8 rounded-xl shadow-lg shadow-primary/20 flex items-center gap-2 transition-transform active:scale-95"
+                                            >
+                                                <Play className="h-4 w-4 fill-white/20" />
+                                                Iniciar Migración
+                                            </Button>
+                                        </div>
+                                    )}
                                     </div>
                                 </div>
                             )}

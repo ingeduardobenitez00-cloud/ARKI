@@ -497,9 +497,15 @@ export default function ConsultaPage() {
         }
 
         let hasPermission = false;
+
+        const userLocalNorm = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
+        const electorLocalNorm = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+
         if (isAdmin) {
             hasPermission = true;
         } else if (userSeccionales.includes(electorSec)) {
+            hasPermission = true;
+        } else if (userLocalNorm && electorLocalNorm && userLocalNorm === electorLocalNorm) {
             hasPermission = true;
         } else if (isInvalidSeccional && electorSec === originalElectorSec) {
             // Si era inválida y no se pudo resolver, permitimos guardar por defecto (o según regla de negocio)

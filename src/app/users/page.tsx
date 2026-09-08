@@ -51,7 +51,7 @@ const userSchema = z.object({
   local: z.string().optional(),
   mesas: z.array(z.coerce.number()).optional(),
   permissions: z.array(z.string()).min(1, 'Debes seleccionar al menos un permiso.'),
-  moduleActions: z.record(z.array(z.enum(['create', 'update', 'delete', 'pdf', 'excel']))).optional(),
+  moduleActions: z.record(z.array(z.enum(['create', 'update', 'delete', 'pdf', 'excel', 'delete_all']))).optional(),
   clasificacion: z.string().optional(),
 });
 
@@ -186,7 +186,7 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
         );
     }, [seccionales, seccionalSearch]);
 
-    const toggleAction = (modulePath: string, action: 'create' | 'update' | 'delete' | 'pdf' | 'excel') => {
+    const toggleAction = (modulePath: string, action: 'create' | 'update' | 'delete' | 'pdf' | 'excel' | 'delete_all') => {
         const currentActions = moduleActions[modulePath] || [];
         const newActions = currentActions.includes(action)
             ? currentActions.filter((a: string) => a !== action)
@@ -573,6 +573,7 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                                                         <TableHead className="text-center h-8">BORRAR</TableHead>
                                                         <TableHead className="text-center h-8 bg-blue-50/50 text-blue-600">PDF</TableHead>
                                                         <TableHead className="text-center h-8 bg-green-50/50 text-green-600">EXCEL</TableHead>
+                                                        <TableHead className="text-center h-8 bg-red-50/50 text-red-600" title="Borrado Masivo">MASIVO</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -610,6 +611,9 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                                                                 </TableCell>
                                                                 <TableCell className="text-center py-2 bg-green-50/20">
                                                                     <Checkbox checked={actions.includes('excel')} disabled={!hasAccess} onCheckedChange={() => toggleAction(item.href, 'excel')} />
+                                                                </TableCell>
+                                                                <TableCell className="text-center py-2 bg-red-50/20">
+                                                                    <Checkbox checked={actions.includes('delete_all')} disabled={!hasAccess} onCheckedChange={() => toggleAction(item.href, 'delete_all')} />
                                                                 </TableCell>
                                                             </TableRow>
                                                         );

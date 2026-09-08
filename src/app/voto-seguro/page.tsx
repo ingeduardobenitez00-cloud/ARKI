@@ -912,31 +912,29 @@ export default function VotoSeguroPage() {
                                                                         </div>
                                                                     )}
                                                                     {canExportPdf && (
-                                                                        <>
-                                                                            <div 
-                                                                                className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
-                                                                                onPointerDown={(e) => { e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
-                                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
-                                                                            >
-                                                                                <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF LISTA
-                                                                            </div>
-                                                                            <div 
-                                                                                className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-200 rounded-full hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-sm ml-1"
-                                                                                onPointerDown={(e) => { e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
-                                                                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
-                                                                            >
-                                                                                <FileText className="h-3.5 w-3.5 mr-1 text-amber-600" /> CREDENCIALES
-                                                                            </div>
-                                                                        </>
+                                                                        <div 
+                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                            onPointerDown={(e) => { e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserPDF(userName, userData.votos); }}
+                                                                        >
+                                                                            <FileText className="h-3.5 w-3.5 mr-1 text-red-600" /> PDF LISTA
+                                                                        </div>
                                                                     )}
-                                                                    {user?.role === 'Super-Admin' && (
+                                                                    <div 
+                                                                        className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-amber-50 text-amber-700 border border-amber-200 rounded-full hover:bg-amber-100 hover:border-amber-300 transition-all cursor-pointer shadow-sm ml-1"
+                                                                        onPointerDown={(e) => { e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
+                                                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); executeExportUserCredentialsPDF(userName, userData.votos); }}
+                                                                    >
+                                                                        <FileText className="h-3.5 w-3.5 mr-1 text-amber-600" /> CREDENCIALES
+                                                                    </div>
+                                                                    {(user?.role === 'Super-Admin' || (user?.moduleActions?.['/voto-seguro']?.includes('delete_all') && userData.userId === user?.id)) && userData.votos.length > 0 && viewMode !== 'internas' && (
                                                                         <div 
                                                                             className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-600 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-1"
                                                                             onPointerDown={(e) => { e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
                                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
-                                                                            title="Eliminar todos los votos de este dirigente"
+                                                                            title={user?.role === 'Super-Admin' ? "Eliminar todos los votos de este dirigente" : "Eliminar todos mis votos"}
                                                                         >
-                                                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> BORRAR TODO
+                                                                            <Trash2 className="h-3.5 w-3.5 mr-1" /> {user?.role === 'Super-Admin' ? "BORRAR TODO" : "BORRAR MI LISTADO"}
                                                                         </div>
                                                                     )}
                                                                     {isAdmin && userData.votos.length > 0 && viewMode !== 'internas' && (
@@ -946,15 +944,6 @@ export default function VotoSeguroPage() {
                                                                             onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToMoveAll({userName, userId: userData.userId, votos: userData.votos}); setIsMoveAllDialogOpen(true); }}
                                                                         >
                                                                             <ArrowRightLeft className="h-3.5 w-3.5 mr-1 text-blue-600" /> MOVER TODO
-                                                                        </div>
-                                                                    )}
-                                                                    {enableBulkDelete && user?.role === 'Super-Admin' && userData.votos.length > 0 && viewMode !== 'internas' && (
-                                                                        <div 
-                                                                            className="flex items-center justify-center h-7 px-3 text-[9px] font-black uppercase tracking-widest bg-red-50 text-red-700 border border-red-200 rounded-full hover:bg-red-100 hover:border-red-300 transition-all cursor-pointer shadow-sm ml-2"
-                                                                            onPointerDown={(e) => { e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
-                                                                            onClick={(e) => { e.preventDefault(); e.stopPropagation(); setUserToDeleteAll({userName, userId: userData.userId, votos: userData.votos}); setIsDeleteAllDialogOpen(true); }}
-                                                                        >
-                                                                            <Trash2 className="h-3.5 w-3.5 mr-1 text-red-600" /> BORRAR TODO
                                                                         </div>
                                                                     )}
                                                                 </div>
