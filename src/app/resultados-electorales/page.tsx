@@ -4,23 +4,38 @@ import { useState, useEffect, useMemo } from 'react';
 import { collection, onSnapshot, query, getDocs, doc } from 'firebase/firestore';
 import { useFirestore } from '@/firebase';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { INTENDENTE_CANDIDATES, JUNTA_LISTS, getJuntaOptions } from '@/data/electoral-metadata';
+import { INTENDENTE_CANDIDATES, JUNTA_LISTS, getJuntaOptions, GENERALES_INTENDENTE_CANDIDATES, GENERALES_JUNTA_LISTS, getGeneralesJuntaOptions } from '@/data/electoral-metadata';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { Users, Vote, Percent, TrendingUp, Gavel, Medal, Server, Loader2 } from 'lucide-react';
 import { calculateDHondt, rankCandidatesByPreferential, ListResult } from '@/lib/electoral-math';
+import { cn } from '@/lib/utils';
+import { Archive } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ResultadosElectoralesPage() {
     const db = useFirestore();
     const [totals, setTotals] = useState<any>(null);
     const [tsjeTotals, setTsjeTotals] = useState<any>(null);
     const [dataSource, setDataSource] = useState<'interno' | 'tsje'>('tsje');
+    const [electionMode, setElectionMode] = useState<'generales' | 'internas'>('generales');
     const [isTsjeLoading, setIsTsjeLoading] = useState(false);
+    const [selectedPrefList, setSelectedPrefList] = useState<string>('lista-1');
     
     const [totalMesasGlobal, setTotalMesasGlobal] = useState(0);
     const [totalElectoresGlobal, setTotalElectoresGlobal] = useState(0);
+
+    const activeIntendenteCandidates = electionMode === 'internas' ? INTENDENTE_CANDIDATES : GENERALES_INTENDENTE_CANDIDATES;
+    const activeJuntaLists = electionMode === 'internas' ? JUNTA_LISTS : GENERALES_JUNTA_LISTS;
+    const activeGetJuntaOptions = electionMode === 'internas' ? getJuntaOptions : getGeneralesJuntaOptions;
+
+    // Reset selected list when mode changes
+    useEffect(() => {
+        setSelectedPrefList('electos');
+    }, [electionMode]);
 
     // Fetch Interno Firebase Data
     useEffect(() => {
@@ -53,6 +68,13 @@ export default function ResultadosElectoralesPage() {
     // Fetch TSJE Data via Proxy
     useEffect(() => {
         if (dataSource === 'tsje') {
+            if (electionMode === 'generales') {
+                // We don't have a live TSJE endpoint for the upcoming Generales yet.
+                // Fetching codeleccion=44 would bring Internas data and mess up the dashboard.
+                setTsjeTotals(null);
+                return;
+            }
+
             setIsTsjeLoading(true);
             
             Promise.all([
@@ -106,9 +128,9 @@ export default function ResultadosElectoralesPage() {
                 setIsTsjeLoading(false);
             });
         }
-    }, [dataSource]);
+    }, [dataSource, electionMode]);
 
-    const activeTotals = dataSource === 'interno' ? totals : (tsjeTotals || { intendente: {}, junta: {}, processedMesas: 0 });
+    const activeTotals = dataSource === 'interno' ? totals : (tsjeTotals || { intendente: {}, junta: {}, processedMesas: 0, totalMesas: 0, totalElectores: 0 });
 
     const intendenteTotals = useMemo(() => {
         return activeTotals?.intendente || { votos_nulos: 0, votos_blancos: 0 };
@@ -131,36 +153,36 @@ export default function ResultadosElectoralesPage() {
 
     const dHondtResults = useMemo(() => {
         if (!activeTotals?.junta) return [];
-        const lists: ListResult[] = JUNTA_LISTS.map(l => ({
+        const lists: ListResult[] = activeJuntaLists.map(l => ({
             id: l.id,
             name: l.name,
             totalVotes: activeTotals.junta[l.id]?.total || 0,
             options: activeTotals.junta[l.id]?.opciones || {}
         }));
         return calculateDHondt(lists, 24);
-    }, [activeTotals]);
+    }, [activeTotals, activeJuntaLists]);
 
     const preferentialRankings = useMemo(() => {
         if (!activeTotals?.junta) return {};
         const rankings: Record<string, any[]> = {};
-        JUNTA_LISTS.forEach(list => {
+        activeJuntaLists.forEach(list => {
             const options = activeTotals.junta[list.id]?.opciones || {};
-            const candidates = getJuntaOptions(list.id);
+            const candidates = activeGetJuntaOptions(list.id);
             rankings[list.id] = rankCandidatesByPreferential(options, candidates);
         });
         return rankings;
-    }, [activeTotals]);
+    }, [activeTotals, activeJuntaLists, activeGetJuntaOptions]);
 
-    const activeTotalMesas = dataSource === 'tsje' ? (activeTotals?.totalMesas || totalMesasGlobal) : totalMesasGlobal;
-    const activeTotalElectores = dataSource === 'tsje' ? (activeTotals?.totalElectores || totalElectoresGlobal) : totalElectoresGlobal;
+    const activeTotalMesas = dataSource === 'tsje' ? (activeTotals?.totalMesas || 1540) : (electionMode === 'generales' ? 1540 : totalMesasGlobal);
+    const activeTotalElectores = dataSource === 'tsje' ? (activeTotals?.totalElectores || 0) : totalElectoresGlobal;
 
     const intendenteChartData = useMemo(() => {
-        return INTENDENTE_CANDIDATES.map(c => ({
+        return activeIntendenteCandidates.map(c => ({
             name: c.name,
             votos: intendenteTotals[c.id] || 0,
-            color: c.list.includes('2') ? '#ef4444' : c.list.includes('7') ? '#eab308' : '#10b981'
+            color: c.list.includes('2') && electionMode === 'internas' ? '#ef4444' : c.list.includes('7') && electionMode === 'internas' ? '#eab308' : c.list.includes('1') ? '#ef4444' : c.list.includes('2') ? '#3b82f6' : '#10b981'
         })).sort((a, b) => b.votos - a.votos);
-    }, [intendenteTotals]);
+    }, [intendenteTotals, activeIntendenteCandidates, electionMode]);
 
     const electedConcejales = useMemo(() => {
         const elected: any[] = [];
@@ -171,7 +193,7 @@ export default function ResultadosElectoralesPage() {
                 elected.push({
                     ...w,
                     listId: res.listId,
-                    listNumber: JUNTA_LISTS.find(l => l.id === res.listId)?.listNumber,
+                    listNumber: activeJuntaLists.find(l => l.id === res.listId)?.listNumber,
                     position: index + 1,
                     quotient: res.quotients?.[index] || 0
                 });
@@ -195,10 +217,27 @@ export default function ResultadosElectoralesPage() {
                         ) : (
                             <Badge variant="outline" className="animate-pulse bg-blue-50 text-blue-600 border-blue-200">TREP INTERNO</Badge>
                         )}
-                        <span className="font-bold">Elecciones Internas ANR 2026</span>
+                        <span className="font-bold">{electionMode === 'internas' ? 'Elecciones Internas ANR 2026' : 'Elecciones Generales 2026'}</span>
                     </div>
                 </div>
                 <div className="flex gap-4">
+                    <div className="flex bg-muted/50 p-1 rounded-xl">
+                        <Button 
+                            variant={electionMode === 'generales' ? 'default' : 'ghost'} 
+                            onClick={() => setElectionMode('generales')}
+                            className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", electionMode === 'generales' ? "shadow-sm" : "")}
+                        >
+                            Generales
+                        </Button>
+                        <Button 
+                            variant={electionMode === 'internas' ? 'default' : 'ghost'} 
+                            onClick={() => setElectionMode('internas')}
+                            className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", electionMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm" : "")}
+                        >
+                            <Archive className="w-3.5 h-3.5 mr-2" />
+                            internas_ANR_2026
+                        </Button>
+                    </div>
                     <div className="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
                         <div className="text-[10px] uppercase font-bold text-slate-400">Mesas Procesadas</div>
                         <div className="text-2xl font-black">{activeTotals?.processedMesas || 0} <span className="text-sm font-normal text-slate-400">/ {activeTotalMesas || '...'}</span></div>
@@ -217,7 +256,7 @@ export default function ResultadosElectoralesPage() {
                 <div className="p-8 flex flex-col items-center justify-center bg-white rounded-2xl border shadow-sm border-dashed">
                     <Loader2 className="w-8 h-8 text-red-500 animate-spin mb-4" />
                     <div className="font-bold text-slate-700">Conectando con Servidores TSJE...</div>
-                    <div className="text-sm text-slate-400">Solicitando paquete de datos: Elecciones Internas ANR 2026</div>
+                    <div className="text-sm text-slate-400">Solicitando paquete de datos: {electionMode === 'internas' ? 'Elecciones Internas ANR 2026' : 'Elecciones Generales 2026'}</div>
                 </div>
             )}
 
@@ -226,13 +265,13 @@ export default function ResultadosElectoralesPage() {
                     <Server className="w-8 h-8 text-red-400 mb-4" />
                     <div className="font-black text-red-700 text-lg uppercase">Esperando transmisión oficial JSON</div>
                     <div className="text-sm text-red-600 max-w-md mt-2 font-medium">
-                        El proxy está enlazado a los servidores del TSJE para las Elecciones Internas ANR 2026. Los gráficos se poblarán automáticamente cuando el TSJE publique los resultados oficiales.
+                        El proxy está enlazado a los servidores del TSJE para las {electionMode === 'internas' ? 'Elecciones Internas ANR 2026' : 'Elecciones Generales 2026'}. Los gráficos se poblarán automáticamente cuando el TSJE publique los resultados oficiales.
                     </div>
                 </div>
             )}
 
             {/* Summary Grid */}
-            <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 transition-all duration-500 ${(dataSource === 'tsje' && !tsjeTotals) ? 'opacity-30 pointer-events-none grayscale' : ''}`}>
+            <div className={`grid grid-cols-1 md:grid-cols-4 gap-4 transition-all duration-500`}>
                 <Card className="bg-white border-none shadow-sm overflow-hidden">
                     <CardContent className="p-6 flex items-center gap-4">
                         <div className={`p-3 rounded-2xl ${dataSource === 'tsje' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}><Users /></div>
@@ -255,7 +294,7 @@ export default function ResultadosElectoralesPage() {
                 </Card>
             </div>
 
-            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-8 transition-all duration-500 ${(dataSource === 'tsje' && !tsjeTotals) ? 'opacity-30 pointer-events-none grayscale' : ''}`}>
+            <div className={`grid grid-cols-1 lg:grid-cols-3 gap-8 transition-all duration-500`}>
                 {/* Intendente Section */}
                 <div className="lg:col-span-2 space-y-6">
                     <Card className="border-none shadow-sm overflow-hidden bg-white">
@@ -267,7 +306,7 @@ export default function ResultadosElectoralesPage() {
                         <CardContent className="p-0">
                             <div className="grid grid-cols-1 divide-y">
                                 {intendenteChartData.map((data) => {
-                                    const candidate = INTENDENTE_CANDIDATES.find(c => c.name === data.name);
+                                    const candidate = activeIntendenteCandidates.find(c => c.name === data.name);
                                     const percentage = totalVotosIntendente ? (data.votos / totalVotosIntendente * 100) : 0;
                                     const photoUrl = candidate?.photo || 'https://via.placeholder.com/150';
                                     const listName = candidate?.list || 'N/A';
@@ -275,7 +314,7 @@ export default function ResultadosElectoralesPage() {
                                     return (
                                         <div key={data.name} className="p-6 flex items-center gap-6 hover:bg-slate-50 transition-colors">
                                             <div className="relative">
-                                                <img src={photoUrl} className="w-16 h-16 rounded-full object-cover ring-2 ring-slate-100 shadow-md" onError={(e) => (e.target as any).src = 'https://via.placeholder.com/150'} />
+                                                <img src={photoUrl} referrerPolicy="no-referrer" className="w-16 h-16 rounded-full object-cover ring-2 ring-slate-100 shadow-md" onError={(e) => (e.target as any).src = 'https://via.placeholder.com/150'} />
                                                 <div className="absolute -bottom-1 -right-1 bg-white rounded-full p-1 shadow-sm border">
                                                     <div className="w-4 h-4 rounded-full" style={{ backgroundColor: data.color }} />
                                                 </div>
@@ -331,36 +370,83 @@ export default function ResultadosElectoralesPage() {
 
                 <div className="space-y-6">
                     <Card className="border-none shadow-sm overflow-hidden bg-white">
-                        <CardHeader className="border-b bg-slate-50/50">
+                        <CardHeader className="border-b bg-slate-50/50 flex flex-row items-center justify-between pb-3">
                             <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 flex items-center gap-2">
-                                <Medal className="w-4 h-4" /> Votos Preferencias Concejales
+                                <Medal className="w-4 h-4" /> Preferencias Concejales
                             </CardTitle>
+                            <Select value={selectedPrefList} onValueChange={setSelectedPrefList}>
+                                <SelectTrigger className="w-[180px] h-8 text-xs font-bold uppercase">
+                                    <SelectValue placeholder="Seleccionar Lista" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="electos" className="text-xs font-bold uppercase text-red-600 bg-red-50 focus:bg-red-100">
+                                        Bancadas (D'Hondt) - Electos
+                                    </SelectItem>
+                                    {activeJuntaLists.map(list => (
+                                        <SelectItem key={list.id} value={list.id} className="text-xs font-bold uppercase">
+                                            Lista {list.listNumber}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </CardHeader>
                         <CardContent className="p-0">
                             <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-100">
-                                {electedConcejales.map((c, i) => (
-                                    <div key={`${c.listId}-${c.name}`} className="p-3 flex items-center gap-3 hover:bg-blue-50/30 transition-colors">
-                                        <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm">
-                                            {i + 1}
+                                {selectedPrefList === 'electos' ? (
+                                    electedConcejales.map((c, i) => (
+                                        <div key={`electos-${c.listId}-${c.name}`} className="p-3 flex items-center gap-3 hover:bg-blue-50/30 transition-colors">
+                                            <div className="w-6 h-6 rounded-full bg-red-600 text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm">
+                                                {i + 1}
+                                            </div>
+                                            <img 
+                                                src={c.photo || 'https://via.placeholder.com/150'} 
+                                                alt={c.name}
+                                                referrerPolicy="no-referrer"
+                                                className="w-10 h-10 rounded-full object-cover border border-red-200 bg-slate-100 shadow-sm shrink-0"
+                                                onError={(e) => (e.target as any).src = 'https://via.placeholder.com/150'}
+                                            />
+                                            <div className="flex-1">
+                                                <div className="text-xs font-black text-slate-800 uppercase leading-none">{c.name}</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Lista {c.listNumber} • Pos. {c.position}</div>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <div className="text-sm font-black text-slate-900 leading-none">{c.votes?.toLocaleString() || 0}</div>
+                                                <div className="text-[9px] text-slate-400 uppercase font-bold leading-none mt-1">Votos</div>
+                                            </div>
+                                            <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700">ELECTO</Badge>
                                         </div>
-                                        <img 
-                                            src={c.photo || 'https://via.placeholder.com/150'} 
-                                            alt={c.name}
-                                            className="w-10 h-10 rounded-full object-cover border border-slate-200 bg-slate-100 shadow-sm shrink-0"
-                                            onError={(e) => (e.target as any).src = 'https://via.placeholder.com/150'}
-                                        />
-                                        <div className="flex-1">
-                                            <div className="text-xs font-black text-slate-800 uppercase leading-none">{c.name}</div>
-                                            <div className="text-[10px] font-bold text-slate-400 uppercase">Lista {c.listNumber} • Pos. {c.position}</div>
+                                    ))
+                                ) : (
+                                    (preferentialRankings[selectedPrefList] || []).map((c: any, i: number) => {
+                                        const listSeats = dHondtResults.find(r => r.listId === selectedPrefList)?.seats || 0;
+                                        const isElected = i < listSeats;
+                                        return (
+                                        <div key={`${selectedPrefList}-${c.name}`} className="p-3 flex items-center gap-3 hover:bg-blue-50/30 transition-colors">
+                                            <div className={`w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-black shrink-0 shadow-sm ${isElected ? 'bg-red-600' : 'bg-slate-300'}`}>
+                                                {i + 1}
+                                            </div>
+                                            <img 
+                                                src={c.photo || 'https://via.placeholder.com/150'} 
+                                                alt={c.name}
+                                                referrerPolicy="no-referrer"
+                                                className={`w-10 h-10 rounded-full object-cover border bg-slate-100 shadow-sm shrink-0 ${isElected ? 'border-red-200' : 'border-slate-200'}`}
+                                                onError={(e) => (e.target as any).src = 'https://via.placeholder.com/150'}
+                                            />
+                                            <div className="flex-1">
+                                                <div className="text-xs font-black text-slate-800 uppercase leading-none">{c.name}</div>
+                                                <div className="text-[10px] font-bold text-slate-400 uppercase">Opción {c.option}</div>
+                                            </div>
+                                            <div className="text-right flex-shrink-0">
+                                                <div className="text-sm font-black text-slate-900 leading-none">{c.votes?.toLocaleString() || 0}</div>
+                                                <div className="text-[9px] text-slate-400 uppercase font-bold leading-none mt-1">Votos</div>
+                                            </div>
+                                            {isElected && (
+                                                <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700">ELECTO</Badge>
+                                            )}
                                         </div>
-                                        <div className="text-right flex-shrink-0">
-                                            <div className="text-sm font-black text-slate-900 leading-none">{c.votes?.toLocaleString() || 0}</div>
-                                            <div className="text-[9px] text-slate-400 uppercase font-bold leading-none mt-1">Votos</div>
-                                        </div>
-                                        <Badge variant="secondary" className="text-[10px] bg-blue-50 text-blue-700">ELECTO</Badge>
-                                    </div>
-                                ))}
-                                {electedConcejales.length === 0 && (
+                                    )})
+                                )}
+                                {(selectedPrefList === 'electos' ? electedConcejales.length === 0 : (!preferentialRankings[selectedPrefList] || preferentialRankings[selectedPrefList].length === 0)) && (
                                     <div className="p-8 text-center text-slate-400 text-xs italic">
                                         Esperando datos de escrutinio...
                                     </div>
@@ -374,7 +460,7 @@ export default function ResultadosElectoralesPage() {
                             <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500 text-center">Resumen Junta Municipal</CardTitle>
                         </CardHeader>
                         <CardContent className="p-4 space-y-3">
-                            {JUNTA_LISTS.map(list => {
+                            {activeJuntaLists.map(list => {
                                     const total = juntaTotals[list.id] || 0;
                                     return (
                                         <div key={list.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-slate-50 transition-colors border-b last:border-0 border-slate-100">
@@ -400,7 +486,7 @@ export default function ResultadosElectoralesPage() {
                                 <div key={res.listId} className="flex justify-between items-center p-3 rounded-xl bg-slate-50">
                                     <div className="flex flex-col">
                                         <span className="text-[10px] font-bold text-slate-400 uppercase">{res.listName}</span>
-                                        <span className="text-sm font-black text-slate-700">LISTA {JUNTA_LISTS.find(l => l.id === res.listId)?.listNumber}</span>
+                                        <span className="text-sm font-black text-slate-700">LISTA {activeJuntaLists.find(l => l.id === res.listId)?.listNumber}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <span className="text-2xl font-black text-primary">{res.seats}</span>
@@ -444,7 +530,7 @@ export default function ResultadosElectoralesPage() {
                             </div>
                             <p className="text-[10px] text-white/60 leading-relaxed">
                                 {dataSource === 'tsje' 
-                                    ? 'Datos actualizados desde los servidores oficiales del TSJE para las Elecciones Internas ANR 2026.'
+                                    ? `Datos actualizados desde los servidores oficiales del TSJE para las ${electionMode === 'internas' ? 'Elecciones Internas ANR 2026' : 'Elecciones Generales 2026'}.`
                                     : 'Datos actualizados instantáneamente desde los centros de votación vía escaneo de actas QR.'}
                             </p>
                         </CardContent>

@@ -13,12 +13,28 @@ export const INTENDENTE_CANDIDATES: Candidate[] = [
   { id: 'lista-300', name: '300 - DANILO GOMEZ', list: '300', photo: '/candidates/intendente/danilo-gomez.jpg', type: 'Intendente' },
 ];
 
+export const GENERALES_INTENDENTE_CANDIDATES: Candidate[] = [
+  { id: 'lista-1', name: 'CAMILO PEREZ', list: '1', photo: '/candidates/generales/intendente-1.webp', type: 'Intendente' },
+  { id: 'lista-4', name: 'SOLE NUÑEZ', list: '4', photo: '/candidates/generales/intendente-4.webp', type: 'Intendente' },
+  { id: 'lista-6', name: 'RODRI FRANCO', list: '6', photo: '/candidates/generales/intendente-6.webp', type: 'Intendente' },
+  { id: 'lista-300', name: 'ARLENE AQUINO', list: '300', photo: '/candidates/generales/intendente-300.webp', type: 'Intendente' }
+];
+
 export const JUNTA_LISTS = [
     { id: 'lista-2c', name: '2C', listNumber: '2C' },
     { id: 'lista-2p', name: '2P', listNumber: '2P' },
     { id: 'lista-6', name: '6', listNumber: '6' },
     { id: 'lista-7', name: '7', listNumber: '7' },
     { id: 'lista-20', name: '20', listNumber: '20' },
+];
+
+export const GENERALES_JUNTA_LISTS = [
+  { id: 'lista-1', name: 'PARTIDO COLORADO (ANR)', listNumber: '1' },
+  { id: 'lista-2', name: 'PARTIDO LIBERAL RADICAL AUTENTICO (PLRA)', listNumber: '2' },
+  { id: 'lista-4', name: 'ENCUENTRO NACIONAL', listNumber: '4' },
+  { id: 'lista-8', name: 'PATRIA QUERIDA', listNumber: '8' },
+  { id: 'lista-9', name: 'HAGAMOS', listNumber: '9' },
+  { id: 'lista-42', name: 'FRENTE GUASU', listNumber: '42' }
 ];
 
 // Real names mapping for Junta Municipal
@@ -170,4 +186,70 @@ export const getJuntaOptions = (listId: string): Candidate[] => {
             type: 'Concejal'
         };
     });
+};
+
+export const getGeneralesJuntaOptions = (listId: string): Candidate[] => {
+  const namesByList: Record<string, string[]> = {
+    '1': [
+      'GERARDO "GRINGO" BENITEZ', 'MIGUEL SOSA', 'SEBA RADICE', 'NASSER ESGAIB',
+      '“EL ARKI” SOTOMAYOR', 'JOSE PLATE', 'IVAN CHILAVERT', 'MARCE CENTURION',
+      'CERES ESCOBAR', 'DANI FERNANDEZ', 'CARLOS MOREL', 'TINO AYALA',
+      '“PIRIKI” RODRIGUEZ', 'JESUS LARA', 'HUGO RAMIREZ', 'MARIANO CACERES',
+      'CYNTHIA ROMERO', 'GABRIEL CALONGA', 'AXEL MONGELOS', 'OSCAR NOLDIN',
+      'KARINA ACUÑA', 'ENRIQUE WAGENER', 'JAVIER PINTOS', 'ARTURO TUKI ALMIRON'
+    ],
+    '2': [
+      "AUGUSTO WAGNER", "RAMON ORTIZ", "CHRISTIAN BAREIRO", "FIORELLA FORESTIERI “YO CONFIO”",
+      "HUMBERTO BLASCO", "ARIEL ANDINO", "TANCREDO LUIS CENTURION", "CARINA BENITEZ YEGROS",
+      "SEBA JAEGGLI", "COCO GONZALEZ", "MARIA JOSE MIRANDA", "ARQ. CARLOS E. RUIZ SCHAERER",
+      "CECILIA VARGAS PEÑA", "MAITO VARGAS", "NERY VELAZQUEZ", "FATIMA GOMEZ",
+      "MARIA CRISTINA BENITEZ", "ROGELIO BARROS", "YESICA SAGUIER", "NITO SANTA CRUZ",
+      "LUIS FRETES", "HENRY NELSON CAÑETE FERNANDEZ", "JUAN FRANCISCO BENITEZ RIVAS", "JUAN JARA"
+    ],
+    '4': [
+      "SEBAS GARAY PQ", "NOELIA DIAZ", "MAURI MALUFF", "GUSTAVO RODRIGUEZ",
+      "ROSA VACCHETTA", "DR. CELINO FERREIRA S.", "ALVARO GRAU PQ", "GLADIS FISCHER",
+      "JORGE RAMOS “DOCTOR FRANCIA”", "JOSEFINA DUARTE", "OTI SANCHEZ", "JULIO VILLALBA CAVE",
+      "PABLO CALLIZO", "FABI MONTIEL KLEINER", "MAXI SEIFERHELD “LEVANTA ESCUELAS”", "CORA ARBO",
+      "“TU BUEN AMIGO” BRUNO", "ING AGR CARMEN “TATE” CUBAS", "JAZMIN GALEANO SAPENA PQ", "INGRID NOGUERA",
+      "DANI RODRIGUEZ", "ING GLADYS CANESE", "PEDRO MAYOR", "MAGIN LOPEZ “GESTION Y CONTROL”"
+    ],
+    '8': [
+      "HUGO LOPEZ", "TADEO ZARRATEA DAVALOS", "MARIA LUISA BELLO", "RODRIGO SEBASTIAN ARELLANO MOREIRA",
+      "JOSE “PUMA” RODRIGUEZ", "FERNANDO “FERGO” GAMARRA", "CAP R LETIZIA RAMIREZ PAREDES", "LIC. AMI LOMBARDO",
+      "CLAUDIO “MORSA” GONZALEZ", "DIXON BUTTERWORTH KENNEDY", "JORGE ANTONIO PRADO ESQUIVEL", "CARLOS ENRIQUE BAREIRO DUARTE",
+      "ALFREDO RAUL NOGUERA VARGAS", "TOMAS FABIAN PLATE FRANCO", "ANDRES MIGUEL RUIZ DIAZ ARECO", "ADA LISSI ARRIOLA ALCARAZ",
+      "JOSE LUIS FONTCLARA FERNANDEZ", "VICTORIA JARA HEYN", "NELSON CASTRO", "NORMA REINA ISABEL RIOS",
+      "JORGE DANIEL CHAVEZ QUIÑONEZ", "LINO ANDRES AVILA ORTEGA", "CARLOS FERREIRA", "CRISTIAN DAVID SAMANIEGO NUÑEZ"
+    ],
+    '9': [
+      "ALBERTO NUÑEZ ISASI", "ALFREDO EFRAIN ESQUIVEL", "FERNANDO CENTURION", "MIRTHA ARACELI ORTIZ BENITEZ",
+      "SAMU ALVAREZ", "RAFAELA BEATRIZ VELAZQUEZ", "GUSTAVO ADOLFO CLOSA BENITEZ", "JOSE DEL ROSARIO ORTELLADO FRANCO",
+      "VICTOR HUGO SANCHEZ ACOSTA", "MIGUEL GUSTAVO PORTILLO ORUE", "LEONARDO OJEDA", "EDITH FRANCO DE SARDI",
+      "ALBERTO DA SILVA", "ALBERTO GEREMIAS BORDON", "HUGO ENRIQUE STANLEY PERSON", "MIRNA CONCEPCION PAREDES",
+      "THAMARA GISEL MATTO", "OSCAR FABIAN RODRIGUEZ", "ANA MARIA QUINTANA", "ABRAHAN GARCIA INSAURRALDE",
+      "GLADIS PAOLA ESPINOLA OTAZU", "HUGO DANIEL LONCHARICH BASUALDO", "JOSE ANTONIO CABRERA MIÑARRO", "LUCIANO ANTONIO BENITEZ GONZALEZ"
+    ],
+    '42': [
+      "MARIA DENIS", "JESSI ARIAS", "MANU GERDING", "PACHIN CENTURION",
+      "HAIDEE ROMERO", "IVAN ISASI", "MALU VAZQUEZ", "LIZ OSORIO",
+      "JUANI CASURIAGA", "HECTOR OTAZU", "SUSANA BARRETO", "ROSA MIRANDA",
+      "CESAR GONZALEZ PARINI", "OSCAR HERREROS USHER", "JORGE ENRIQUE AYALA", "NATHALIA CORREA",
+      "SAMUEL VERA", "ALHELI GONZALEZ CACERES", "BETO DUNJO", "MARIA CONCEPCION CANDIA",
+      "CARLOS PORTILLO", "YOLANDA MUJICA", "PAOLA ACOSTA DENIS", "ORLANDO MAIDANA"
+    ]
+  };
+
+  const listNumber = listId.replace('lista-', '');
+  return Array.from({ length: 24 }, (_, i) => {
+      const optionNumber = i + 1;
+      return {
+          id: `${listId}-opt-${optionNumber}`,
+          name: namesByList[listNumber]?.[i] || `CANDIDATO ${optionNumber}`,
+          list: listNumber,
+          option: optionNumber,
+          photo: `/candidates/generales/concejal-${listNumber}-opt-${optionNumber}.webp`,
+          type: 'Concejal'
+      };
+  });
 };

@@ -38,8 +38,8 @@ export function calculateDHondt(lists: ListResult[], totalSeats: number = 24): D
     // 2. Sort all quotients descending
     table.sort((a, b) => b.quotient - a.quotient);
 
-    // 3. Take the top N quotients
-    const winners = table.slice(0, totalSeats);
+    // 3. Take the top N quotients (must be > 0)
+    const winners = table.filter(w => w.quotient > 0).slice(0, totalSeats);
 
     // 4. Count seats per list
     return lists.map(list => {
