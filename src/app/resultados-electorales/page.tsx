@@ -173,8 +173,8 @@ export default function ResultadosElectoralesPage() {
         return rankings;
     }, [activeTotals, activeJuntaLists, activeGetJuntaOptions]);
 
-    const activeTotalMesas = dataSource === 'tsje' ? (activeTotals?.totalMesas || 1540) : (electionMode === 'generales' ? 1540 : totalMesasGlobal);
-    const activeTotalElectores = dataSource === 'tsje' ? (activeTotals?.totalElectores || 0) : totalElectoresGlobal;
+    const activeTotalMesas = dataSource === 'tsje' ? (activeTotals?.totalMesas || 1325) : (electionMode === 'generales' ? 1325 : totalMesasGlobal);
+    const activeTotalElectores = dataSource === 'tsje' ? (activeTotals?.totalElectores || 0) : (electionMode === 'generales' ? 452282 : totalElectoresGlobal);
 
     const intendenteChartData = useMemo(() => {
         return activeIntendenteCandidates.map(c => ({
