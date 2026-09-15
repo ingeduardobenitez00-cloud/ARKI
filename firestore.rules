@@ -12,8 +12,11 @@ service cloud.firestore {
     match /seccionales/{document=**} { allow read: if true; }
     match /status/{document=**} { allow read: if true; }
 
-    // 2. PADRÓN (sheet1)
+    // 2. PADRÓN (sheet1 y sheet_generales)
     match /sheet1/{docId} {
+      allow read: if true;
+    }
+    match /sheet_generales/{docId} {
       allow read: if true;
     }
 
