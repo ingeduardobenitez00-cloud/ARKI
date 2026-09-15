@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, orderBy, getDoc, onSnapshot } from 'firebase/firestore';
@@ -134,7 +135,7 @@ export default function ControlVotacionPage() {
         
         // Optimizamos usando 'in' para traer tanto Number como String en una sola consulta
         const q = query(
-            collection(db, 'sheet1'), 
+            collection(db, COLLECTION_PADRON), 
             where('CODIGO_SEC', '==', seccionalToQuery), 
             where('LOCAL', '==', selectedLocal), 
             where('MESA', 'in', [selectedMesa, String(selectedMesa)])
@@ -164,7 +165,7 @@ export default function ControlVotacionPage() {
         if (isUpdating || !db || !user || viewMode === 'internas') return;
         setIsUpdating(true);
         const newStatus = elector.estado_votacion === 'Ya Votó' ? 'Pendiente' : 'Ya Votó';
-        const electorRef = doc(db, 'sheet1', elector.id);
+        const electorRef = doc(db, COLLECTION_PADRON, elector.id);
         const captureRef = doc(db, 'votos_confirmados', elector.id); // Sincronización con colección de capturas
         
         const dataToUpdate = { estado_votacion: newStatus };

@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState } from 'react';
 import { collection, getDocs, getDoc, query, where, writeBatch, deleteField, doc, addDoc, updateDoc, deleteDoc, orderBy, setDoc, limit } from 'firebase/firestore';
@@ -36,7 +37,7 @@ import { allMenuItems, userRoles, menuCategories } from '@/lib/menu-data';
 import { cn } from '@/lib/utils';
 import { useEffect } from 'react';
 
-const SHEET_COLLECTION = 'sheet1';
+
 const PRESETS_COLLECTION = 'role_presets';
 
 interface RolePreset {
@@ -624,7 +625,7 @@ export default function ConfiguracionPage() {
     if(!db || !user) return;
     setIsOptimizing(true);
     try {
-        const dataCollection = collection(db, SHEET_COLLECTION);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         const snapshot = await getDocs(dataCollection);
         if (snapshot.empty) {
             toast({ title: "Sin datos", description: "No hay registros en el padrón para optimizar." });
@@ -655,10 +656,10 @@ export default function ConfiguracionPage() {
         // pero dado que es un script administrativo, vamos a hacer queries separadas y unirlas.
         
         // Votos emitidos (Día D)
-        const qSheetDiaD = await getDocs(query(collection(db, SHEET_COLLECTION), where('estado_votacion', '==', 'Ya Votó')));
+        const qSheetDiaD = await getDocs(query(collection(db, COLLECTION_PADRON), where('estado_votacion', '==', 'Ya Votó')));
         
         // Votos Seguros captados en sheet1 (los que tienen registradoPor_id)
-        const qSheetVotoSeguro = await getDocs(query(collection(db, SHEET_COLLECTION), where('observacion', '==', 'VOTO SEGURO')));
+        const qSheetVotoSeguro = await getDocs(query(collection(db, COLLECTION_PADRON), where('observacion', '==', 'VOTO SEGURO')));
         
         const sheetMap = new Map();
         qSheetDiaD.forEach(d => sheetMap.set(d.id, d));

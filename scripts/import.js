@@ -9,7 +9,7 @@ const fs = require('fs');
 
 // --- CONFIGURACIÓN ---
 const DATA_FILE_NAME = 'padron.xlsx'; 
-let COLLECTION_NAME = 'sheet1'; 
+let COLLECTION_NAME = 'sheet_generales'; 
 const SERVICE_ACCOUNT_KEY_PATH = path.join(__dirname, 'serviceAccountKey.json');
 const BATCH_SIZE = 500; 
 

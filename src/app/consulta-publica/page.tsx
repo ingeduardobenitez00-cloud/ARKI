@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useMemo } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -20,7 +21,7 @@ interface PadronDocument {
   [key: string]: any;
 }
 
-const COLLECTION_NAME = 'sheet1';
+
 
 export default function ConsultaPublicaPage() {
   const db = useFirestore();
@@ -44,7 +45,7 @@ export default function ConsultaPublicaPage() {
 
     try {
         const resultsMap = new Map<string, PadronDocument>();
-        const dataCollection = collection(db, COLLECTION_NAME);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         const isNumericSearch = /^\d+$/.test(term);
         let queries = [];
 
@@ -195,7 +196,7 @@ export default function ConsultaPublicaPage() {
                                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Lugar de Votación</span>
                                     <p className="text-sm font-black uppercase text-slate-700 flex items-start gap-2">
                                         <MapPin className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                                        {row.DESC_LOCAL || row.LOCAL}
+                                        {row.LOCAL}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">

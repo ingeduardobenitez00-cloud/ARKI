@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, writeBatch, doc, deleteDoc } from 'firebase/firestore';
@@ -60,7 +61,7 @@ export default function ArchivedMeetingsPage() {
             let count = 0;
             meeting.participants.forEach(p => {
                 if (p.TELEFONO && p.original_doc_id) {
-                    batch.update(doc(db, 'sheet1', p.original_doc_id), { TELEFONO: p.TELEFONO });
+                    batch.update(doc(db, COLLECTION_PADRON, p.original_doc_id), { TELEFONO: p.TELEFONO });
                     count++;
                 }
             });
@@ -70,7 +71,7 @@ export default function ArchivedMeetingsPage() {
                 toast({ title: '¡Sincronizado!', description: `${count} teléfonos actualizados.` });
             }
         } catch (err) {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: 'sheet1', operation: 'update' }));
+            errorEmitter.emit('permission-error', new FirestorePermissionError({ path: COLLECTION_PADRON, operation: 'update' }));
         } finally { setIsSyncing(prev => ({ ...prev, [meeting.id]: false })); }
     };
     

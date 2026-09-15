@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useMemo, useEffect } from 'react';
 import dynamic from 'next/dynamic';
@@ -71,7 +72,7 @@ interface PadronData {
     LONGITUD?: number;
 }
 
-const COLLECTION_PADRON = 'sheet1';
+
 const COLLECTION_CAPTURAS = 'votos_confirmados';
 
 export default function ConsultaPage() {
@@ -258,7 +259,7 @@ export default function ConsultaPage() {
             let itemSecc = String(item.seccional_jurisdiccion || item.SECCIONAL || item.CODIGO_SEC || 'SIN SECCIONAL');
             
             // Priorizar el local que le corresponde
-            const electorLocalRaw = String(item.LOCAL || item.DESC_LOCAL || '').trim().toUpperCase();
+            const electorLocalRaw = String(item.DESC_LOCAL || item.LOCAL || '').trim().toUpperCase();
             if (electorLocalRaw) {
                 const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
                 if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
@@ -474,7 +475,7 @@ export default function ConsultaPage() {
                 const distVal = selectedPerson.COD_DIST !== undefined && selectedPerson.COD_DIST !== '' ? selectedPerson.COD_DIST : selectedPerson.DISTRITO;
                 const distStr = String(distVal ?? '');
                 const zonaStr = String(selectedPerson.ZONA ?? '');
-                const localStr = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '');
+                const localStr = String(selectedPerson.LOCAL || '');
                 
                 const localesQuery = query(
                     collection(db, 'locales_votacion'),
@@ -499,7 +500,7 @@ export default function ConsultaPage() {
         let hasPermission = false;
 
         const userLocalNorm = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
-        const electorLocalNorm = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+        const electorLocalNorm = String(selectedPerson.LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
 
         if (isAdmin) {
             hasPermission = true;
@@ -612,7 +613,7 @@ export default function ConsultaPage() {
                 // Formato internacional paraguayo (5959xxxxxxx)
                 const formattedPhone = cleanPhone.startsWith('09') ? '595' + cleanPhone.substring(1) : (cleanPhone.startsWith('9') ? '595' + cleanPhone : cleanPhone);
                 
-                const messageText = `¡Hola *${selectedOperator.name}*! Te saluda *${user.name}*. Acabo de captar a un elector para tu seccional y te lo acabo de asignar en el sistema: \n\n👤 *Elector:* ${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}\n🪪 *C.I.:* ${selectedPerson.CEDULA}\n📍 *Local:* ${selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || 'No especificado'}\n📱 *Teléfono:* ${telefono || 'No especificado'}\n\n¡Ya lo tienes en tu listado de Voto Seguro de ARKI! 💪🔴`;
+                const messageText = `¡Hola *${selectedOperator.name}*! Te saluda *${user.name}*. Acabo de captar a un elector para tu seccional y te lo acabo de asignar en el sistema: \n\n👤 *Elector:* ${selectedPerson.NOMBRE} ${selectedPerson.APELLIDO}\n🪪 *C.I.:* ${selectedPerson.CEDULA}\n📍 *Local:* ${selectedPerson.DESC_LOCAL || 'No especificado'}\n📱 *Teléfono:* ${telefono || 'No especificado'}\n\n¡Ya lo tienes en tu listado de Voto Seguro de ARKI! 💪🔴`;
                 
                 const waUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(messageText)}`;
                 window.open(waUrl, '_blank');
@@ -669,7 +670,7 @@ export default function ConsultaPage() {
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
                             <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px]">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                             <TableCell className="text-[10px] uppercase">
-                                <div>{p.DESC_LOCAL || p.LOCAL}</div>
+                                <div>{p.LOCAL}</div>
                                 <div className="text-primary font-bold">MESA: {p.MESA} / ORDEN: {p.ORDEN}</div>
                             </TableCell>
                             <TableCell className="text-[11px] font-bold text-green-700">{p.TELEFONO || '---'}</TableCell>
@@ -805,7 +806,7 @@ export default function ConsultaPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Cédula</Label><p className="font-black text-sm">{selectedPerson.CEDULA}</p></div>
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
-                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
+                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
                                 </div>
                                 
                                 {/* HISTORICO DE VOTOS */}

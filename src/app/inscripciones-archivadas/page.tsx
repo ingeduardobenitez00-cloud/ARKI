@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useMemo } from 'react';
 import { collection, query, orderBy, writeBatch, doc, deleteDoc } from 'firebase/firestore';
@@ -87,7 +88,7 @@ export default function InscripcionesArchivadasPage() {
         setIsSyncing(prev => ({ ...prev, [archive.id]: true }));
         try {
             const batch = writeBatch(db);
-            archive.participants.forEach(p => { if (p.telefono && p.cedula) batch.update(doc(db, 'sheet1', String(p.cedula)), { TELEFONO: p.telefono }); });
+            archive.participants.forEach(p => { if (p.telefono && p.cedula) batch.update(doc(db, COLLECTION_PADRON, String(p.cedula)), { TELEFONO: p.telefono }); });
             await batch.commit(); toast({ title: '¡Sincronizado!' });
         } finally { setIsSyncing(prev => ({ ...prev, [archive.id]: false })); }
     };

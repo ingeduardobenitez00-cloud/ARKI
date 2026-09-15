@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
@@ -35,7 +36,7 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
 };
 
 const PAGE_SIZE = 50;
-const COLLECTION_NAME = 'sheet1';
+
 
 const columnsToDisplay = [
     { key: 'CODIGO_SEC', label: 'SECC' },
@@ -125,7 +126,7 @@ export default function PadronExportPage() {
         }
         setSelectedLocal('ALL');
 
-        const dataCollection = collection(db, COLLECTION_NAME);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         let records: PadronDocument[] = [];
         
         const uniqueLocales = Array.from(new Set(metadataLocales));
@@ -223,10 +224,7 @@ export default function PadronExportPage() {
       const targetLocal = selectedLocal.trim().toUpperCase();
       data = data.filter(p => {
           const valLocal = String(p.LOCAL || '').trim().toUpperCase();
-          const valDesc1 = String(p.DESC_LOCAL || '').trim().toUpperCase();
-          const valDesc2 = String(p.LOCAL_DESC || '').trim().toUpperCase();
-          const valDesc3 = String(p.NOMBRE_LOCAL || '').trim().toUpperCase();
-          return valLocal === targetLocal || valDesc1 === targetLocal || valDesc2 === targetLocal || valDesc3 === targetLocal;
+          return valLocal === targetLocal;
       });
     }
 
@@ -485,13 +483,13 @@ export default function PadronExportPage() {
         } catch (e) {}
 
         const uniqueLocalesInSeccional = Array.from(new Set(allSeccionalData.map(r => {
-            const loc = r.LOCAL || r.DESC_LOCAL || r.LOCAL_DESC || r.NOMBRE_LOCAL;
+            const loc = r.LOCAL;
             return String(loc || 'DESCONOCIDO').trim().toUpperCase();
         })));
 
         for (const local of uniqueLocalesInSeccional) {
             const localData = allSeccionalData.filter(p => {
-                const loc = String(p.LOCAL || p.DESC_LOCAL || p.LOCAL_DESC || p.NOMBRE_LOCAL || '').trim().toUpperCase();
+                const loc = String(p.LOCAL || '').trim().toUpperCase();
                 return loc === local;
             });
             

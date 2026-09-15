@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, addDoc, serverTimestamp, getDoc, doc, increment, updateDoc, query, where, getDocs, limit, orderBy } from 'firebase/firestore';
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils';
 
 const SETTINGS_COLLECTION = 'system_settings';
 const FLYERS_COLLECTION = 'flyer_library';
-const SHEET_COLLECTION = 'sheet1';
+
 
 export default function PublicRegistrationPage() {
     const db = useFirestore();
@@ -116,7 +117,7 @@ export default function PublicRegistrationPage() {
         
         setIsSearching(true);
         try {
-            const docRef = doc(db!, SHEET_COLLECTION, cleanCedula);
+            const docRef = doc(db!, COLLECTION_PADRON, cleanCedula);
             const snap = await getDoc(docRef);
             
             if (snap.exists()) {

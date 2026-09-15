@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, getDocs, doc, writeBatch, deleteField, query, where, limit } from 'firebase/firestore';
@@ -33,7 +34,7 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 // Definición de las colecciones de Firebase
-const COLLECTION_PADRON = 'sheet1';
+
 const COLLECTION_CAPTURAS = 'votos_confirmados';
 
 interface LogEntry {

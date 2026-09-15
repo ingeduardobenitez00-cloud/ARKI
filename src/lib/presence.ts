@@ -1,5 +1,5 @@
-
 'use client';
+
 
 import { getDatabase, ref, onValue, set, onDisconnect, serverTimestamp as rtdbTimestamp } from "firebase/database";
 import { getFirestore, doc, serverTimestamp as firestoreTimestamp, setDoc } from "firebase/firestore";

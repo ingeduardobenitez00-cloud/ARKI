@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useCallback } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -36,7 +37,7 @@ const loadImage = (url: string): Promise<HTMLImageElement> => {
     });
 };
 
-const COLLECTION_NAME = 'sheet1';
+
 
 const columnsToDisplay = [
     { key: 'CODIGO_SEC', label: 'SECC' },
@@ -115,7 +116,7 @@ export default function ResumenSeccionalPage() {
             console.error("Error fetching locales:", e);
         }
 
-        const dataCollection = collection(db, COLLECTION_NAME);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         let records: PadronDocument[] = [];
         
         try {

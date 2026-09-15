@@ -1,6 +1,7 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { collection, getDocs, doc, writeBatch, deleteField, getDoc, query, addDoc, where, increment } from 'firebase/firestore';
 import { useFirestore, useMemoFirebase } from '@/firebase';
 import { useCollection } from '@/firebase/firestore/use-collection';
@@ -11,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
 import { 
     FileSpreadsheet, 
     UploadCloud, 
@@ -40,7 +42,7 @@ import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 
 // Definición de colecciones de Firebase
-const COLLECTION_PADRON = 'sheet1';
+
 const COLLECTION_CAPTURAS = 'votos_confirmados';
 
 interface LogEntry {
@@ -118,7 +120,7 @@ export default function MigrarVotosPage() {
         const map: Record<string, string[]> = {};
         if (allLocales) {
             allLocales.forEach((l: any) => {
-                const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+                const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
                 if (normLocal && l.seccional_id) {
                     const secId = String(l.seccional_id).trim();
                     if (!map[normLocal]) map[normLocal] = [];
@@ -135,6 +137,20 @@ export default function MigrarVotosPage() {
     useEffect(() => {
         logsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [logs]);
+
+    const resolveElectorSeccional = useCallback((elector: any) => {
+        let sec = String(elector.SECCIONAL || elector.CODIGO_SEC || '');
+        const electorLocalRaw = String(elector.DESC_LOCAL || elector.LOCAL || '').trim().toUpperCase();
+        if (electorLocalRaw) {
+            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
+                const possibleSecs = localToSeccionalMap[normLocal];
+                const matchingUserSec = possibleSecs.find(s => userSeccionales.includes(s));
+                sec = matchingUserSec || possibleSecs[0];
+            }
+        }
+        return sec;
+    }, [localToSeccionalMap, userSeccionales]);
 
     const addLog = (type: LogEntry['type'], message: string) => {
         const time = new Date().toLocaleTimeString();
@@ -342,7 +358,7 @@ export default function MigrarVotosPage() {
     // Identificar destinos externos (electores que no pertenecen a mi local o que son de otra seccional)
     const externalDestinations = useMemo(() => {
         if (sheetData.length === 0 || !mapping.cedula) return [];
-        const destMap = new Map<string, { seccional: string, local: string, count: number }>();
+        const destMap = new Map<string, { seccional: string, local: string, count: number, electors: any[] }>();
         const userLocal = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
 
         sheetData.forEach(row => {
@@ -351,21 +367,12 @@ export default function MigrarVotosPage() {
             const cedulaStr = String(rawCed).replace(/\D/g, '');
             const elector = fetchedElectors[cedulaStr];
             
-            if (elector && elector.CODIGO_SEC) {
-                const electorLocalRaw = String(elector.LOCAL || elector.DESC_LOCAL || 'SIN LOCAL').trim().toUpperCase();
+            if (elector) {
+                const electorLocalRaw = String(elector.DESC_LOCAL || elector.LOCAL || 'SIN LOCAL').trim().toUpperCase();
                 const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
                 
-                // Usamos la seccional configurada en el sistema para ese local si existe.
-                // Si no, recaemos en la del padrón.
-                let electorSec = '';
-                if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
-                    const possibleSecs = localToSeccionalMap[normLocal];
-                    const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
-                    electorSec = matchingUserSec || possibleSecs[0];
-                }
-                if (!electorSec) {
-                    electorSec = String(elector.CODIGO_SEC || '').trim();
-                }
+                // Usamos la función de resolución inteligente
+                let electorSec = resolveElectorSeccional(elector);
                 
                 const electorLocal = electorLocalRaw;
                 
@@ -389,9 +396,11 @@ export default function MigrarVotosPage() {
                 if (!isMyLocal) {
                     const key = `${electorSec}_${electorLocal}`;
                     if (!destMap.has(key)) {
-                        destMap.set(key, { seccional: electorSec, local: electorLocal, count: 0 });
+                        destMap.set(key, { seccional: electorSec, local: electorLocal, count: 0, electors: [] });
                     }
-                    destMap.get(key)!.count++;
+                    const dest = destMap.get(key)!;
+                    dest.count++;
+                    dest.electors.push(elector);
                 }
             }
         });
@@ -416,7 +425,8 @@ export default function MigrarVotosPage() {
             );
             
             const targetSec = String(seccionalName).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim();
-            const hasMatchingSec = userSecs.includes(targetSec);
+            const isAdmin = ['Admin', 'Super-Admin'].includes(u.role);
+            const hasMatchingSec = userSecs.includes(targetSec) || isAdmin;
             
             if (!hasMatchingSec || !['Dirigente', 'Coordinador', 'Presidente', 'Admin', 'Super-Admin'].includes(u.role)) {
                 return;
@@ -494,10 +504,10 @@ export default function MigrarVotosPage() {
             const elector = fetchedElectors[cedulaStr];
             if (elector) {
                 valid++;
-                const electorSec = String(elector.CODIGO_SEC || '').trim();
+                const electorSec = resolveElectorSeccional(elector).trim();
                 if (userSeccionales.includes(electorSec)) {
                     // Está en mi seccional, ahora vemos si es de mi local
-                    const electorLocalStr = String(elector.LOCAL || elector.DESC_LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+                    const electorLocalStr = String(elector.DESC_LOCAL || elector.LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
                     
                     let isMyLocal = false;
                     if (userLocal && electorLocalStr) {
@@ -582,7 +592,7 @@ export default function MigrarVotosPage() {
                     cedula: cedulaStr,
                     nombre: electorData.NOMBRE_COMPLETO || `${electorData.NOMBRE || ''} ${electorData.APELLIDO || ''}`.trim(),
                     registradoPor: registeredBy,
-                    seccional: electorData.CODIGO_SEC || ''
+                    seccional: resolveElectorSeccional(electorData) || ''
                 });
             }
         }
@@ -667,18 +677,11 @@ export default function MigrarVotosPage() {
             if (telClean === '595') telClean = '';
 
             // 3. Determinar Operador (Delegación) para este elector
-            const electorLocalRaw = String(electorData.LOCAL || electorData.DESC_LOCAL || 'SIN LOCAL').trim().toUpperCase();
+            const electorLocalRaw = String(electorData.DESC_LOCAL || electorData.LOCAL || 'SIN LOCAL').trim().toUpperCase();
             const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
             
             let electorSec = '';
-            if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
-                const possibleSecs = localToSeccionalMap[normLocal];
-                const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
-                electorSec = matchingUserSec || possibleSecs[0];
-            }
-            if (!electorSec) {
-                electorSec = String(electorData.CODIGO_SEC || '').trim();
-            }
+            electorSec = resolveElectorSeccional(electorData).trim();
             const electorLocal = electorLocalRaw;
             
             let assignedOperatorId = user.id;
@@ -700,8 +703,8 @@ export default function MigrarVotosPage() {
             // 4. Preparación de guardado en Votos Seguros (votos_confirmados)
             const capturasRef = doc(db, COLLECTION_CAPTURAS, docId);
             
-            const finalSec = overrideSeccional || electorData.CODIGO_SEC || '';
-            const finalLocal = overrideLocal || electorData.LOCAL || '';
+            const finalSec = overrideSeccional || resolveElectorSeccional(electorData) || '';
+            const finalLocal = overrideLocal || electorData.DESC_LOCAL || electorData.LOCAL || '';
 
             const vsObj: any = {
                 ...electorData,
@@ -1322,7 +1325,7 @@ export default function MigrarVotosPage() {
                                             </TableHeader>
                                             <TableBody>
                                                 {previewData.map((row, idx) => {
-                                                    const isLocal = row.elector && userSeccionales.includes(String(row.elector.CODIGO_SEC));
+                                                    const isLocal = row.elector && userSeccionales.includes(resolveElectorSeccional(row.elector));
                                                     return (
                                                         <TableRow key={idx} className="border-b border-slate-100/50 hover:bg-white/50 text-xs font-bold text-slate-700">
                                                             <td className="py-3.5 px-4 font-mono text-slate-900">{row.cedulaRaw}</td>
@@ -1333,9 +1336,9 @@ export default function MigrarVotosPage() {
                                                             </td>
                                                             <td className="py-3.5 px-4 text-slate-500">{row.telefonoRaw}</td>
                                                             <td className="py-3.5 px-4">
-                                                                {row.elector?.CODIGO_SEC ? (
+                                                                {row.elector ? (
                                                                     <Badge variant="outline" className="text-[9px] font-black">
-                                                                        SECC {row.elector.CODIGO_SEC}
+                                                                        SECC {resolveElectorSeccional(row.elector) || '0'}
                                                                     </Badge>
                                                                 ) : '---'}
                                                             </td>
@@ -1389,9 +1392,39 @@ export default function MigrarVotosPage() {
                                                                         <span className="text-[10px] font-black uppercase text-slate-800 truncate pr-2">{dest.local}</span>
                                                                         <span className="text-[8px] font-bold text-slate-500">SECCIONAL {dest.seccional}</span>
                                                                     </div>
-                                                                    <Badge variant="outline" className="text-[8px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 px-2 shrink-0">
-                                                                        {dest.count} Electores
-                                                                    </Badge>
+                                                                    <Dialog>
+                                                                        <DialogTrigger asChild>
+                                                                            <Badge variant="outline" className="text-[8px] font-bold border-indigo-200 text-indigo-700 bg-indigo-50 px-2 shrink-0 cursor-pointer hover:bg-indigo-100 transition-colors">
+                                                                                {dest.count} Electores
+                                                                            </Badge>
+                                                                        </DialogTrigger>
+                                                                        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                                                                            <DialogHeader>
+                                                                                <DialogTitle>Electores de este Local</DialogTitle>
+                                                                                <DialogDescription>
+                                                                                    {dest.local} - Seccional {dest.seccional}
+                                                                                </DialogDescription>
+                                                                            </DialogHeader>
+                                                                            <div className="mt-4">
+                                                                                <Table>
+                                                                                    <TableHeader>
+                                                                                        <TableRow>
+                                                                                            <TableHead>Cédula</TableHead>
+                                                                                            <TableHead>Nombre</TableHead>
+                                                                                        </TableRow>
+                                                                                    </TableHeader>
+                                                                                    <TableBody>
+                                                                                        {dest.electors.map((e, idx) => (
+                                                                                            <TableRow key={idx}>
+                                                                                                <TableCell className="font-bold">{e.CEDULA}</TableCell>
+                                                                                                <TableCell>{e.NOMBRE_COMPLETO || `${e.NOMBRE || ''} ${e.APELLIDO || ''}`}</TableCell>
+                                                                                            </TableRow>
+                                                                                        ))}
+                                                                                    </TableBody>
+                                                                                </Table>
+                                                                            </div>
+                                                                        </DialogContent>
+                                                                    </Dialog>
                                                                 </div>
                                                                 
                                                                 <select

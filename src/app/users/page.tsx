@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { User, Seccional } from '@/types';
@@ -61,7 +62,7 @@ type UserFormData = z.infer<typeof userSchema>;
 type EditUserFormData = z.infer<typeof editUserSchema>;
 
 const USERS_COLLECTION_NAME = 'users';
-const PADRON_COLLECTION = 'sheet1';
+
 
 const ROLE_HIERARCHY: Record<string, number> = {
   'Super-Admin': 0,
@@ -230,7 +231,7 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
 
         setIsSearchingPadron(true);
         try {
-            const padronRef = collection(db, PADRON_COLLECTION);
+            const padronRef = collection(db, COLLECTION_PADRON);
             const q1 = query(padronRef, where('CEDULA', '==', Number(term)));
             const q2 = query(padronRef, where('CEDULA', '==', term));
             
@@ -418,14 +419,32 @@ function UserFormContent({ control, register, errors, editingUser, watch, setVal
                             Jurisdicciones Asignadas (Multi-Selección)
                         </Label>
                         
-                        <div className="relative mb-3">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
-                            <Input 
-                                placeholder="BUSCAR SECCIONAL..." 
-                                value={seccionalSearch}
-                                onChange={(e) => setSeccionalSearch(e.target.value)}
-                                className="pl-8 h-9 text-[10px] font-bold uppercase border-primary/10 rounded-xl"
-                            />
+                        <div className="flex items-center gap-2 mb-3">
+                            <div className="relative flex-1">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 text-muted-foreground" />
+                                <Input 
+                                    placeholder="BUSCAR SECCIONAL..." 
+                                    value={seccionalSearch}
+                                    onChange={(e) => setSeccionalSearch(e.target.value)}
+                                    className="pl-8 h-9 text-[10px] font-bold uppercase border-primary/10 rounded-xl"
+                                />
+                            </div>
+                            <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                className="h-9 text-[10px] font-bold rounded-xl whitespace-nowrap"
+                                onClick={() => {
+                                    if (assignedSeccionales.length === filteredSeccionales.length && filteredSeccionales.length > 0) {
+                                        setValue('seccionales', []);
+                                    } else {
+                                        const allIds = filteredSeccionales.map(s => String(s.id).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
+                                        setValue('seccionales', allIds);
+                                    }
+                                }}
+                            >
+                                {(assignedSeccionales.length === filteredSeccionales.length && filteredSeccionales.length > 0) ? 'DESMARCAR TODAS' : 'MARCAR TODAS'}
+                            </Button>
                         </div>
 
                         <ScrollArea className="h-32 border rounded-xl bg-white p-3 shadow-inner">
@@ -746,7 +765,7 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
                         if (count > 0) await batch.commit();
 
                         // 3. sheet1 (votoSeguroUpdatedBy_nombre)
-                        const sheetVotoQuery = query(collection(db, 'sheet1'), where('votoSeguroUpdatedBy_id', '==', uid));
+                        const sheetVotoQuery = query(collection(db, COLLECTION_PADRON), where('votoSeguroUpdatedBy_id', '==', uid));
                         const sheetVotoSnap = await getDocs(sheetVotoQuery);
                         batch = writeBatch(db);
                         count = 0;
@@ -758,7 +777,7 @@ function UserDialog({ isOpen, onOpenChange, editingUser, onSuccess, seccionales 
                         if (count > 0) await batch.commit();
 
                         // 4. sheet1 (telefonoUpdatedBy_nombre)
-                        const sheetTelQuery = query(collection(db, 'sheet1'), where('telefonoUpdatedBy_id', '==', uid));
+                        const sheetTelQuery = query(collection(db, COLLECTION_PADRON), where('telefonoUpdatedBy_id', '==', uid));
                         const sheetTelSnap = await getDocs(sheetTelQuery);
                         batch = writeBatch(db);
                         count = 0;

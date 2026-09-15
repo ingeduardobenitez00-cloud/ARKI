@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, limit, orderBy, startAfter, doc, getDoc } from 'firebase/firestore';
@@ -26,7 +27,7 @@ interface PadronDocument {
 }
 
 const PAGE_SIZE = 100;
-const COLLECTION_NAME = 'sheet1';
+
 const MAX_RECORDS = 2000;
 
 const columnsToDisplay = [
@@ -95,7 +96,7 @@ export default function PadronVistaPage() {
     
     try {
         const valStr = String(selectedSeccional).trim();
-        const dataCollection = collection(db, COLLECTION_NAME);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         
         // Base query - Ordenar por APELLIDO y NOMBRE para paginación consistente
         let baseQuery = query(
@@ -128,7 +129,7 @@ export default function PadronVistaPage() {
         console.error("Error loading data", e);
         // Fallback simple si el índice no existe o hay error de tipo
         if (!isNextPage) {
-             const fallbackQuery = query(collection(db, COLLECTION_NAME), where('CODIGO_SEC', '==', selectedSeccional), limit(PAGE_SIZE));
+             const fallbackQuery = query(collection(db, COLLECTION_PADRON), where('CODIGO_SEC', '==', selectedSeccional), limit(PAGE_SIZE));
              const snap = await getDocs(fallbackQuery);
              setAllSeccionalData(snap.docs.map(d => ({id: d.id, ...d.data()})));
              setHasMore(false);
@@ -156,7 +157,7 @@ export default function PadronVistaPage() {
     setSearchMode(true);
     try {
         // 1. Intentar búsqueda directa por ID (Cédula) - LA MÁS BARATA
-        const docRef = doc(db, COLLECTION_NAME, term);
+        const docRef = doc(db, COLLECTION_PADRON, term);
         const snap = await getDoc(docRef);
         if (snap.exists()) {
             setAllSeccionalData([{ id: snap.id, ...snap.data() } as PadronDocument]);
@@ -165,7 +166,7 @@ export default function PadronVistaPage() {
         }
 
         // 2. Si no es cédula, buscar por campo CEDULA exacto
-        const qCed = query(collection(db, COLLECTION_NAME), where('CEDULA', '==', term), limit(1));
+        const qCed = query(collection(db, COLLECTION_PADRON), where('CEDULA', '==', term), limit(1));
         const snapCed = await getDocs(qCed);
         if (!snapCed.empty) {
             setAllSeccionalData(snapCed.docs.map(d => ({ id: d.id, ...d.data() } as PadronDocument)));
@@ -175,7 +176,7 @@ export default function PadronVistaPage() {
 
         // 3. Búsqueda por nombre (Limitada para evitar costos)
         const qName = query(
-            collection(db, COLLECTION_NAME), 
+            collection(db, COLLECTION_PADRON), 
             where('APELLIDO', '>=', term.toUpperCase()), 
             where('APELLIDO', '<=', term.toUpperCase() + '\uf8ff'),
             limit(50)

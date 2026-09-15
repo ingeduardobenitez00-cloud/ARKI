@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useMemo } from 'react';
 import { collection, getDocs, query, where } from 'firebase/firestore';
@@ -21,7 +22,7 @@ interface PadronDocument {
 }
 
 const PAGE_SIZE = 50;
-const COLLECTION_NAME = 'sheet1';
+
 
 export default function PadronPage() {
   const db = useFirestore();
@@ -47,7 +48,7 @@ export default function PadronPage() {
 
     try {
         const resultsMap = new Map<string, PadronDocument>();
-        const dataCollection = collection(db, COLLECTION_NAME);
+        const dataCollection = collection(db, COLLECTION_PADRON);
         const isNumericSearch = /^\d+$/.test(term);
         let queries = [];
 

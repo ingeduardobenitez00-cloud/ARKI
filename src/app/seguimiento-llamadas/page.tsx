@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, limit, orderBy, getDoc, getCountFromServer } from 'firebase/firestore';
@@ -54,7 +55,7 @@ interface PadronData {
     ultimaLlamada_por?: string;
 }
 
-const COLLECTION_NAME = 'sheet1';
+
 
 const CALL_STATES = [
     { id: 'CONTESTO', label: 'Contestó', icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50', border: 'border-green-200', activeBg: 'bg-green-600 text-white' },
@@ -155,7 +156,7 @@ export default function SeguimientoLlamadasPage() {
         setIsLoadingRecent(true);
         try {
             const q = query(
-                collection(db, COLLECTION_NAME),
+                collection(db, COLLECTION_PADRON),
                 where('ultimaLlamada_fecha', '>', ''),
                 orderBy('ultimaLlamada_fecha', 'desc')
             );
@@ -168,7 +169,7 @@ export default function SeguimientoLlamadasPage() {
 
             try {
                 const countQ = query(
-                    collection(db, COLLECTION_NAME),
+                    collection(db, COLLECTION_PADRON),
                     where('ultimaLlamada_fecha', '>', '')
                 );
                 const countSnap = await getCountFromServer(countQ);
@@ -213,7 +214,7 @@ export default function SeguimientoLlamadasPage() {
         
         try {
             const resultsMap = new Map<string, PadronData>();
-            const dataCollection = collection(db!, COLLECTION_NAME);
+            const dataCollection = collection(db!, COLLECTION_PADRON);
 
             let searchQueries = [];
 
@@ -308,7 +309,7 @@ export default function SeguimientoLlamadasPage() {
         if (!selectedPerson || !db || !user) return;
         setIsSaving(true);
         
-        const personRef = doc(db, COLLECTION_NAME, selectedPerson.id);
+        const personRef = doc(db, COLLECTION_PADRON, selectedPerson.id);
         const dataToUpdate: any = {
             ESTADO_LLAMADA: estadoLlamada,
             COMENTARIO_LLAMADA: comentario,
@@ -365,7 +366,7 @@ export default function SeguimientoLlamadasPage() {
         if (!selectedPerson || !db || !user) return;
         setIsSavingPhone(true);
         
-        const personRef = doc(db, COLLECTION_NAME, selectedPerson.id);
+        const personRef = doc(db, COLLECTION_PADRON, selectedPerson.id);
         const dataToUpdate = { TELEFONO: editingPhone };
 
         updateDoc(personRef, dataToUpdate)
@@ -399,7 +400,7 @@ export default function SeguimientoLlamadasPage() {
         try {
             // Obtener absolutamente todos los registros que tienen fecha de llamada
             const q = query(
-                collection(db!, COLLECTION_NAME),
+                collection(db!, COLLECTION_PADRON),
                 where('ultimaLlamada_fecha', '>', ''),
                 orderBy('ultimaLlamada_fecha', 'desc')
             );

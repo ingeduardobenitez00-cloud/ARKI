@@ -5,7 +5,7 @@ const { Dbf } = require('dbf-reader');
 
 const SERVICE_ACCOUNT_KEY_PATH = path.join(__dirname, 'serviceAccountKey.json');
 const DATA_FILE_NAME = 'padron_capital.dbf';
-const COLLECTION_NAME = 'sheet1';
+const COLLECTION_NAME = 'sheet_generales';
 const BATCH_SIZE = 500;
 
 if (!fs.existsSync(SERVICE_ACCOUNT_KEY_PATH)) {
@@ -55,11 +55,11 @@ async function importDbf() {
         let writeCount = 0;
         let totalProcessed = 0;
 
-        for (let i = 0; i < datatable.rows.length; i++) {
+        for (let i = 341500; i < datatable.rows.length; i++) {
             const record = datatable.rows[i];
             
             // Intenta detectar la cédula dinámicamente o usa la primera columna
-            const cedulaRaw = record['CEDULA'] || record['cedula'] || record['CI'] || record['ci'] || Object.values(record)[0];
+            const cedulaRaw = record['N_CEDULA'] || record['CEDULA'] || record['cedula'] || record['CI'] || record['ci'] || Object.values(record)[0];
             const cedulaStr = String(cedulaRaw).trim();
             
             // Intenta detectar el local
@@ -81,6 +81,15 @@ async function importDbf() {
                     }
                     return acc;
                 }, {});
+
+                // ESTO ES CLAVE: Asegurarnos de que el campo "CEDULA" siempre exista
+                // ya que el sistema ARKI (y sus consultas) dependen de este nombre exacto.
+                cleanRecord['CEDULA'] = cedulaStr;
+                
+                // Asegurarnos de que NOMBRE_COMPLETO exista si el DBF solo trae NOMBRE y APELLIDO
+                if (!cleanRecord['NOMBRE_COMPLETO'] && cleanRecord['NOMBRE']) {
+                    cleanRecord['NOMBRE_COMPLETO'] = `${cleanRecord['NOMBRE']} ${cleanRecord['APELLIDO'] || ''}`.trim();
+                }
 
                 const docRef = db.collection(COLLECTION_NAME).doc(cedulaStr);
                 batch.set(docRef, cleanRecord, { merge: true });

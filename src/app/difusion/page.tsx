@@ -1,4 +1,5 @@
 'use client';
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { collection, getDocs, query, where, doc, updateDoc, orderBy, limit, startAfter, getDoc, addDoc, serverTimestamp, setDoc } from 'firebase/firestore';
@@ -312,7 +313,7 @@ export default function DifusionPage() {
         setBatchSentCount(0);
         try {
             const results: Elector[] = [];
-            const dataCol = collection(db, 'sheet1');
+            const dataCol = collection(db, COLLECTION_PADRON);
             const scanLote = async (val: string | number) => {
                 let lastDoc = null;
                 let hasMore = true;
@@ -395,7 +396,7 @@ export default function DifusionPage() {
         
         // Update Firestore permanently!
         if (db) {
-            const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+            const collectionName = activeTab === 'padron' ? COLLECTION_PADRON : 'votos_confirmados';
             const electorRef = doc(db, collectionName, p.id);
             updateDoc(electorRef, {
                 DIFUNDIDO: true,
@@ -460,7 +461,7 @@ export default function DifusionPage() {
         if (!editingPhoneId || !db || !user) return;
         setIsSavingPhone(true);
         const data = { [phoneType]: tempPhone };
-        const collectionName = activeTab === 'padron' ? 'sheet1' : 'votos_confirmados';
+        const collectionName = activeTab === 'padron' ? COLLECTION_PADRON : 'votos_confirmados';
         updateDoc(doc(db, collectionName, editingPhoneId), data)
             .then(() => {
                 if (activeTab === 'padron') {
@@ -543,7 +544,7 @@ export default function DifusionPage() {
 
         try {
             const resultsMap = new Map<string, Elector>();
-            const dataCol = collection(db!, 'sheet1');
+            const dataCol = collection(db!, COLLECTION_PADRON);
             const isNumericSearch = /^\d+$/.test(term);
 
             let searchQueries = [];
@@ -608,7 +609,7 @@ export default function DifusionPage() {
         setIsSavingSidebarPhone(true);
         const data = { TELEFONO: sidebarPhone };
         try {
-            await updateDoc(doc(db, 'sheet1', selectedSidebarElector.id), data);
+            await updateDoc(doc(db, COLLECTION_PADRON, selectedSidebarElector.id), data);
             
             // Actualizar estado en resultados de búsqueda local
             setSidebarSearchResults(prev => prev.map(e => e.id === selectedSidebarElector.id ? { ...e, TELEFONO: sidebarPhone } : e));
@@ -654,7 +655,7 @@ export default function DifusionPage() {
 
         // Update Firestore permanently!
         if (db) {
-            const electorRef = doc(db, 'sheet1', p.id);
+            const electorRef = doc(db, COLLECTION_PADRON, p.id);
             updateDoc(electorRef, {
                 DIFUNDIDO: true,
                 difundidoAt: nowStr,

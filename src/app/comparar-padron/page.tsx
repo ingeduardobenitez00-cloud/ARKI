@@ -1,4 +1,5 @@
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
 
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { collection, getDocs, doc, query, where } from 'firebase/firestore';
@@ -23,7 +24,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/use-auth';
 import * as XLSX from 'xlsx';
 
-const COLLECTION_PADRON = 'sheet1';
+
 
 interface LogEntry {
     type: 'success' | 'warn' | 'error' | 'info';

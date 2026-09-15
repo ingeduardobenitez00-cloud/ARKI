@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useMemo, useEffect, useRef } from 'react';
 import { collection, getDocs, query, where, doc, writeBatch, getDoc, addDoc, serverTimestamp, deleteDoc, orderBy } from 'firebase/firestore';
@@ -42,7 +43,7 @@ interface ParticipantData extends PadronData {
     original_doc_id: string;
 }
 
-const PADRON_COLLECTION = 'sheet1';
+
 const REUNION_COLLECTION = 'reunion_actual';
 
 export default function ReunionesPage() {
@@ -94,7 +95,7 @@ export default function ReunionesPage() {
         if (!term) return;
         setIsSearching(true); setSelectedPerson(null);
         try {
-            const dataCol = collection(db!, PADRON_COLLECTION);
+            const dataCol = collection(db!, COLLECTION_PADRON);
             const q1 = query(dataCol, where('CEDULA', '==', Number(term)));
             const q2 = query(dataCol, where('CEDULA', '==', term));
             const [snap1, snap2] = await Promise.all([getDocs(q1), getDocs(q2)]);

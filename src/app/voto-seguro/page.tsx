@@ -1,5 +1,6 @@
-
 "use client";
+import { COLLECTION_PADRON } from '@/lib/constants';
+
 
 import { useState, useMemo } from 'react';
 import { collection, doc, updateDoc, deleteDoc, query, where, limit, orderBy, increment, writeBatch } from 'firebase/firestore';
@@ -271,7 +272,7 @@ export default function VotoSeguroPage() {
         let itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
         
         // Priorizar el local que le corresponde
-        const electorLocalRaw = String(voto.LOCAL || voto.DESC_LOCAL || '').trim().toUpperCase();
+        const electorLocalRaw = String(voto.LOCAL || '').trim().toUpperCase();
         if (electorLocalRaw) {
             const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
             if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
@@ -544,7 +545,7 @@ export default function VotoSeguroPage() {
     if (!votoToDelete || !db || !user) return;
     setIsDeleting(true);
     const docRef = doc(db, 'votos_confirmados', votoToDelete.id);
-    const padronRef = doc(db, 'sheet1', votoToDelete.id);
+    const padronRef = doc(db, COLLECTION_PADRON, votoToDelete.id);
 
     const promises = [
         deleteDoc(docRef),
@@ -573,7 +574,7 @@ export default function VotoSeguroPage() {
       setIsMoving(true);
       try {
           const docRef = doc(db, 'votos_confirmados', votoToMove.id);
-          const padronRef = doc(db, 'sheet1', votoToMove.id);
+          const padronRef = doc(db, COLLECTION_PADRON, votoToMove.id);
           const newOperatorName = destinationUser.name || destinationUser.email || 'Desconocido';
 
           const promises = [
@@ -630,7 +631,7 @@ export default function VotoSeguroPage() {
 
               chunk.forEach(voto => {
                   const docRef = doc(db, 'votos_confirmados', voto.id);
-                  const padronRef = doc(db, 'sheet1', voto.id);
+                  const padronRef = doc(db, COLLECTION_PADRON, voto.id);
 
                   batch.update(docRef, { 
                       registradoPor_id: destinationUser.id, 
@@ -683,7 +684,7 @@ export default function VotoSeguroPage() {
 
               chunk.forEach(voto => {
                   const docRef = doc(db, 'votos_confirmados', voto.id);
-                  const padronRef = doc(db, 'sheet1', voto.id);
+                  const padronRef = doc(db, COLLECTION_PADRON, voto.id);
 
                   batch.delete(docRef);
                   batch.update(padronRef, { 
