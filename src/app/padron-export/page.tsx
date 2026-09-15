@@ -8,7 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { FileDown, FileText, ChevronDown, Filter, Loader2, AlertCircle, Search, Database, ChevronLeft, ChevronRight, FileSpreadsheet, Lock } from 'lucide-react';
+import { FileDown, FileText, ChevronDown, Filter, Loader2, AlertCircle, Search, Database, ChevronLeft, ChevronRight, FileSpreadsheet, Lock, Archive } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -72,6 +72,7 @@ export default function PadronExportPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [page, setPage] = useState(1);
+  const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
 
   const [isFilenameDialogOpen, setIsFilenameDialogOpen] = useState(false);
   const [customFilename, setCustomFilename] = useState('');
@@ -126,7 +127,9 @@ export default function PadronExportPage() {
         }
         setSelectedLocal('ALL');
 
-        const dataCollection = collection(db, COLLECTION_PADRON);
+        const targetCollectionName = viewMode === 'internas' ? 'padron' : 'sheet_generales';
+        const dataCollection = collection(db, targetCollectionName);
+        const localField = viewMode === 'internas' ? 'LOCAL' : 'DESC_LOCAL';
         let records: PadronDocument[] = [];
         
         const uniqueLocales = Array.from(new Set(metadataLocales));
@@ -139,12 +142,23 @@ export default function PadronExportPage() {
             }
             
             const fetchPromises = chunks.map(async (chunk) => {
-                const q = query(dataCollection, where('LOCAL', 'in', chunk));
+                const q = query(dataCollection, where(localField, 'in', chunk));
                 const snap = await getDocs(q);
                 return snap.docs.map(d => {
                     const data = d.data();
                     if (!data.CEDULA) {
                         data.CEDULA = d.id;
+                    }
+                    if (viewMode === 'generales') {
+                        data.LOCAL = data.DESC_LOCAL || data.LOCAL;
+                        data.CODIGO_SEC = data.SECCIONAL;
+                        if (data.C_FENACI && data.C_FENACI.toDate) {
+                            const date = data.C_FENACI.toDate();
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const year = date.getFullYear();
+                            data.FECHA_NACI = `${day}/${month}/${year}`;
+                        }
                     }
                     return { id: d.id, ...data } as PadronDocument;
                 });
@@ -206,7 +220,7 @@ export default function PadronExportPage() {
     } finally {
         setIsLoading(false);
     }
-  }, [db, selectedSeccional, toast]);
+  }, [db, selectedSeccional, viewMode, toast]);
 
   useEffect(() => { 
     if (selectedSeccional !== 'ALL') {
@@ -215,7 +229,7 @@ export default function PadronExportPage() {
       setLocales([]);
       setSelectedLocal('ALL');
     }
-  }, [selectedSeccional, loadSeccionalData]);
+  }, [selectedSeccional, viewMode, loadSeccionalData]);
 
   const filteredData = useMemo(() => {
     let data = allSeccionalData;
@@ -555,6 +569,24 @@ export default function PadronExportPage() {
             <p className="text-muted-foreground font-medium uppercase text-xs">Consulta y exporta el total de registros oficiales sin límites.</p>
         </div>
         <div className="flex items-center gap-2">
+            <div className="flex bg-muted/50 p-1 rounded-xl mr-2">
+                <Button 
+                    variant={viewMode === 'generales' ? 'default' : 'ghost'} 
+                    onClick={() => setViewMode('generales')}
+                    className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'generales' ? "shadow-sm" : "")}
+                >
+                    Generales
+                </Button>
+                <Button 
+                    variant={viewMode === 'internas' ? 'default' : 'ghost'} 
+                    onClick={() => setViewMode('internas')}
+                    className={cn("h-9 font-black uppercase text-[10px] px-4 rounded-lg", viewMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm text-white" : "")}
+                >
+                    <Archive className="w-3.5 h-3.5 mr-2" />
+                    internas_ANR_2026
+                </Button>
+            </div>
+            
             <div className="flex items-center gap-2 bg-muted/50 p-1 rounded-lg border shadow-sm">
                 <Filter className="h-4 w-4 ml-2 text-muted-foreground" />
                 <Select value={selectedSeccional} onValueChange={setSelectedSeccional}>
