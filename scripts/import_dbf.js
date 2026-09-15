@@ -55,7 +55,7 @@ async function importDbf() {
         let writeCount = 0;
         let totalProcessed = 0;
 
-        for (let i = 341500; i < datatable.rows.length; i++) {
+        for (let i = 0; i < datatable.rows.length; i++) {
             const record = datatable.rows[i];
             
             // Intenta detectar la cédula dinámicamente o usa la primera columna

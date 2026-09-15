@@ -1,14 +1,17 @@
 const admin = require('firebase-admin');
 const serviceAccount = require('./scripts/serviceAccountKey.json');
-if (!admin.apps.length) {
-    admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-    });
-}
+admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
 const db = admin.firestore();
-async function checkUser() {
-    const snap = await db.collection('users').where('name', '>=', 'GUILLERMO').limit(5).get();
-    snap.forEach(doc => console.log(doc.data().name, doc.data().role, doc.data().seccionales));
+
+async function test() {
+    console.log("Searching for 5630148 (number)");
+    const snap = await db.collection('sheet_generales').where('CEDULA', '==', 5630148).get();
+    snap.forEach(doc => console.log('DOC DATA:', doc.data()));
+    
+    console.log("Searching for 5630148 (string)");
+    const snap2 = await db.collection('sheet_generales').where('CEDULA', '==', '5630148').get();
+    snap2.forEach(doc => console.log('DOC DATA (str):', doc.data()));
+
     process.exit(0);
 }
-checkUser();
+test();

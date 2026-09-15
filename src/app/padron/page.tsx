@@ -49,12 +49,21 @@ export default function PadronPage() {
     try {
         const resultsMap = new Map<string, PadronDocument>();
         const dataCollection = collection(db, COLLECTION_PADRON);
-        const isNumericSearch = /^\d+$/.test(term);
+        let termToSearch = term;
+        let isNumericSearch = /^\d+$/.test(term);
+        
+        // Si el usuario ingresó números con puntos, los removemos para la búsqueda por cédula
+        const numericWithoutDots = term.replace(/\./g, '');
+        if (/^\d+$/.test(numericWithoutDots)) {
+            isNumericSearch = true;
+            termToSearch = numericWithoutDots;
+        }
+
         let queries = [];
 
         if (isNumericSearch) {
-            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', Number(term)))));
-            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', term))));
+            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', Number(termToSearch)))));
+            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', termToSearch))));
         } else {
             const searchWords = term.split(' ').filter(word => word.length >= 3);
             if (searchWords.length === 0) {
@@ -191,7 +200,7 @@ export default function PadronPage() {
                           <span className="text-[11px] font-black uppercase text-slate-700 truncate max-w-[250px]">{row.DESC_LOCAL || row.LOCAL}</span>
                           <div className="flex items-center gap-2">
                             <Badge variant="outline" className="text-[10px] font-black bg-primary/5 text-primary border-primary/10">
-                                MESA: {row.MESA} / ORDEN: {row.ORDEN}
+                                MESA: {row.MESA || '-'} / ORDEN: {row.ORDEN || '-'}
                             </Badge>
                           </div>
                         </div>

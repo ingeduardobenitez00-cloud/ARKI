@@ -46,12 +46,21 @@ export default function ConsultaPublicaPage() {
     try {
         const resultsMap = new Map<string, PadronDocument>();
         const dataCollection = collection(db, COLLECTION_PADRON);
-        const isNumericSearch = /^\d+$/.test(term);
+        let termToSearch = term;
+        let isNumericSearch = /^\d+$/.test(term);
+        
+        // Si el usuario ingresó números con puntos, los removemos para la búsqueda por cédula
+        const numericWithoutDots = term.replace(/\./g, '');
+        if (/^\d+$/.test(numericWithoutDots)) {
+            isNumericSearch = true;
+            termToSearch = numericWithoutDots;
+        }
+
         let queries = [];
 
         if (isNumericSearch) {
-            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', Number(term)))));
-            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', term))));
+            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', Number(termToSearch)))));
+            queries.push(getDocs(query(dataCollection, where('CEDULA', '==', termToSearch))));
         } else {
             const searchWords = term.split(' ').filter(word => word.length >= 3);
             if (searchWords.length === 0) {
@@ -196,7 +205,7 @@ export default function ConsultaPublicaPage() {
                                     <span className="text-[9px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Lugar de Votación</span>
                                     <p className="text-sm font-black uppercase text-slate-700 flex items-start gap-2">
                                         <MapPin className="h-4 w-4 shrink-0 text-primary mt-0.5" />
-                                        {row.LOCAL}
+                                        {row.DESC_LOCAL || row.LOCAL}
                                     </p>
                                 </div>
                                 <div className="flex items-center gap-3">
@@ -206,11 +215,11 @@ export default function ConsultaPublicaPage() {
                                     </div>
                                     <div className="flex-1 bg-white border rounded-lg p-2 flex flex-col items-center shadow-sm">
                                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mesa</span>
-                                        <span className="text-base font-black text-primary">{row.MESA}</span>
+                                        <span className="text-base font-black text-primary">{row.MESA || '-'}</span>
                                     </div>
                                     <div className="flex-1 bg-white border rounded-lg p-2 flex flex-col items-center shadow-sm">
                                         <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Orden</span>
-                                        <span className="text-base font-black text-primary">{row.ORDEN}</span>
+                                        <span className="text-base font-black text-primary">{row.ORDEN || '-'}</span>
                                     </div>
                                 </div>
                                 

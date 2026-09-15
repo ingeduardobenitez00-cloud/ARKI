@@ -290,7 +290,7 @@ export default function TelefonosPage() {
                                         </div>
                                         <div className="space-y-1 md:text-right border-t md:border-t-0 md:border-l pt-4 md:pt-0 md:pl-4 border-slate-200">
                                             <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Referencia Electoral</Label>
-                                            <p className="text-[11px] font-black uppercase text-slate-700">{selectedPerson.DESC_LOCAL}</p>
+                                            <p className="text-[11px] font-black uppercase text-slate-700">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL}</p>
                                             <p className="text-[10px] font-bold text-slate-500 uppercase">SECC {selectedPerson.CODIGO_SEC} | MESA {selectedPerson.MESA} | ORDEN {selectedPerson.ORDEN}</p>
                                         </div>
                                     </div>

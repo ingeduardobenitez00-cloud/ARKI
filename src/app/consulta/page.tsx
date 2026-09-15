@@ -806,7 +806,7 @@ export default function ConsultaPage() {
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Cédula</Label><p className="font-black text-sm">{selectedPerson.CEDULA}</p></div>
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
-                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
+                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
                                 </div>
                                 
                                 {/* HISTORICO DE VOTOS */}

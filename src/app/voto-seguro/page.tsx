@@ -738,7 +738,7 @@ export default function VotoSeguroPage() {
                           <TableCell className="text-center">{p.CODIGO_SEC ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                           <TableCell className="text-[10px] uppercase">
                               <div>{p.LOCAL}</div>
-                              <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>
+                              <div className="text-primary font-bold">M: {p.MESA || '-'} / O: {p.ORDEN || '-'}</div>
                           </TableCell>
                           <TableCell>
                               {p.TELEFONO ? (

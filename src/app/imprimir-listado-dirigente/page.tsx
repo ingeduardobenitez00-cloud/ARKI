@@ -11,10 +11,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Search, FileText, User as UserIcon, Loader2, MapPin, Printer } from 'lucide-react';
+import { Search, FileText, User as UserIcon, Loader2, MapPin, Printer, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 
@@ -253,6 +254,41 @@ export default function ImprimirListadoDirigentePage() {
     }
   };
 
+  const exportExcel = () => {
+    if (!selectedDirigente || votos.length === 0) return;
+
+    try {
+      const dataForExcel: any[] = [];
+
+      Object.entries(groupedVotos).forEach(([local, localVotos]) => {
+        localVotos.forEach(row => {
+          dataForExcel.push({
+            'DIRIGENTE': selectedDirigente.name,
+            'LOCAL': local,
+            'SECCIONAL': row.CODIGO_SEC || '',
+            'MESA': row.MESA || '',
+            'ORDEN': row.ORDEN || '',
+            'CEDULA': row.CEDULA || '',
+            'NOMBRE Y APELLIDO': `${row.NOMBRE || ''} ${row.APELLIDO || ''}`.trim(),
+            'TELEFONO': row.TELEFONO_MIGRADO || row.TELEFONO || ''
+          });
+        });
+      });
+
+      const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Votos");
+
+      const filename = `LISTADO_${selectedDirigente.name.replace(/[^a-zA-Z0-9]/g, '_').trim()}.xlsx`;
+      XLSX.writeFile(workbook, filename);
+      
+      toast({ title: `Excel Exportado con éxito` });
+    } catch (error) {
+      console.error(error);
+      toast({ title: "Error al generar el Excel", variant: "destructive" });
+    }
+  };
+
   if (!user || !isAllowed) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] max-w-md mx-auto text-center p-8 space-y-6">
@@ -293,10 +329,16 @@ export default function ImprimirListadoDirigentePage() {
                     Cerrar
                 </Button>
                 {votos.length > 0 && (
-                    <Button onClick={exportPDF} className="h-10 px-6 font-black uppercase gap-2 shadow-md text-xs">
-                        <FileText className="h-4 w-4" />
-                        Generar PDF
-                    </Button>
+                    <>
+                        <Button onClick={exportExcel} variant="secondary" className="h-10 px-6 font-black uppercase gap-2 shadow-md text-xs bg-green-600 hover:bg-green-700 text-white border-0">
+                            <Download className="h-4 w-4" />
+                            Excel
+                        </Button>
+                        <Button onClick={exportPDF} className="h-10 px-6 font-black uppercase gap-2 shadow-md text-xs">
+                            <FileText className="h-4 w-4" />
+                            PDF
+                        </Button>
+                    </>
                 )}
             </div>
           </CardHeader>
