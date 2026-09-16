@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, Users, Medal, Gavel, Server, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Loader2, Users, Medal, Gavel, Server, MapPin, FileDown } from 'lucide-react';
 import { calculateDHondt, rankCandidatesByPreferential, ListResult } from '@/lib/electoral-math';
 import { DISTRITOS_ALTO_PARANA, Distrito } from '@/data/distritos';
 
@@ -96,6 +97,7 @@ export default function ResultadosDistritosPage() {
                         listId: res.listId,
                         listName: listOriginal.name,
                         listNumber: listOriginal.numLista,
+                        listTotalVotes: listOriginal.totalVotes,
                         position: index + 1,
                         quotient: res.quotients?.[index] || 0
                     });
@@ -107,6 +109,74 @@ export default function ResultadosDistritosPage() {
         elected.sort((a, b) => b.quotient - a.quotient);
         return elected;
     }, [dHondtResults, juntaLists]);
+
+    const votosValidosJunta = useMemo(() => {
+        return juntaLists.reduce((acc, l) => acc + l.totalVotes, 0);
+    }, [juntaLists]);
+
+    const votosValidosIntendente = useMemo(() => {
+        if (!dataIntendente?.candidatos) return 0;
+        return dataIntendente.candidatos.reduce((acc: number, c: any) => acc + c.votos, 0);
+    }, [dataIntendente]);
+
+    const exportToWord = () => {
+        const title = `Resultados Electorales - ${selectedDistrito.nombre}`;
+        let html = `
+            <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+            <head><meta charset='utf-8'><title>${title}</title>
+            <style>
+                body { font-family: Arial, sans-serif; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+                th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; }
+                h1, h2 { color: #333; }
+            </style>
+            </head>
+            <body>
+                <h1>${title}</h1>
+                <p><b>Votos Válidos Intendencia:</b> ${votosValidosIntendente.toLocaleString()}</p>
+                <p><b>Votos Válidos Junta Municipal:</b> ${votosValidosJunta.toLocaleString()}</p>
+                
+                <h2>Candidatos a Intendente</h2>
+                <table>
+                    <tr><th>Pos</th><th>Candidato</th><th>Lista</th><th>Votos</th><th>Porcentaje</th></tr>
+                    ${dataIntendente?.candidatos?.length > 0 ? [...dataIntendente.candidatos].sort((a: any, b: any) => b.votos - a.votos).map((c: any, i: number) => {
+                        const pct = votosValidosIntendente ? ((c.votos / votosValidosIntendente) * 100).toFixed(1) : '0.0';
+                        return `<tr><td>${i+1}</td><td>${c.nomCandidato || c.desPartido}</td><td>${c.numLista} - ${c.desPartido}</td><td>${c.votos}</td><td>${pct}%</td></tr>`;
+                    }).join('') : '<tr><td colspan="5">No hay datos</td></tr>'}
+                </table>
+
+                <h2>Resumen Votos por Lista (Junta) y Bancadas</h2>
+                <table>
+                    <tr><th>Lista</th><th>Partido</th><th>Votos Totales</th><th>Porcentaje</th><th>Bancas (D'Hondt)</th></tr>
+                    ${[...juntaLists].sort((a:any, b:any) => b.totalVotes - a.totalVotes).map((list: any) => {
+                        const pct = votosValidosJunta ? ((list.totalVotes / votosValidosJunta) * 100).toFixed(1) : '0.0';
+                        const seats = dHondtResults.find((r) => r.listId === list.id)?.seats || 0;
+                        return `<tr><td>Lista ${list.numLista}</td><td>${list.name}</td><td>${list.totalVotes}</td><td>${pct}%</td><td>${seats}</td></tr>`;
+                    }).join('')}
+                </table>
+
+                <h2>Concejales Electos (Preferencial + D'Hondt)</h2>
+                <table>
+                    <tr><th>Pos</th><th>Candidato</th><th>Lista</th><th>Opción</th><th>Votos Preferenciales</th><th>% de su Lista</th></tr>
+                    ${electedConcejales.map((c: any, i: number) => {
+                        const pct = c.listTotalVotes ? ((c.votes / c.listTotalVotes) * 100).toFixed(2) : '0.00';
+                        return `<tr><td>${i+1}</td><td>${c.name}</td><td>${c.listNumber} - ${c.listName}</td><td>${c.option}</td><td>${c.votes}</td><td>${pct}%</td></tr>`;
+                    }).join('')}
+                </table>
+            </body>
+            </html>
+        `;
+
+        const blob = new Blob(['\ufeff', html], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Resultados_${selectedDistrito.nombre.replace(/\s+/g, '_')}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
 
     return (
         <div className="space-y-8 p-6 max-w-7xl mx-auto bg-slate-50/50 min-h-screen">
@@ -149,6 +219,10 @@ export default function ResultadosDistritosPage() {
                             </SelectContent>
                         </Select>
                     </div>
+
+                    <Button onClick={exportToWord} variant="outline" className="ml-2 gap-2 text-blue-600 border-blue-200 hover:bg-blue-50 font-bold uppercase text-xs" disabled={isLoading}>
+                        <FileDown className="w-4 h-4" /> Exportar Word
+                    </Button>
                 </div>
             </div>
 
@@ -165,8 +239,8 @@ export default function ResultadosDistritosPage() {
                             <CardContent className="p-6 flex items-center gap-4">
                                 <div className="p-3 rounded-2xl bg-blue-50 text-blue-600"><Users /></div>
                                 <div>
-                                    <div className="text-sm text-slate-500 font-medium">Votos Totales (Junta Municipal)</div>
-                                    <div className="text-3xl font-black">{dataJunta?.totales?.totalVotos?.toLocaleString() || 0}</div>
+                                    <div className="text-sm text-slate-500 font-medium">Votos Válidos a Listas (Junta)</div>
+                                    <div className="text-3xl font-black">{votosValidosJunta.toLocaleString() || 0}</div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -174,8 +248,8 @@ export default function ResultadosDistritosPage() {
                             <CardContent className="p-6 flex items-center gap-4">
                                 <div className="p-3 rounded-2xl bg-green-50 text-green-600"><Users /></div>
                                 <div>
-                                    <div className="text-sm text-slate-500 font-medium">Votos Totales (Intendencia)</div>
-                                    <div className="text-3xl font-black">{dataIntendente?.totales?.totalVotos?.toLocaleString() || 0}</div>
+                                    <div className="text-sm text-slate-500 font-medium">Votos Válidos (Intendencia)</div>
+                                    <div className="text-3xl font-black">{votosValidosIntendente.toLocaleString() || 0}</div>
                                 </div>
                             </CardContent>
                         </Card>
@@ -191,7 +265,7 @@ export default function ResultadosDistritosPage() {
                         <CardContent className="p-0">
                             <div className="max-h-[300px] overflow-y-auto divide-y divide-slate-100">
                                 {dataIntendente?.candidatos?.length > 0 ? [...dataIntendente.candidatos].sort((a: any, b: any) => b.votos - a.votos).map((c: any, i: number) => {
-                                    const pct = dataIntendente?.totales?.totalVotos ? ((c.votos / dataIntendente.totales.totalVotos) * 100).toFixed(1) : '0.0';
+                                    const pct = votosValidosIntendente ? ((c.votos / votosValidosIntendente) * 100).toFixed(1) : '0.0';
                                     return (
                                         <div key={`int-${i}-${c.numLista}`} className="p-4 flex items-center gap-4 hover:bg-green-50/30 transition-colors">
                                             <div className="w-8 h-8 rounded-full bg-green-600 text-white flex items-center justify-center text-xs font-black shrink-0 shadow-md">
@@ -255,8 +329,8 @@ export default function ResultadosDistritosPage() {
                                     <CardTitle className="uppercase tracking-widest text-sm font-bold text-slate-500">Resumen Votos por Lista (Junta)</CardTitle>
                                 </CardHeader>
                                 <CardContent className="p-4 space-y-3 max-h-[400px] overflow-y-auto">
-                                    {juntaLists.sort((a:any, b:any) => b.totalVotes - a.totalVotes).map((list: any) => {
-                                        const pct = dataJunta?.totales?.totalVotos ? ((list.totalVotes / dataJunta.totales.totalVotos) * 100).toFixed(1) : '0.0';
+                                    {[...juntaLists].sort((a:any, b:any) => b.totalVotes - a.totalVotes).map((list: any) => {
+                                        const pct = votosValidosJunta ? ((list.totalVotes / votosValidosJunta) * 100).toFixed(1) : '0.0';
                                         return (
                                             <div key={list.id} className="flex justify-between items-center p-2 rounded-lg hover:bg-slate-50 transition-colors border-b last:border-0 border-slate-100">
                                                 <div className="flex flex-col">
@@ -306,8 +380,10 @@ export default function ResultadosDistritosPage() {
                                                     <div className="text-[9px] text-slate-500 uppercase font-bold leading-none mt-1">Votos Pref.</div>
                                                 </div>
                                                 <div className="text-right flex-shrink-0 w-24">
-                                                    <div className="text-xs font-black text-blue-700 leading-none">{c.quotient.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
-                                                    <div className="text-[9px] text-blue-500/70 uppercase font-bold leading-none mt-1">Cociente</div>
+                                                    <div className="text-xs font-black text-blue-700 leading-none">
+                                                        {c.listTotalVotes ? ((c.votes / c.listTotalVotes) * 100).toFixed(2) : '0.00'}%
+                                                    </div>
+                                                    <div className="text-[9px] text-blue-500/70 uppercase font-bold leading-none mt-1">% de la Lista</div>
                                                 </div>
                                             </div>
                                         )) : (

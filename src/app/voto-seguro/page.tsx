@@ -43,7 +43,9 @@ interface VotoSeguroData {
   NOMBRE: string;
   APELLIDO: string;
   CODIGO_SEC?: string | number;
+  SECCIONAL?: string | number;
   LOCAL?: string;
+  DESC_LOCAL?: string;
   MESA?: string | number;
   ORDEN?: string | number;
   TELEFONO?: string;
@@ -213,7 +215,7 @@ export default function VotoSeguroPage() {
     } else if (isPresidente || isCoordinador) {
         // Presidentes y Coordinadores ven sus SECCIONALES ASIGNADAS o sus propios registros
         allowedList = rawList.filter(item => {
-            const itemSec = String(item.CODIGO_SEC || '');
+            const itemSec = String(item.SECCIONAL || item.CODIGO_SEC || '');
             const isFromMySeccional = userSeccionales.includes(itemSec);
             
             if (isFromMySeccional) return true;
@@ -269,10 +271,10 @@ export default function VotoSeguroPage() {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
         
-        let itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
+        let itemSecc = String(voto.seccional_jurisdiccion || voto.SECCIONAL || voto.CODIGO_SEC || 'SIN SECCIONAL');
         
         // Priorizar el local que le corresponde
-        const electorLocalRaw = String(voto.LOCAL || '').trim().toUpperCase();
+        const electorLocalRaw = String(voto.DESC_LOCAL || voto.LOCAL || '').trim().toUpperCase();
         if (electorLocalRaw) {
             const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
             if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
@@ -357,7 +359,7 @@ export default function VotoSeguroPage() {
         let csvContent = "\uFEFF" + headers + "\n";
         filteredList.forEach(row => {
             const userName = row.registradoPor_nombre || 'DESCONOCIDO';
-            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
+            const line = [row.SECCIONAL || row.CODIGO_SEC, row.DESC_LOCAL || row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
                 .map(v => `"${String(v || '').replace(/;/g, ' ').toUpperCase()}"`).join(';');
             csvContent += line + "\n";
         });
@@ -378,7 +380,7 @@ export default function VotoSeguroPage() {
         const headers = ['SECC', 'LOCAL', 'MESA', 'ORDEN', 'CEDULA', 'NOMBRE', 'APELLIDO', 'TELEFONO', 'TELEFONO_MIGRADO', 'USUARIO'].join(';');
         let csvContent = "\uFEFF" + headers + "\n";
         userVotos.forEach(row => {
-            const line = [row.CODIGO_SEC, row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
+            const line = [row.SECCIONAL || row.CODIGO_SEC, row.DESC_LOCAL || row.LOCAL, row.MESA, row.ORDEN, row.CEDULA, row.NOMBRE, row.APELLIDO, row.TELEFONO, row.TELEFONO_MIGRADO, userName]
                 .map(v => `"${String(v || '').replace(/;/g, ' ').toUpperCase()}"`).join(';');
             csvContent += line + "\n";
         });
@@ -413,8 +415,8 @@ export default function VotoSeguroPage() {
 
         userVotos.forEach(row => {
             const rowData = [
-                row.CODIGO_SEC || '',
-                row.LOCAL || '',
+                row.SECCIONAL || row.CODIGO_SEC || '',
+                row.DESC_LOCAL || row.LOCAL || '',
                 row.MESA || '',
                 row.CEDULA || '',
                 row.NOMBRE || '',
@@ -517,7 +519,7 @@ export default function VotoSeguroPage() {
             
             // LOCAL
             doc.setFontSize(5.5);
-            let drawLocal = String(voto.LOCAL || '').trim().toUpperCase();
+            let drawLocal = String(voto.DESC_LOCAL || voto.LOCAL || '').trim().toUpperCase();
             if (drawLocal.length > 30) drawLocal = drawLocal.substring(0, 30) + '...';
             doc.text(drawLocal, x + 485 * scaleX, y + 340 * scaleY);
             
@@ -735,9 +737,9 @@ export default function VotoSeguroPage() {
                       <TableRow key={p.id} className="hover:bg-muted/20">
                           <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
                           <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
-                          <TableCell className="text-center">{p.CODIGO_SEC ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
+                          <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                           <TableCell className="text-[10px] uppercase">
-                              <div>{p.LOCAL}</div>
+                              <div>{p.DESC_LOCAL || p.LOCAL}</div>
                               <div className="text-primary font-bold">M: {p.MESA || '-'} / O: {p.ORDEN || '-'}</div>
                           </TableCell>
                           <TableCell>

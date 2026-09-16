@@ -5,8 +5,8 @@ export interface Distrito {
 }
 
 export const DISTRITOS_ALTO_PARANA: Distrito[] = [
-    { id: 0, nombre: "Ciudad del Este (Centro/General)", bancasDefault: 12 },
-    { id: 1, nombre: "Ciudad del Este", bancasDefault: 12 },
+    { id: 0, nombre: "Ciudad del Este", bancasDefault: 12 },
+    { id: 1, nombre: "Distrito 1", bancasDefault: 12 },
     { id: 2, nombre: "Distrito 2", bancasDefault: 9 },
     { id: 3, nombre: "Distrito 3", bancasDefault: 9 },
     { id: 5, nombre: "Hernandarias", bancasDefault: 12 },

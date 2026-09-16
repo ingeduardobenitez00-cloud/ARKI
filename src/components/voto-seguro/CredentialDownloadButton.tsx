@@ -143,17 +143,17 @@ export function CredentialDownloadButton({ voto }: { voto: any }) {
                 <div style={{ position: 'relative', zIndex: 1, width: '100%', height: '100%' }}>
                     {/* NOMBRES Y APELLIDOS */}
                     <div style={{ position: 'absolute', top: '210px', left: '225px', fontSize: '14px', fontWeight: 'bold', textTransform: 'uppercase', color: '#000', width: '560px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                        {voto.NOMBRE?.trim()} {voto.APELLIDO?.trim()}
+                        {String(voto.NOMBRE || '').trim()} {String(voto.APELLIDO || '').trim()}
                     </div>
 
                     {/* DIRECCION */}
                     <div style={{ position: 'absolute', top: '260px', left: '245px', fontSize: '13px', fontWeight: 'bold', textTransform: 'uppercase', width: '540px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
-                        {voto.DIRECCION?.trim()}
+                        {String(voto.DIRECCION || '').trim()}
                     </div>
 
                     {/* LOCAL DE VOTACIÓN */}
                     <div style={{ position: 'absolute', top: '320px', left: '485px', fontSize: '12px', fontWeight: 'bold', textTransform: 'uppercase', width: '290px', whiteSpace: 'nowrap', color: '#000', overflow: 'hidden' }}>
-                        {voto.LOCAL?.trim()}
+                        {String(voto.DESC_LOCAL || voto.LOCAL || '').trim()}
                     </div>
 
                     {/* MESA N° */}
