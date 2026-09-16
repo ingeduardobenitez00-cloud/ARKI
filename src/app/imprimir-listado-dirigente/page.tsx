@@ -32,7 +32,9 @@ interface VotoSeguroData {
   NOMBRE: string;
   APELLIDO: string;
   CODIGO_SEC?: string | number;
+  SECCIONAL?: string | number;
   LOCAL?: string;
+  DESC_LOCAL?: string;
   MESA?: string | number;
   ORDEN?: string | number;
   TELEFONO?: string;
@@ -70,6 +72,26 @@ export default function ImprimirListadoDirigentePage() {
   }, [db, isAllowed]);
 
   const { data: allUsers, isLoading: isLoadingUsers } = useCollection<UserData>(usersQuery);
+
+  const localesQuery = useMemoFirebase(() => {
+    if (!db || !isAllowed) return null;
+    return query(collection(db, 'locales_votacion'));
+  }, [db, isAllowed]);
+  
+  const { data: allLocales } = useCollection<any>(localesQuery);
+  
+  const localToSeccionalMap = useMemo(() => {
+      const map: Record<string, string> = {};
+      if (allLocales) {
+          allLocales.forEach((l: any) => {
+              const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+              if (normLocal && l.seccional_id) {
+                  map[normLocal] = String(l.seccional_id).trim();
+              }
+          });
+      }
+      return map;
+  }, [allLocales]);
 
   const dirigentesPorSeccional = useMemo(() => {
     if (!allUsers) return {};
@@ -129,7 +151,15 @@ export default function ImprimirListadoDirigentePage() {
   const groupedVotos = useMemo(() => {
     const groups: Record<string, VotoSeguroData[]> = {};
     votos.forEach(v => {
-      const local = (v.LOCAL || 'SIN LOCAL ESPECIFICADO').trim().toUpperCase();
+      const local = String(v.DESC_LOCAL || v.LOCAL || 'SIN LOCAL ESPECIFICADO').trim().toUpperCase();
+      const normLocal = local.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      const configuredSeccional = localToSeccionalMap[normLocal];
+      if (configuredSeccional) {
+          v.CODIGO_SEC = configuredSeccional;
+          v.SECCIONAL = configuredSeccional;
+      }
+
       if (!groups[local]) {
         groups[local] = [];
       }
@@ -146,7 +176,7 @@ export default function ImprimirListadoDirigentePage() {
     });
 
     return sortedGroups;
-  }, [votos]);
+  }, [votos, localToSeccionalMap]);
 
   const exportPDF = async () => {
     if (!selectedDirigente || votos.length === 0) return;
@@ -204,7 +234,7 @@ export default function ImprimirListadoDirigentePage() {
         }
 
         // Título del Local
-        const seccionalLocal = localVotos[0]?.CODIGO_SEC || 'N/A';
+        const seccionalLocal = localVotos[0]?.CODIGO_SEC || localVotos[0]?.SECCIONAL || 'N/A';
         doc.setFontSize(9);
         doc.setTextColor(180, 0, 0); // Rojo
         doc.setFont("helvetica", "bold");
@@ -216,7 +246,7 @@ export default function ImprimirListadoDirigentePage() {
 
         localVotos.forEach(row => {
             const tableRow = [
-                row.CODIGO_SEC || '',
+                row.CODIGO_SEC || row.SECCIONAL || '',
                 `M: ${row.MESA || ''} / O: ${row.ORDEN || ''}`,
                 row.CEDULA || '',
                 `${row.NOMBRE || ''} ${row.APELLIDO || ''}`.trim(),
@@ -265,7 +295,7 @@ export default function ImprimirListadoDirigentePage() {
           dataForExcel.push({
             'DIRIGENTE': selectedDirigente.name,
             'LOCAL': local,
-            'SECCIONAL': row.CODIGO_SEC || '',
+            'SECCIONAL': row.CODIGO_SEC || row.SECCIONAL || '',
             'MESA': row.MESA || '',
             'ORDEN': row.ORDEN || '',
             'CEDULA': row.CEDULA || '',
@@ -379,7 +409,7 @@ export default function ImprimirListadoDirigentePage() {
                                 <TableBody>
                                     {localVotos.map(v => (
                                         <TableRow key={v.id} className="text-xs hover:bg-white">
-                                            <TableCell className="font-bold">{v.CODIGO_SEC}</TableCell>
+                                            <TableCell className="font-bold">{v.CODIGO_SEC || v.SECCIONAL}</TableCell>
                                             <TableCell className="font-bold text-primary">M: {v.MESA} / O: {v.ORDEN}</TableCell>
                                             <TableCell className="font-mono">{v.CEDULA}</TableCell>
                                             <TableCell className="font-black uppercase">{v.NOMBRE} {v.APELLIDO}</TableCell>
