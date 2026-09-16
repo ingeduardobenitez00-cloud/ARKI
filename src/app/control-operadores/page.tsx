@@ -35,8 +35,10 @@ export default function RendimientoOperadoresPage() {
     
     const [seccionales, setSeccionales] = useState<Seccional[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
+    const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
 
     const [totalVotosGlobal, setTotalVotosGlobal] = useState(0);
+    const [totalVotosInternas, setTotalVotosInternas] = useState(0);
 
     const usersQuery = useMemoFirebase(() => {
         if (!db) return null;
@@ -49,11 +51,11 @@ export default function RendimientoOperadoresPage() {
         if (!liveUsersData) return [];
         const mapped = liveUsersData.map(u => ({
             ...u,
-            votosCargados: (u as any).votosCargados || 0
+            votosCargados: viewMode === 'internas' ? ((u as any).votosCargadosInternas || 0) : ((u as any).votosCargados || 0)
         })) as UserPerformance[];
         mapped.sort((a, b) => b.votosCargados - a.votosCargados);
         return mapped;
-    }, [liveUsersData]);
+    }, [liveUsersData, viewMode]);
 
     const fetchInitialData = useCallback(async () => {
         try {
@@ -64,6 +66,8 @@ export default function RendimientoOperadoresPage() {
             // Fetch the REAL total count of votes globally, which is very cheap (1 read per 1000 index hits)
             const countSnap = await getCountFromServer(collection(db, VOTOS_COLLECTION));
             setTotalVotosGlobal(countSnap.data().count);
+            const countSnapInternas = await getCountFromServer(collection(db, 'votos_confirmados_internas'));
+            setTotalVotosInternas(countSnapInternas.data().count);
         } catch (error) {
             console.error(error);
         }
@@ -77,15 +81,17 @@ export default function RendimientoOperadoresPage() {
     useEffect(() => {
         if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Super-Admin')) return;
         
+        const currentTotal = viewMode === 'internas' ? totalVotosInternas : totalVotosGlobal;
         // Si hay una discrepancia mayor a 50 votos entre el total real y la suma de perfiles,
         // forzamos una sincronización automática silenciosa para arreglar el TOP histórico.
-        if (totalVotosGlobal > 0 && sumUsersVotos > 0 && (totalVotosGlobal - sumUsersVotos > 50) && !isAutoSyncing) {
+        if (currentTotal > 0 && sumUsersVotos > 0 && (Math.abs(currentTotal - sumUsersVotos) > 50) && !isAutoSyncing) {
             const doAutoSync = async () => {
                 setIsAutoSyncing(true);
                 try {
                     toast({ title: 'Sincronizando Histórico...', description: 'Estamos actualizando el TOP de operadores automáticamente.' });
                     
-                    const capturesSnap = await getDocs(collection(db, VOTOS_COLLECTION));
+                    const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : VOTOS_COLLECTION;
+                    const capturesSnap = await getDocs(collection(db, collectionName));
                     const operatorCounts: Record<string, number> = {};
 
                     capturesSnap.forEach(docSnap => {
@@ -103,7 +109,8 @@ export default function RendimientoOperadoresPage() {
 
                     for (const userId of usersList) {
                         const totalVotos = operatorCounts[userId] || 0;
-                        batch.update(doc(db, USERS_COLLECTION, userId), { votosCargados: totalVotos });
+                        const updateData = viewMode === 'internas' ? { votosCargadosInternas: totalVotos } : { votosCargados: totalVotos };
+                        batch.update(doc(db, USERS_COLLECTION, userId), updateData);
                         count++;
 
                         if (count >= 400) {
@@ -124,7 +131,7 @@ export default function RendimientoOperadoresPage() {
             };
             doAutoSync();
         }
-    }, [totalVotosGlobal, sumUsersVotos, currentUser, db, isAutoSyncing, toast]);
+    }, [totalVotosGlobal, totalVotosInternas, sumUsersVotos, currentUser, db, isAutoSyncing, toast, viewMode]);
 
     const isLoading = usersLoading || seccionales.length === 0;
 
@@ -266,7 +273,8 @@ export default function RendimientoOperadoresPage() {
             doc.setFontSize(11);
             doc.setTextColor(100);
             doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, 30);
-            doc.text(`Total de votos seguros en sistema: ${totalVotosGlobal}`, 14, 36);
+            const currentTotal = viewMode === 'internas' ? totalVotosInternas : totalVotosGlobal;
+            doc.text(`Total de votos seguros en sistema (${viewMode === 'internas' ? 'Internas' : 'Generales'}): ${currentTotal}`, 14, 36);
 
             const tableColumn = ["Operador", "Seccional", "Votos Cargados"];
             const tableRows: any[] = [];
@@ -296,7 +304,7 @@ export default function RendimientoOperadoresPage() {
             tableRows.push([
                 { content: 'TOTAL CARGADO', styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
                 { content: '-', styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
-                { content: totalVotosGlobal.toString(), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+                { content: currentTotal.toString(), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
             ]);
 
             autoTable(doc, {
@@ -338,9 +346,27 @@ export default function RendimientoOperadoresPage() {
                         Control de carga y efectividad de votos seguros por usuario.
                     </p>
                 </div>
-                <Button onClick={handlePrintReport} className="font-black h-12 px-8 shadow-xl rounded-2xl active:scale-95 transition-all">
-                    <Download className="w-5 h-5 mr-2" /> DESCARGAR REPORTE PDF
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex bg-slate-100 p-1 rounded-xl">
+                        <Button 
+                            variant={viewMode === 'internas' ? 'default' : 'ghost'} 
+                            onClick={() => setViewMode('internas')}
+                            className={cn("h-10 font-black uppercase text-xs px-6 rounded-lg", viewMode === 'internas' ? "bg-amber-500 hover:bg-amber-600 shadow-sm" : "")}
+                        >
+                            Internas
+                        </Button>
+                        <Button 
+                            variant={viewMode === 'generales' ? 'default' : 'ghost'} 
+                            onClick={() => setViewMode('generales')}
+                            className={cn("h-10 font-black uppercase text-xs px-6 rounded-lg", viewMode === 'generales' ? "shadow-sm" : "")}
+                        >
+                            Generales
+                        </Button>
+                    </div>
+                    <Button onClick={handlePrintReport} className="font-black h-12 px-6 shadow-xl rounded-2xl active:scale-95 transition-all">
+                        <Download className="w-5 h-5 md:mr-2" /> <span className="hidden md:inline">DESCARGAR REPORTE</span>
+                    </Button>
+                </div>
             </div>
 
             {/* Panel de Estadísticas y Top Rendimiento */}
@@ -351,10 +377,10 @@ export default function RendimientoOperadoresPage() {
                             <div className="absolute -right-4 -top-4 opacity-10"><BarChart3 className="w-24 h-24 text-emerald-600" /></div>
                             <div className="flex items-center gap-3 mb-2 z-10">
                                 <div className="bg-emerald-100 p-2 rounded-xl text-emerald-600"><TrendingUp className="h-5 w-5" /></div>
-                                <p className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Votos Totales</p>
+                                <p className="text-[10px] font-black uppercase text-emerald-700 tracking-wider">Votos Totales {viewMode === 'internas' ? '(Internas)' : '(Generales)'}</p>
                             </div>
-                            <p className="text-3xl font-black text-emerald-900 leading-none z-10">{totalVotosGlobal}</p>
-                            <p className="text-[9px] font-bold text-emerald-700/60 uppercase mt-1 z-10">Asegurados en sistema</p>
+                            <p className="text-3xl font-black text-emerald-900 leading-none z-10">{viewMode === 'internas' ? totalVotosInternas : totalVotosGlobal}</p>
+                            <p className="text-[9px] font-bold text-emerald-700/60 uppercase mt-1 z-10">Asegurados en el sistema</p>
                         </div>
                         
                         <div className="bg-blue-50/50 border border-blue-100 rounded-[1.5rem] p-4 flex flex-col justify-center shadow-sm relative overflow-hidden">
@@ -381,7 +407,7 @@ export default function RendimientoOperadoresPage() {
                     <Card className="border-primary/10 bg-gradient-to-br from-primary/5 to-transparent rounded-[1.5rem] shadow-sm">
                         <CardHeader className="py-4 border-b border-primary/5 bg-white/50">
                             <CardTitle className="text-[10px] font-black uppercase flex items-center gap-2">
-                                <Award className="h-4 w-4 text-primary" /> Top Seccionales {stats.isGlobalView ? '' : `(Filtro: ${stats.seccionalName})`}
+                                <Award className="h-4 w-4 text-primary" /> Top Seccionales {viewMode === 'internas' ? '(Internas)' : '(Generales)'} {stats.isGlobalView ? '' : `(Filtro: ${stats.seccionalName})`}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="pt-4 px-4 pb-4">
@@ -482,7 +508,7 @@ export default function RendimientoOperadoresPage() {
                                                 </div>
                                             </div>
                                             <div className="flex flex-col items-end mr-4">
-                                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Votos Seguros</span>
+                                                <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Votos Seguros {viewMode === 'internas' ? '(Internas)' : '(Generales)'}</span>
                                                 <Badge variant="secondary" className="mt-1 bg-primary/10 text-primary font-black text-sm px-3">{totalVotesInGroup}</Badge>
                                             </div>
                                         </div>
@@ -494,7 +520,7 @@ export default function RendimientoOperadoresPage() {
                                                     <TableHead className="pl-8 py-3 w-[60px]">Status</TableHead>
                                                     <TableHead>Operador / Identidad</TableHead>
                                                     <TableHead>Rol del Sistema</TableHead>
-                                                    <TableHead className="text-right pr-8">Votos Cargados</TableHead>
+                                                    <TableHead className="text-right pr-8">Votos Cargados {viewMode === 'internas' ? '(Internas)' : '(Generales)'}</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
