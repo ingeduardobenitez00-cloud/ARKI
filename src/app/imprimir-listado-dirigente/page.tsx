@@ -152,13 +152,6 @@ export default function ImprimirListadoDirigentePage() {
     const groups: Record<string, VotoSeguroData[]> = {};
     votos.forEach(v => {
       const local = String(v.DESC_LOCAL || v.LOCAL || 'SIN LOCAL ESPECIFICADO').trim().toUpperCase();
-      const normLocal = local.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      const configuredSeccional = localToSeccionalMap[normLocal];
-      if (configuredSeccional) {
-          v.CODIGO_SEC = configuredSeccional;
-          v.SECCIONAL = configuredSeccional;
-      }
 
       if (!groups[local]) {
         groups[local] = [];
@@ -234,7 +227,10 @@ export default function ImprimirListadoDirigentePage() {
         }
 
         // Título del Local
-        const seccionalLocal = localVotos[0]?.CODIGO_SEC || localVotos[0]?.SECCIONAL || 'N/A';
+        const normLocal = local.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        const configuredSeccional = localToSeccionalMap[normLocal];
+        const seccionalLocal = configuredSeccional || localVotos[0]?.CODIGO_SEC || localVotos[0]?.SECCIONAL || 'N/A';
+        
         doc.setFontSize(9);
         doc.setTextColor(180, 0, 0); // Rojo
         doc.setFont("helvetica", "bold");
