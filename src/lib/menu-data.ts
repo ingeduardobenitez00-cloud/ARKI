@@ -61,6 +61,7 @@ export const allMenuItems = [
   { href: '/control-votacion', label: 'Control Votación', icon: ClipboardCheck, tooltip: 'CONTROLA EL ESTADO DE VOTACIÓN POR MESA.' },
   { href: '/escaner-actas', label: 'Escaner de Actas', icon: QrCode, tooltip: 'ESCANEO DE ACTAS TREP Y CARGA DE RESULTADOS.' },
   { href: '/resultados-electorales', label: 'Resultados en Vivo', icon: BarChart3, tooltip: 'VISUALIZA LOS RESULTADOS ELECTORALES EN TIEMPO REAL.' },
+  { href: '/resumen-departamental', label: 'Resumen Departamental', icon: BarChart3, tooltip: 'BALANCE GENERAL Y TENDENCIAS POLÍTICAS.' },
   { href: '/resultados-distritos', label: 'Resultados Distritos', icon: BarChart3, tooltip: 'EXPLORA LOS RESULTADOS DE TODOS LOS DISTRITOS.' },
   { href: '/resultados-por-local', label: 'Resultados por Local', icon: MapIcon, tooltip: 'VISUALIZA LOS RESULTADOS OFICIALES POR LOCAL DE VOTACIÓN.' },
   { href: '/reporte-mesas', label: 'Reporte de Actas', icon: FileSpreadsheet, tooltip: 'TABLA DE RESULTADOS OFICIALES POR MESA CON EXPORTACIÓN A PDF.' },
@@ -112,7 +113,7 @@ export const menuCategories = [
   {
     label: 'Operación Día D',
     icon: ClipboardCheck,
-    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/resultados-distritos', '/resultados-por-local', '/reporte-mesas', '/simulador', '/configuracion-electoral', '/verificador-actas', '/reportes']
+    items: ['/control-votacion', '/escaner-actas', '/resultados-electorales', '/resumen-departamental', '/resultados-distritos', '/resultados-por-local', '/reporte-mesas', '/simulador', '/configuracion-electoral', '/verificador-actas', '/reportes']
   },
   {
     label: 'Asistencia y Eventos',
@@ -137,7 +138,7 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: allMenuItems.map(item => item.href)
   },
   'Coordinador': {
-    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/resumen-seccional', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/imprimir-listado-dirigente', '/audiencia', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas', '/resultados-distritos']
+    permissions: ['/', '/mapa-tecnico', '/padron', '/padron-export', '/resumen-seccional', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/inscripciones-eventos', '/inscripciones-archivadas', '/ajustes-inscripcion', '/voto-seguro', '/imprimir-listado-dirigente', '/audiencia', '/mapa-global', '/reportes', '/reuniones', '/reuniones-archivadas', '/control-votacion', '/perfil', '/migrar-votos', '/simulador', '/reporte-mesas', '/resumen-departamental', '/resultados-distritos']
   },
   'Dirigente': {
     permissions: ['/', '/mapa-tecnico', '/padron', '/resumen-seccional', '/comparar-padron', '/consulta', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/voto-seguro', '/imprimir-listado-dirigente', '/audiencia', '/mapa-global', '/reportes', '/perfil', '/migrar-votos', '/simulador']
@@ -152,6 +153,6 @@ export const userRoles: { [key: string]: { permissions: string[] } } = {
     permissions: ['/', '/telefonos', '/seguimiento-llamadas', '/biblioteca', '/difusion', '/difusion-masiva', '/whatsapp-excel', '/migrar-celulares', '/perfil']
   },
   'Vista': {
-    permissions: ['/', '/padron', '/resultados-electorales', '/resultados-distritos', '/resultados-por-local', '/reporte-mesas', '/perfil', '/simulador']
+    permissions: ['/', '/padron', '/resultados-electorales', '/resumen-departamental', '/resultados-distritos', '/resultados-por-local', '/reporte-mesas', '/perfil', '/simulador']
   }
 };
