@@ -192,11 +192,28 @@ export default function ConsultaPage() {
 
     const operatorsInElectorSeccional = useMemo(() => {
         if (!selectedPerson || !allUsers) return [];
-        const electorSec = String(selectedPerson.CODIGO_SEC || '');
+        const electorLocalRaw = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '');
+        const electorLocalNorm = electorLocalRaw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+        const electorSec = String(selectedPerson.SECCIONAL || selectedPerson.CODIGO_SEC || '');
+
         return allUsers.filter(u => {
+            if (u.id === user?.id) return false;
+            
+            const allowedRoles = ['Dirigente', 'Coordinador', 'Admin', 'Super-Admin', 'Presidente'];
+            if (!allowedRoles.includes(u.role)) return false;
+            
+            const uLocal = String(u.local || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+            if (uLocal) {
+                // Si tiene un local asignado, verificamos que coincida
+                return uLocal === electorLocalNorm || uLocal.includes(electorLocalNorm) || electorLocalNorm.includes(uLocal);
+            }
+
+            // Si NO tiene local explícito, usamos su seccional, PERO filtramos a los multiseccionales
             const rawSecc = u.seccionales || (u.seccional ? [u.seccional] : []);
+            if (rawSecc.length > 1) return false; // Excluir multiseccionales
+
             const userSecs = rawSecc.map((s: any) => String(s).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/^(SECCIONAL|SECCION\.|SECCION|SECC\.|SECC|SEC\.|SEC)\s*/g, '').trim());
-            return userSecs.includes(electorSec) && u.id !== user?.id && (u.role === 'Dirigente' || u.role === 'Coordinador');
+            return userSecs.includes(electorSec);
         });
     }, [selectedPerson, allUsers, user]);
 
@@ -451,11 +468,45 @@ export default function ConsultaPage() {
 
         setIsSaving(true);
 
+        // --- NUEVA VALIDACIÓN: BLOQUEAR SI YA ES VOTO SEGURO ---
+        try {
+            const padronRefCheck = doc(db, COLLECTION_PADRON, selectedPerson.id);
+            const padronSnap = await getDoc(padronRefCheck);
+            if (padronSnap.exists()) {
+                const padronData = padronSnap.data();
+                if (padronData.observacion === "VOTO SEGURO") {
+                    const capSnap = await getDoc(doc(db, COLLECTION_CAPTURAS, selectedPerson.id));
+                    let isOwner = false;
+                    let who = "otra persona";
+                    if (capSnap.exists()) {
+                        const capData = capSnap.data();
+                        who = capData.registradoPor_nombre || capData.delegadoPor_nombre || "otra persona";
+                        // Permitir si el usuario actual fue quien lo registró o lo delegó
+                        if (capData.registradoPor_id === user.id || capData.delegadoPor_id === user.id) {
+                            isOwner = true;
+                        }
+                    }
+                    if (!isOwner) {
+                        toast({ 
+                            title: "Acción Denegada", 
+                            description: `Ese elector ya fue registrado como voto seguro de ${who}.`, 
+                            variant: "destructive" 
+                        });
+                        setIsSaving(false);
+                        return;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error verificando estado del elector:", error);
+        }
+        // -------------------------------------------------------
+
         // VALIDACIÓN DE JURISDICCIÓN
         const role = user.role;
         const isAdmin = role === 'Super-Admin' || role === 'Admin' || role === 'Presidente';
         let electorSec = String(selectedPerson.SECCIONAL || selectedPerson.CODIGO_SEC || '');
-        const originalElectorSec = electorSec; // Guardar la original para no modificarla
+        const originalElectorSec = electorSec;
 
         let isInvalidSeccional = false;
         if (!electorSec || electorSec === '') {
@@ -467,50 +518,77 @@ export default function ConsultaPage() {
             }
         }
 
-        // RESOLUCIÓN DINÁMICA DE SECCIONAL POR LOCAL SÓLO PARA VALIDAR PERMISO
-        if (isInvalidSeccional) {
-            try {
-                const dptoVal = selectedPerson.COD_DPTO !== undefined && selectedPerson.COD_DPTO !== '' ? selectedPerson.COD_DPTO : selectedPerson.DEPART;
-                const dptoStr = String(dptoVal ?? '');
-                const distVal = selectedPerson.COD_DIST !== undefined && selectedPerson.COD_DIST !== '' ? selectedPerson.COD_DIST : selectedPerson.DISTRITO;
-                const distStr = String(distVal ?? '');
-                const zonaStr = String(selectedPerson.ZONA ?? '');
-                const localStr = String(selectedPerson.LOCAL || '');
-                
-                const localesQuery = query(
-                    collection(db, 'locales_votacion'),
-                    where('dpto', '==', dptoStr),
-                    where('distrito', '==', distStr),
-                    where('zona', '==', zonaStr),
-                    where('nombre', '==', localStr),
-                    limit(1)
-                );
-                const locSnap = await getDocs(localesQuery);
-                if (!locSnap.empty) {
-                    const locData = locSnap.docs[0].data();
-                    if (locData.seccional_id) {
-                        electorSec = String(locData.seccional_id);
-                    }
-                }
-            } catch (err) {
-                console.error("Error resolviendo seccional del local:", err);
-            }
-        }
-
         let hasPermission = false;
+        let seccionalJurisdiccion = originalElectorSec; // Para guardar en BD
 
         const userLocalNorm = user?.local ? String(user.local).toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim() : null;
-        const electorLocalNorm = String(selectedPerson.LOCAL || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
+        const electorLocalRaw = String(selectedPerson.DESC_LOCAL || selectedPerson.LOCAL || '');
+        const electorLocalNorm = electorLocalRaw.toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').trim();
 
         if (isAdmin) {
             hasPermission = true;
-        } else if (userSeccionales.includes(electorSec)) {
+            if (!userSeccionales.includes(originalElectorSec)) {
+                seccionalJurisdiccion = userSeccionales[0] || originalElectorSec;
+            }
+        } else if (userSeccionales.includes(originalElectorSec)) {
             hasPermission = true;
         } else if (userLocalNorm && electorLocalNorm && userLocalNorm === electorLocalNorm) {
             hasPermission = true;
-        } else if (isInvalidSeccional && electorSec === originalElectorSec) {
-            // Si era inválida y no se pudo resolver, permitimos guardar por defecto (o según regla de negocio)
-            hasPermission = true; 
+            seccionalJurisdiccion = userSeccionales[0] || originalElectorSec;
+        } else {
+            let possibleSecs: string[] = [];
+            if (localToSeccionalMap[electorLocalNorm] && localToSeccionalMap[electorLocalNorm].length > 0) {
+                possibleSecs = localToSeccionalMap[electorLocalNorm];
+            } else {
+                const partialMatchKey = Object.keys(localToSeccionalMap).find(k => k.includes(electorLocalNorm) || electorLocalNorm.includes(k));
+                if (partialMatchKey) {
+                    possibleSecs = localToSeccionalMap[partialMatchKey];
+                }
+            }
+
+            const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+            
+            if (matchingUserSec) {
+                hasPermission = true;
+                seccionalJurisdiccion = matchingUserSec; // Asignamos la seccional de nuestro local
+            } else {
+                // Fallback a consulta a BD si no está en el map local
+                try {
+                    const dptoVal = selectedPerson.COD_DPTO !== undefined && selectedPerson.COD_DPTO !== '' ? selectedPerson.COD_DPTO : selectedPerson.DEPART;
+                    const dptoStr = String(dptoVal ?? '');
+                    const distVal = selectedPerson.COD_DIST !== undefined && selectedPerson.COD_DIST !== '' ? selectedPerson.COD_DIST : selectedPerson.DISTRITO;
+                    const distStr = String(distVal ?? '');
+                    const zonaStr = String(selectedPerson.ZONA ?? '');
+                    
+                    const localesQuery = query(
+                        collection(db, 'locales_votacion'),
+                        where('dpto', '==', dptoStr),
+                        where('distrito', '==', distStr),
+                        where('zona', '==', zonaStr),
+                        where('nombre', '==', electorLocalRaw),
+                        limit(1)
+                    );
+                    const locSnap = await getDocs(localesQuery);
+                    if (!locSnap.empty) {
+                        const locData = locSnap.docs[0].data();
+                        if (locData.seccional_id) {
+                            const dbSecId = String(locData.seccional_id);
+                            if (userSeccionales.includes(dbSecId)) {
+                                hasPermission = true;
+                                seccionalJurisdiccion = dbSecId;
+                            } else {
+                                electorSec = dbSecId; // Para el mensaje de error
+                            }
+                        }
+                    }
+                } catch (err) {
+                    console.error("Error resolviendo seccional del local:", err);
+                }
+
+                if (!hasPermission && isInvalidSeccional) {
+                    hasPermission = true; // Permitimos si todo falló y no tenía seccional
+                }
+            }
         }
 
         if (!hasPermission) {
@@ -525,6 +603,7 @@ export default function ConsultaPage() {
             TELEFONO: telefono,
             registradoPor_id: user.id,
             registradoPor_nombre: user.name,
+            seccional_jurisdiccion: seccionalJurisdiccion,
             updatedAt: new Date().toISOString()
         };
 
@@ -567,6 +646,41 @@ export default function ConsultaPage() {
         if (!selectedPerson || !selectedOperator || !user || !db) return;
 
         setIsDelegating(true);
+
+        // --- NUEVA VALIDACIÓN: BLOQUEAR SI YA ES VOTO SEGURO ---
+        try {
+            const padronRefCheck = doc(db, COLLECTION_PADRON, selectedPerson.id);
+            const padronSnap = await getDoc(padronRefCheck);
+            if (padronSnap.exists()) {
+                const padronData = padronSnap.data();
+                if (padronData.observacion === "VOTO SEGURO") {
+                    const capSnap = await getDoc(doc(db, COLLECTION_CAPTURAS, selectedPerson.id));
+                    let isOwner = false;
+                    let who = "otra persona";
+                    if (capSnap.exists()) {
+                        const capData = capSnap.data();
+                        who = capData.registradoPor_nombre || capData.delegadoPor_nombre || "otra persona";
+                        // Permitir si el usuario actual fue quien lo registró o lo delegó
+                        if (capData.registradoPor_id === user.id || capData.delegadoPor_id === user.id) {
+                            isOwner = true;
+                        }
+                    }
+                    if (!isOwner) {
+                        toast({ 
+                            title: "Acción Denegada", 
+                            description: `Ese elector ya fue registrado como voto seguro de ${who}.`, 
+                            variant: "destructive" 
+                        });
+                        setIsDelegating(false);
+                        return;
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Error verificando estado del elector:", error);
+        }
+        // -------------------------------------------------------
+
         try {
             const dataToSave: any = {
                 ...selectedPerson,
@@ -670,7 +784,7 @@ export default function ConsultaPage() {
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
                             <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px]">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                             <TableCell className="text-[10px] uppercase">
-                                <div>{p.LOCAL}</div>
+                                <div>{p.DESC_LOCAL || p.LOCAL}</div>
                                 <div className="text-primary font-bold">MESA: {p.MESA} / ORDEN: {p.ORDEN}</div>
                             </TableCell>
                             <TableCell className="text-[11px] font-bold text-green-700">{p.TELEFONO || '---'}</TableCell>
@@ -803,10 +917,11 @@ export default function ConsultaPage() {
                 <div className="lg:col-span-2">
                     <Card className="border-primary/10 shadow-lg overflow-hidden min-h-[500px]"><CardHeader className="bg-muted/30 border-b py-4"><CardTitle className="flex items-center gap-3 font-black uppercase text-xs"><UserCheck className="h-4 w-4 text-primary" /> Ficha de Captura</CardTitle></CardHeader>
                         <CardContent className="pt-6">{selectedPerson ? (<div className="space-y-6">
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-primary/5 p-5 rounded-2xl border border-primary/10 text-xs">
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Cédula</Label><p className="font-black text-sm">{selectedPerson.CEDULA}</p></div>
                                     <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Elector</Label><p className="font-black text-sm uppercase">{selectedPerson.NOMBRE} {selectedPerson.APELLIDO}</p></div>
-                                    <div className="sm:col-span-2"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
+                                    <div><Label className="text-[9px] uppercase font-black text-muted-foreground">Seccional</Label><p className="font-black text-sm uppercase">{selectedPerson.SECCIONAL || selectedPerson.CODIGO_SEC || 'NO ESPECIFICADA'}</p></div>
+                                    <div className="sm:col-span-3"><Label className="text-[9px] uppercase font-black text-muted-foreground">Local de Votación</Label><p className="font-black uppercase">{selectedPerson.DESC_LOCAL || selectedPerson.LOCAL} | MESA: {selectedPerson.MESA} / ORDEN: {selectedPerson.ORDEN}</p></div>
                                 </div>
                                 
                                 {/* HISTORICO DE VOTOS */}
@@ -961,8 +1076,8 @@ export default function ConsultaPage() {
                                 Jurisdicción Restringida
                             </AlertDialogTitle>
                             <AlertDialogDescription className="text-xs font-semibold uppercase tracking-wider text-slate-500 leading-relaxed">
-                                Este elector pertenece a la <span className="font-bold text-red-600">Seccional {selectedPerson?.CODIGO_SEC}</span>. 
-                                Solo puedes registrar de forma directa electores de tu(s) seccional(es) autorizada(s) ({userSeccionales.join(', ')}).
+                                Este elector vota en el <span className="font-bold text-red-600">Local: {selectedPerson?.DESC_LOCAL || selectedPerson?.LOCAL || 'NO ESPECIFICADO'}</span>. 
+                                Solo puedes registrar electores que voten en los locales correspondientes a tu jurisdicción asignada (Seccional {userSeccionales.join(', ')}).
                             </AlertDialogDescription>
                         </div>
                     </AlertDialogHeader>
@@ -971,10 +1086,10 @@ export default function ConsultaPage() {
                         <div className="my-6 p-5 border border-dashed rounded-3xl bg-slate-50 space-y-4">
                             <div className="space-y-1 text-left">
                                 <label className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                    ¿Deseas delegar este voto a un operador local?
+                                    ¿Deseas delegar este voto a un operador asignado a ese local?
                                 </label>
                                 <p className="text-[10px] font-medium text-slate-500 uppercase leading-snug">
-                                    Selecciona un operador de la Seccional {selectedPerson?.CODIGO_SEC} para asignarle esta captura:
+                                    Selecciona un operador exclusivo de ese local para asignarle la captura:
                                 </p>
                             </div>
                             
@@ -1037,6 +1152,61 @@ export default function ConsultaPage() {
                             </Button>
                         ) : null}
                         
+                        <Button
+                            variant="default"
+                            onClick={async () => {
+                                setIsRestrictedAlertOpen(false);
+                                // Forzar guardado asignando a la primera seccional del operador
+                                const forcedSec = userSeccionales[0] || 'SIN SECCIONAL';
+                                setIsSaving(true);
+                                try {
+                                    const dataToSave: any = {
+                                        ...selectedPerson,
+                                        observacion: "VOTO SEGURO",
+                                        TELEFONO: telefono,
+                                        registradoPor_id: user?.id,
+                                        registradoPor_nombre: user?.name,
+                                        seccional_jurisdiccion: forcedSec,
+                                        updatedAt: new Date().toISOString()
+                                    };
+                                    if (manualLat && manualLon) {
+                                        dataToSave.LATITUD = parseFloat(manualLat);
+                                        dataToSave.LONGITUD = parseFloat(manualLon);
+                                        dataToSave.ubicadoPor_id = user?.id;
+                                        dataToSave.ubicadoPor_nombre = user?.name;
+                                    }
+                                    const capturaRef = doc(db, COLLECTION_CAPTURAS, selectedPerson!.id);
+                                    const padronRef = doc(db, COLLECTION_PADRON, selectedPerson!.id);
+                                    const userRef = doc(db, 'users', user!.id);
+                                    await Promise.all([
+                                        setDoc(capturaRef, dataToSave),
+                                        updateDoc(padronRef, { observacion: "VOTO SEGURO", TELEFONO: telefono }),
+                                        updateDoc(userRef, { votosCargados: increment(1) }).catch(() => {})
+                                    ]);
+                                    
+                                    logAction(db, { userId: user!.id, userName: user!.name, module: 'REGISTRO VOTOS', action: 'FORZÓ VOTO SEGURO', targetName: `${selectedPerson!.NOMBRE} ${selectedPerson!.APELLIDO}` });
+                                    toast({ title: '¡Guardado Forzado Exitoso!' });
+                                    
+                                    setSearchTerm(''); 
+                                    setSearchResults([]); 
+                                    setSelectedPerson(null); 
+                                    setTelefono(''); 
+                                    setManualLat(''); 
+                                    setManualLon('');
+                                    setShowGps(false);
+                                } catch(e) {
+                                    console.error("Error en forzar guardado:", e);
+                                    toast({ title: 'Error al forzar guardado', variant: 'destructive' });
+                                } finally {
+                                    setIsSaving(false);
+                                }
+                            }}
+                            className="bg-primary hover:bg-primary/90 text-white font-black text-xs uppercase tracking-widest h-12 w-full rounded-2xl shadow-lg transition-all duration-300 flex items-center justify-center gap-2 border-none"
+                        >
+                            <Save className="h-4 w-4" />
+                            FORZAR GUARDADO (VOTA EN MI LOCAL)
+                        </Button>
+
                         <Button
                             variant="outline"
                             onClick={() => {
