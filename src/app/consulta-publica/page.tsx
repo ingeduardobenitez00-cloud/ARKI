@@ -239,6 +239,44 @@ export default function ConsultaPublicaPage() {
                                     voto5={row.VOTO5} 
                                     partido={row.N_PARTIDO}
                                 />
+                                
+                                <Button 
+                                    variant="outline"
+                                    className="w-full mt-4 border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 font-black uppercase tracking-wider h-12 rounded-xl flex items-center justify-center gap-2"
+                                    onClick={() => {
+                                        const ZONAS: Record<string | number, string> = {
+                                            1: 'LA ENCARNACION',
+                                            2: 'CATEDRAL',
+                                            3: 'SAN ROQUE',
+                                            4: 'RECOLETA',
+                                            5: 'TRINIDAD',
+                                            6: 'ZEBALLOS CUE'
+                                        };
+                                        const zonaText = row.DESC_ZONA || (row.ZONA ? ZONAS[row.ZONA] || row.ZONA : '-');
+                                        const seccText = hasSeccional ? `${seccionalValue} - SECCIONAL ${seccionalValue} - CAPITAL` : '-';
+                                        
+                                        const text = `CONSULTA PADRÓN ELECTORAL
+EL ARKI SOTOMAYOR - CONCEJAL
+Lista 1 - Opción 5
+ASU PUEDE CAMBIAR · Elecciones 4 de octubre de 2026
+Nombre: ${row.NOMBRE || ''} ${row.APELLIDO || ''}
+Cédula: ${row.CEDULA || ''}
+Departamento: CAPITAL
+Distrito: ASUNCION
+Seccional: ${seccText}
+Zona: ${zonaText}
+Local de votación: ${row.LOCAL || ''} - ${row.DESC_LOCAL || ''}
+Mesa: ${row.MESA || '-'}
+Orden: ${row.ORDEN || '-'}
+
+Revise su mesa, orden y local de votación.`;
+                                        const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+                                        window.open(url, '_blank');
+                                    }}
+                                >
+                                    <Smartphone className="w-5 h-5" />
+                                    Compartir a WhatsApp
+                                </Button>
                             </div>
                         </div>
                     )})}
