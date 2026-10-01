@@ -943,8 +943,7 @@ export default function ConsultaPage() {
                                         <div>
                                             <h4 className="text-yellow-800 font-black uppercase text-xs">Atención: Voto Ya Registrado</h4>
                                             <p className="text-yellow-700 font-medium text-[11px] uppercase mt-1">
-                                                Este elector ya fue cargado por <span className="font-black">{existingCapture.registradoPor_nombre || 'USUARIO DESCONOCIDO'}</span>. 
-                                                Si continúas y guardas, <b>sobrescribirás</b> el registro y pasará a ser tuyo.
+                                                Este elector ya fue cargado por <span className="font-black">{existingCapture.registradoPor_nombre || 'USUARIO DESCONOCIDO'}</span>.
                                             </p>
                                         </div>
                                     </div>

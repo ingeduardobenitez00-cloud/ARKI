@@ -30,6 +30,128 @@ export default function ConsultaPublicaPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  
+  const generateAndShareCredential = async (row: PadronDocument) => {
+    if (isGenerating) return;
+    setIsGenerating(true);
+    toast({ title: 'Generando imagen...', description: 'Preparando para compartir...' });
+    
+    try {
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 500;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error("No canvas context");
+
+        const img = new window.Image();
+        img.crossOrigin = "anonymous";
+        img.src = '/credencial.png?v=2';
+
+        await new Promise((resolve, reject) => {
+            img.onload = resolve;
+            img.onerror = () => reject(new Error("Error al cargar la imagen base"));
+        });
+
+        ctx.drawImage(img, 0, 0, 800, 500);
+
+        ctx.font = 'bold 24px Helvetica, Arial, sans-serif';
+        ctx.fillStyle = '#000000';
+        
+        const fullName = `${row.NOMBRE || ''} ${row.APELLIDO || ''}`.trim().toUpperCase();
+        let drawName = fullName.length > 40 ? fullName.substring(0, 40) + '...' : fullName;
+        ctx.fillText(drawName, 225, 225);
+
+        let drawDir = (row.DIRECCION || '').trim().toUpperCase();
+        if (drawDir) {
+            drawDir = drawDir.length > 40 ? drawDir.substring(0, 40) + '...' : drawDir;
+            ctx.fillText(drawDir, 245, 275);
+        }
+
+        ctx.font = 'bold 20px Helvetica, Arial, sans-serif';
+        const localText = `${row.DESC_LOCAL || row.LOCAL || ''}`.trim().toUpperCase();
+        let drawLocal = localText.length > 30 ? localText.substring(0, 30) + '...' : localText;
+        ctx.fillText(drawLocal, 485, 340);
+
+        ctx.font = 'bold 36px Helvetica, Arial, sans-serif';
+        ctx.fillText((row.MESA || '').toString(), 405, 400);
+        ctx.fillText((row.ORDEN || '').toString(), 205, 450);
+
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
+        if (!blob) throw new Error("No se pudo generar la imagen");
+
+        const seccText = (row.SECCIONAL || row.CODIGO_SEC || row.SECC || '').toString().trim().toUpperCase();
+        const hasSeccional = seccText && seccText !== 'SIN SECCIONAL' && seccText !== '-' && seccText !== '0';
+        const seccString = hasSeccional ? `${seccText} - SECCIONAL ${seccText} - CAPITAL` : '-';
+        
+        const text = `CONSULTA PADRÓN ELECTORAL
+EL ARKI SOTOMAYOR - CONCEJAL
+Lista 1 - Opción 5
+ASU PUEDE CAMBIAR · Elecciones 4 de octubre de 2026
+Nombre: ${row.NOMBRE || ''} ${row.APELLIDO || ''}
+Cédula: ${row.CEDULA || ''}
+Departamento: CAPITAL
+Distrito: ASUNCION
+Seccional: ${seccString}
+Local de votación: ${row.LOCAL || ''} - ${row.DESC_LOCAL || ''}
+Mesa: ${row.MESA || '-'}
+Orden: ${row.ORDEN || '-'}
+
+Revise su mesa, orden y local de votación.`;
+
+        const file = new File([blob], `credencial_${row.CEDULA}.png`, { type: 'image/png' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Credencial de Votación',
+                    text: text
+                });
+                toast({ title: 'Compartido correctamente' });
+            } catch (err) {
+                console.log('User cancelled share or error:', err);
+            }
+        } else {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `credencial_${row.CEDULA}.png`;
+            a.click();
+            URL.revokeObjectURL(url);
+            
+            const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+            window.open(waUrl, '_blank');
+        }
+
+    } catch (error) {
+        console.error(error);
+        toast({ title: 'Error al generar', description: 'Hubo un problema al generar la credencial.', variant: 'destructive' });
+        
+        const seccText = (row.SECCIONAL || row.CODIGO_SEC || row.SECC || '').toString().trim().toUpperCase();
+        const hasSeccional = seccText && seccText !== 'SIN SECCIONAL' && seccText !== '-' && seccText !== '0';
+        const seccString = hasSeccional ? `${seccText} - SECCIONAL ${seccText} - CAPITAL` : '-';
+        
+        const text = `CONSULTA PADRÓN ELECTORAL
+EL ARKI SOTOMAYOR - CONCEJAL
+Lista 1 - Opción 5
+ASU PUEDE CAMBIAR · Elecciones 4 de octubre de 2026
+Nombre: ${row.NOMBRE || ''} ${row.APELLIDO || ''}
+Cédula: ${row.CEDULA || ''}
+Departamento: CAPITAL
+Distrito: ASUNCION
+Seccional: ${seccString}
+Local de votación: ${row.LOCAL || ''} - ${row.DESC_LOCAL || ''}
+Mesa: ${row.MESA || '-'}
+Orden: ${row.ORDEN || '-'}
+
+Revise su mesa, orden y local de votación.`;
+        const waUrl = `https://wa.me/?text=${encodeURIComponent(text)}`;
+        window.open(waUrl, '_blank');
+    } finally {
+        setIsGenerating(false);
+    }
+  };
   
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -243,39 +365,11 @@ export default function ConsultaPublicaPage() {
                                 <Button 
                                     variant="outline"
                                     className="w-full mt-4 border-green-500 text-green-600 hover:bg-green-50 hover:text-green-700 font-black uppercase tracking-wider h-12 rounded-xl flex items-center justify-center gap-2"
-                                    onClick={() => {
-                                        const ZONAS: Record<string | number, string> = {
-                                            1: 'LA ENCARNACION',
-                                            2: 'CATEDRAL',
-                                            3: 'SAN ROQUE',
-                                            4: 'RECOLETA',
-                                            5: 'TRINIDAD',
-                                            6: 'ZEBALLOS CUE'
-                                        };
-                                        const zonaText = row.DESC_ZONA || (row.ZONA ? ZONAS[row.ZONA] || row.ZONA : '-');
-                                        const seccText = hasSeccional ? `${seccionalValue} - SECCIONAL ${seccionalValue} - CAPITAL` : '-';
-                                        
-                                        const text = `CONSULTA PADRÓN ELECTORAL
-EL ARKI SOTOMAYOR - CONCEJAL
-Lista 1 - Opción 5
-ASU PUEDE CAMBIAR · Elecciones 4 de octubre de 2026
-Nombre: ${row.NOMBRE || ''} ${row.APELLIDO || ''}
-Cédula: ${row.CEDULA || ''}
-Departamento: CAPITAL
-Distrito: ASUNCION
-Seccional: ${seccText}
-Zona: ${zonaText}
-Local de votación: ${row.LOCAL || ''} - ${row.DESC_LOCAL || ''}
-Mesa: ${row.MESA || '-'}
-Orden: ${row.ORDEN || '-'}
-
-Revise su mesa, orden y local de votación.`;
-                                        const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-                                        window.open(url, '_blank');
-                                    }}
+                                    disabled={isGenerating}
+                                    onClick={() => generateAndShareCredential(row)}
                                 >
-                                    <Smartphone className="w-5 h-5" />
-                                    Compartir a WhatsApp
+                                    {isGenerating ? <Loader2 className="animate-spin w-5 h-5" /> : <Smartphone className="w-5 h-5" />}
+                                    Compartir N° y Orden de Mesa
                                 </Button>
                             </div>
                         </div>
