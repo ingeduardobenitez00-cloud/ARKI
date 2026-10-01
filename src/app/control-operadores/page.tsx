@@ -268,18 +268,26 @@ export default function RendimientoOperadoresPage() {
         try {
             const doc = new jsPDF();
             doc.setFontSize(18);
-            doc.text('Reporte de Rendimiento de Operadores', 14, 22);
+            
+            // Título dinámico según la vista actual
+            const tipoEleccion = viewMode === 'internas' ? 'Internas' : 'Generales';
+            doc.text(`Reporte de Rendimiento - ${tipoEleccion}`, 14, 22);
             
             doc.setFontSize(11);
             doc.setTextColor(100);
             doc.text(`Generado el: ${new Date().toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}`, 14, 30);
+            
+            // Ajustar el total para que solo sume lo de los operadores visibles
             const currentTotal = viewMode === 'internas' ? totalVotosInternas : totalVotosGlobal;
-            doc.text(`Total de votos seguros en sistema (${viewMode === 'internas' ? 'Internas' : 'Generales'}): ${currentTotal}`, 14, 36);
+            const scopeText = stats.isGlobalView ? 'en todo el sistema' : `en ${stats.seccionalName}`;
+            
+            doc.text(`Total de votos seguros ${scopeText} (${tipoEleccion}): ${currentTotal}`, 14, 36);
 
-            const tableColumn = ["Operador", "Seccional", "Votos Cargados"];
+            const tableColumn = ["Operador", "Seccional", `Votos Cargados (${tipoEleccion})`];
             const tableRows: any[] = [];
 
-            const usersForReport = [...users].sort((a, b) => {
+            // Usamos visibleUsers para respetar si el usuario es presidente de seccional y no mezclarle datos
+            const usersForReport = [...visibleUsers].sort((a, b) => {
                 const secA = (a.seccionales && a.seccionales[0]) || a.seccional || 'Global';
                 const secB = (b.seccionales && b.seccionales[0]) || b.seccional || 'Global';
                 if (secA !== secB) return String(secA).localeCompare(String(secB), undefined, { numeric: true });
@@ -301,10 +309,13 @@ export default function RendimientoOperadoresPage() {
                 tableRows.push(rowData);
             });
 
+            // Sumatoria de los que están en la tabla
+            const subtotalTabla = usersForReport.reduce((acc, u) => acc + u.votosCargados, 0);
+
             tableRows.push([
-                { content: 'TOTAL CARGADO', styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
+                { content: 'SUBTOTAL OPERADORES EN REPORTE', styles: { halign: 'right', fontStyle: 'bold', fillColor: [241, 245, 249] } },
                 { content: '-', styles: { halign: 'center', fontStyle: 'bold', fillColor: [241, 245, 249] } },
-                { content: currentTotal.toString(), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
+                { content: subtotalTabla.toString(), styles: { fontStyle: 'bold', fillColor: [241, 245, 249] } }
             ]);
 
             autoTable(doc, {
@@ -327,7 +338,8 @@ export default function RendimientoOperadoresPage() {
                 }
             });
 
-            doc.save(`Rendimiento_Operadores_${new Date().getTime()}.pdf`);
+            // Nombre del archivo diferenciado
+            doc.save(`Rendimiento_Operadores_${tipoEleccion}_${new Date().getTime()}.pdf`);
             toast({ title: 'Reporte Generado', description: 'El PDF se ha descargado exitosamente.' });
         } catch (error) {
             toast({ title: 'Error', description: 'No se pudo generar el PDF', variant: 'destructive' });
