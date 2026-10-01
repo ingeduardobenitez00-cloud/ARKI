@@ -116,6 +116,40 @@ export async function POST(request: Request) {
             // .create() falla si el documento ya existe
             await docRef.create(docData);
 
+            // ==============================================================
+            // NUEVO: ACTUALIZAR EL ESTADO DEL ELECTOR EN EL REPORTE
+            // ==============================================================
+            if (data.estado === 'v') {
+                try {
+                    // En Firestore, MESA, LOCAL y ORDEN suelen estar guardados como números
+                    const mesaNum = parseInt(data.mesa, 10);
+                    
+                    // Buscamos al elector exacto cruzando LOCAL, MESA y ORDEN
+                    const electoresSnap = await db.collection('votos_confirmados')
+                        .where('LOCAL', '==', data.local)
+                        .where('MESA', '==', mesaNum)
+                        .where('ORDEN', '==', data.orden)
+                        .get();
+
+                    if (!electoresSnap.empty) {
+                        const batch = db.batch();
+                        electoresSnap.forEach((votoDoc) => {
+                            // Cambiamos el estado a 'Ya Votó' para que el dashboard lo refleje en verde
+                            batch.update(votoDoc.ref, {
+                                estado_votacion: 'Ya Votó',
+                                updatedAt: new Date().toISOString()
+                            });
+                        });
+                        await batch.commit();
+                        console.log(`Elector actualizado a Ya Votó: LOCAL ${data.local} MESA ${data.mesa} ORDEN ${data.orden}`);
+                    }
+                } catch (updateError) {
+                    console.error('Error al intentar actualizar votos_confirmados:', updateError);
+                    // No retornamos error al TSJE/Webhook porque su dato sí se guardó, solo falló nuestra actualización interna.
+                }
+            }
+            // ==============================================================
+
             return NextResponse.json({ ok: true, duplicado: false }, { status: 200 });
 
         } catch (dbError: any) {
