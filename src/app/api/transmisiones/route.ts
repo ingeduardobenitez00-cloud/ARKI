@@ -1,16 +1,8 @@
 import { NextResponse } from 'next/server';
-import * as admin from 'firebase-admin';
 import * as crypto from 'crypto';
 import { z } from 'zod';
-
-// Initialize Firebase Admin si no está inicializado
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp();
-    } catch (error) {
-        console.error('Firebase admin initialization error', error);
-    }
-}
+import { collection, doc, getDoc, setDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
+import { db } from '@/firebase/config';
 
 // Esquema de validación estricto según los requerimientos
 const transmisionSchema = z.object({
@@ -51,12 +43,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
 
-        // Verificamos que el timestamp no sea más viejo que 5 minutos (300 segundos)
         const nowUnix = Math.floor(Date.now() / 1000);
         const MAX_AGE_SECONDS = 300;
         
-        // Excepción temporal: si estamos testeando con el timestamp del ejemplo (1760000000), permitirlo,
-        // o puedes comentar esta excepción cuando vayas a producción.
+        // Excepción temporal: si estamos testeando con el timestamp del ejemplo (1760000000), permitirlo
         if (Math.abs(nowUnix - timestampUnix) > MAX_AGE_SECONDS && timestampUnix !== 1760000000) {
             return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
@@ -67,22 +57,17 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
 
-        // Leer el cuerpo crudo EXACTAMENTE como llegó
         const rawBody = await request.text();
-
-        // Calcular la firma esperada: HMAC-SHA256(timestamp + "." + cuerpo_crudo)
         const expectedSignature = crypto
             .createHmac('sha256', token)
             .update(`${timestampHeader}.${rawBody}`)
             .digest('hex');
 
-        // Comparar firmas de forma segura (previniendo timing attacks)
         try {
             if (!crypto.timingSafeEqual(Buffer.from(signatureHeader, 'hex'), Buffer.from(expectedSignature, 'hex'))) {
                 return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
             }
         } catch(e) {
-             // Fallback si la longitud del hash enviado es inválida o no es hex válido
              return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
 
@@ -94,7 +79,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: false, error: 'solicitud_invalida' }, { status: 400 });
         }
 
-        // Validar que el JSON tenga todos los campos requeridos y tipos correctos
         const validationResult = transmisionSchema.safeParse(bodyJson);
         if (!validationResult.success) {
             return NextResponse.json({ ok: false, error: 'solicitud_invalida' }, { status: 400 });
@@ -102,39 +86,105 @@ export async function POST(request: Request) {
 
         const data = validationResult.data;
 
-        // 5. Guardar en Firestore con protección contra duplicados
+        // 5. Guardar en Firestore con Client SDK
         try {
-            const db = admin.firestore();
-            // Usamos origen_id como el ID del documento para garantizar unicidad de forma nativa
-            const docRef = db.collection('transmisiones_recibidas').doc(data.origen_id.toString());
+            const docRef = doc(db, 'transmisiones_recibidas', data.origen_id.toString());
             
+            // Check if document already exists to return duplicado = true
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                return NextResponse.json({ ok: true, duplicado: true }, { status: 200 });
+            }
+
             const docData = {
                 ...data,
-                recibido_en: admin.firestore.FieldValue.serverTimestamp()
+                recibido_en: new Date().toISOString()
             };
 
-            // .create() falla si el documento ya existe
-            await docRef.create(docData);
+            await setDoc(docRef, docData);
 
             // ==============================================================
-            // NUEVO: ACTUALIZAR EL ESTADO DEL ELECTOR EN EL REPORTE
+            // ACTUALIZAR EL ESTADO DEL ELECTOR EN EL REPORTE
             // ==============================================================
             if (data.estado === 'v') {
                 try {
-                    // En Firestore, MESA, LOCAL y ORDEN suelen estar guardados como números
-                    const mesaNum = parseInt(data.mesa, 10);
+                    const locNum = Number(data.local);
+                    const locStr = String(data.local);
                     
-                    // Buscamos al elector exacto cruzando LOCAL, MESA y ORDEN
-                    const electoresSnap = await db.collection('votos_confirmados')
-                        .where('LOCAL', '==', data.local)
-                        .where('MESA', '==', mesaNum)
-                        .where('ORDEN', '==', data.orden)
-                        .get();
+                    const localNamesToSearch: any[] = [locNum, locStr];
+                    const localesQuery = await getDocs(query(collection(db, 'locales_votacion'), where('codigo_local', '==', locStr)));
+                    
+                    localesQuery.forEach(d => {
+                        const lData = d.data();
+                        if (lData.nombre) {
+                            localNamesToSearch.push(lData.nombre);
+                        }
+                    });
 
-                    if (!electoresSnap.empty) {
-                        const batch = db.batch();
-                        electoresSnap.forEach((votoDoc) => {
-                            // Cambiamos el estado a 'Ya Votó' para que el dashboard lo refleje en verde
+                    const mesaNum = Number(data.mesa);
+                    const mesaStr = String(data.mesa);
+                    const ordNum = Number(data.orden);
+                    const ordStr = String(data.orden);
+
+                    const seccNum = Number(data.seccional);
+                    const seccStr = String(data.seccional);
+
+                    const queries = [];
+                    // 1. Match by resolved Local Name
+                    for (const loc of localNamesToSearch) {
+                        for (const mes of [mesaNum, mesaStr]) {
+                            for (const ord of [ordNum, ordStr]) {
+                                queries.push(
+                                    getDocs(query(
+                                        collection(db, 'votos_confirmados'),
+                                        where('LOCAL', '==', loc),
+                                        where('MESA', '==', mes),
+                                        where('ORDEN', '==', ord)
+                                    ))
+                                );
+                            }
+                        }
+                    }
+
+                    // 2. Fallback match by Seccional + Mesa + Orden
+                    for (const sec of [seccNum, seccStr]) {
+                        for (const mes of [mesaNum, mesaStr]) {
+                            for (const ord of [ordNum, ordStr]) {
+                                queries.push(
+                                    getDocs(query(
+                                        collection(db, 'votos_confirmados'),
+                                        where('SECCIONAL', '==', sec),
+                                        where('MESA', '==', mes),
+                                        where('ORDEN', '==', ord)
+                                    ))
+                                );
+                                queries.push(
+                                    getDocs(query(
+                                        collection(db, 'votos_confirmados'),
+                                        where('CODIGO_SEC', '==', sec),
+                                        where('MESA', '==', mes),
+                                        where('ORDEN', '==', ord)
+                                    ))
+                                );
+                            }
+                        }
+                    }
+
+                    const snaps = await Promise.all(queries);
+                    const matchedDocs: any[] = [];
+                    snaps.forEach(snap => {
+                        if (!snap.empty) {
+                            snap.forEach(d => {
+                                if (!matchedDocs.some(md => md.id === d.id)) {
+                                    matchedDocs.push(d);
+                                }
+                            });
+                        }
+                    });
+
+                    if (matchedDocs.length > 0) {
+                        const batch = writeBatch(db);
+                        matchedDocs.forEach((votoDoc) => {
                             batch.update(votoDoc.ref, {
                                 estado_votacion: 'Ya Votó',
                                 updatedAt: new Date().toISOString()
@@ -145,18 +195,12 @@ export async function POST(request: Request) {
                     }
                 } catch (updateError) {
                     console.error('Error al intentar actualizar votos_confirmados:', updateError);
-                    // No retornamos error al TSJE/Webhook porque su dato sí se guardó, solo falló nuestra actualización interna.
                 }
             }
-            // ==============================================================
 
             return NextResponse.json({ ok: true, duplicado: false }, { status: 200 });
 
         } catch (dbError: any) {
-            // El código 6 en Firebase Admin significa ALREADY_EXISTS
-            if (dbError.code === 6) {
-                return NextResponse.json({ ok: true, duplicado: true }, { status: 200 });
-            }
             console.error('Error guardando en Firestore:', dbError);
             return NextResponse.json({ ok: false, error: 'no_guardado' }, { status: 500 });
         }

@@ -109,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const isLoadingCombined = isAuthLoading || isUserLoading;
     if (isLoadingCombined) return;
     
-    const publicRoutes = ['/login', '/inscripcion', '/consulta-publica', '/simulador'];
+    const publicRoutes = ['/login', '/inscripcion', '/consulta-publica', '/simulador', '/reprocesar'];
 
     const isPublic = publicRoutes.some(route => pathname === route || pathname === route + '/');
 

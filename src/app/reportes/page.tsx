@@ -28,6 +28,7 @@ interface VotoSeguroData {
   NOMBRE: string;
   APELLIDO: string;
   CODIGO_SEC?: string | number;
+  SECCIONAL?: string | number;
   LOCAL?: string;
   MESA?: string | number;
   ORDEN?: string | number;
@@ -102,6 +103,31 @@ export default function ReportesPage() {
   }, [db, user]);
 
   const { data: allUsers } = useCollection<any>(usersQuery);
+
+  // Consulta de locales_votacion para resolver la seccional correcta
+  const localesQuery = useMemoFirebase(() => {
+    if (!db) return null;
+    return query(collection(db, 'locales_votacion'));
+  }, [db]);
+
+  const { data: allLocales } = useCollection<any>(localesQuery);
+
+  const localToSeccionalMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    if (allLocales) {
+      allLocales.forEach((l: any) => {
+        const normLocal = String(l.nombre || '').toUpperCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+        if (normLocal && l.seccional_id) {
+          const secId = String(l.seccional_id).trim();
+          if (!map[normLocal]) map[normLocal] = [];
+          if (!map[normLocal].includes(secId)) {
+            map[normLocal].push(secId);
+          }
+        }
+      });
+    }
+    return map;
+  }, [allLocales]);
 
   const userSeccionalesMap = useMemo(() => {
     if (!allUsers || !userSeccionales.length) return new Map<string, string[]>();
@@ -258,7 +284,35 @@ export default function ReportesPage() {
     searchedList.forEach((voto: VotoSeguroData) => {
         let userName = voto.registradoPor_nombre || 'USUARIO DESCONOCIDO';
         const userId = voto.registradoPor_id || 'unknown';
-        const itemSecc = String(voto.seccional_jurisdiccion || voto.CODIGO_SEC || 'SIN SECCIONAL');
+        
+        let itemSecc = String(voto.seccional_jurisdiccion || voto.SECCIONAL || voto.CODIGO_SEC || 'SIN SECCIONAL');
+        
+        // Priorizar el local que le corresponde
+        const electorLocalRaw = String(voto.DESC_LOCAL || voto.LOCAL || '').trim().toUpperCase();
+        if (electorLocalRaw) {
+            const normLocal = electorLocalRaw.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+            if (localToSeccionalMap[normLocal] && localToSeccionalMap[normLocal].length > 0) {
+                const possibleSecs = localToSeccionalMap[normLocal];
+                const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                itemSecc = matchingUserSec || possibleSecs[0];
+            } else {
+                // Si no hay match exacto, intentamos match parcial
+                const partialMatchKey = Object.keys(localToSeccionalMap).find(k => k.includes(normLocal) || normLocal.includes(k));
+                if (partialMatchKey) {
+                    const possibleSecs = localToSeccionalMap[partialMatchKey];
+                    const matchingUserSec = possibleSecs.find(sec => userSeccionales.includes(sec));
+                    itemSecc = matchingUserSec || possibleSecs[0];
+                }
+            }
+        }
+
+        const numSec = parseInt(itemSecc, 10);
+        if (isNaN(numSec) || numSec <= 0 || numSec > 45) {
+            itemSecc = 'SIN SECCIONAL';
+        } else {
+            itemSecc = numSec.toString();
+        }
+
         const yaVoto = voto.estado_votacion === 'Ya Votó';
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
@@ -315,7 +369,7 @@ export default function ReportesPage() {
         });
         
     return sortedGroups;
-  }, [searchedList]);
+  }, [searchedList, localToSeccionalMap, userSeccionales]);
 
   const generateGlobalExcel = () => {
     if (searchedList.length === 0) {
@@ -328,7 +382,7 @@ export default function ReportesPage() {
             "Cédula": row.CEDULA || '',
             "Elector": `${row.NOMBRE} ${row.APELLIDO}`,
             "Teléfono": row.TELEFONO || '',
-            "Seccional": row.CODIGO_SEC || '',
+            "Seccional": row.seccional_jurisdiccion || row.SECCIONAL || row.CODIGO_SEC || '',
             "Local": row.LOCAL || '',
             "Mesa": row.MESA || '',
             "Orden": row.ORDEN || '',
@@ -458,7 +512,7 @@ export default function ReportesPage() {
                             <TableCell className="font-mono text-[10px] text-center font-bold text-slate-600">{p.CEDULA}</TableCell>
                             <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
                             <TableCell className="text-center font-mono text-[10px]">{p.TELEFONO || '-'}</TableCell>
-                            <TableCell className="text-center">{p.CODIGO_SEC ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
+                            <TableCell className="text-center">{(p.seccional_jurisdiccion || p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.seccional_jurisdiccion || p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                             <TableCell className="text-[10px] uppercase">
                                 <div>{p.LOCAL}</div>
                                 <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>

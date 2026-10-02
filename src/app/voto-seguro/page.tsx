@@ -296,6 +296,8 @@ export default function VotoSeguroPage() {
         const numSec = parseInt(itemSecc, 10);
         if (isNaN(numSec) || numSec <= 0 || numSec > 45) {
             itemSecc = 'SIN SECCIONAL';
+        } else {
+            itemSecc = numSec.toString();
         }
 
         // Normalizar el nombre para agrupar variaciones (removiendo acentos, espacios y convirtiendo a mayúsculas)
