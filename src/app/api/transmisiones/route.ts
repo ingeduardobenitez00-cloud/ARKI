@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { z } from 'zod';
 import { collection, doc, getDoc, setDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import { initializeApp, getApps, getApp } from 'firebase/app';
+import { getFirestore } from 'firebase/firestore';
+import { firebaseConfig } from '@/firebase/config';
 
 // Esquema de validación estricto según los requerimientos
 const transmisionSchema = z.object({
@@ -85,6 +87,15 @@ export async function POST(request: Request) {
         }
 
         const data = validationResult.data;
+
+        // Inicializar Firebase (server-safe)
+        let firebaseApp;
+        if (!getApps().length) {
+            firebaseApp = initializeApp(firebaseConfig);
+        } else {
+            firebaseApp = getApp();
+        }
+        const db = getFirestore(firebaseApp);
 
         // 5. Guardar en Firestore con Client SDK
         try {
