@@ -9,7 +9,7 @@ import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2, MapPin, RefreshCw, Layers, Lock, ShieldCheck, UserCircle } from 'lucide-react';
+import { Loader2, MapPin, RefreshCw, Layers, Lock, ShieldCheck, UserCircle, DatabaseZap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -60,6 +60,8 @@ export default function MapaGlobalPage() {
     const [selectedCoordinador, setSelectedCoordinador] = useState('ALL');
     const [selectedDirigente, setSelectedDirigente] = useState('ALL');
     
+    const [viewMode, setViewMode] = useState<'generales' | 'internas'>('generales');
+    
     const [refreshKey, setRefreshKey] = useState(0);
     const [isLoadingFilters, setIsLoadingFilters] = useState(true);
 
@@ -69,9 +71,10 @@ export default function MapaGlobalPage() {
 
     const pointsQuery = useMemoFirebase(() => {
         if (!db) return null;
-        // Solo traemos los que tienen coordenadas. Límite de 1000 para seguridad de costos.
-        return query(collection(db, 'votos_confirmados'), limit(1000));
-    }, [db, refreshKey]);
+        const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : 'votos_confirmados';
+        // Removemos el límite para que el mapa muestre todos los datos de reporte actualizados
+        return query(collection(db, collectionName));
+    }, [db, refreshKey, viewMode]);
 
     const { data: rawPoints, isLoading: isLoadingPoints } = useCollection<ElectorUbicado>(pointsQuery);
 
@@ -184,17 +187,40 @@ export default function MapaGlobalPage() {
                         {isDirigente && <Badge variant="secondary" className="font-black uppercase text-[9px] py-1.5 px-3">MIS CARGAS GPS</Badge>}
                     </div>
                 </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={handleRefresh}
-                        disabled={isLoadingPoints}
-                        className="h-9 px-4 font-black uppercase border-primary/20 text-primary rounded-xl bg-white shadow-sm flex items-center gap-2"
-                    >
-                        <RefreshCw className={cn("h-3.5 w-3.5", isLoadingPoints && "animate-spin")} />
-                        RECUPERAR DATOS
-                    </Button>
-                    {(isLoadingFilters || isLoadingPoints) && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                    <div className="flex items-center gap-3">
+                        <div className="flex bg-slate-100 p-1 rounded-2xl w-fit">
+                            <button 
+                                onClick={() => setViewMode('generales')}
+                                className={cn(
+                                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all", 
+                                    viewMode === 'generales' ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                )}
+                            >
+                                Generales
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('internas')}
+                                className={cn(
+                                    "px-4 py-2 rounded-xl text-[10px] font-black uppercase transition-all flex items-center gap-2", 
+                                    viewMode === 'internas' ? "bg-orange-500 text-white shadow-sm" : "text-slate-400 hover:text-slate-600"
+                                )}
+                            >
+                                <DatabaseZap className="h-3 w-3" />
+                                internas_ANR
+                            </button>
+                        </div>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleRefresh}
+                            disabled={isLoadingPoints}
+                            className="h-9 px-4 font-black uppercase border-primary/20 text-primary rounded-xl bg-white shadow-sm flex items-center gap-2"
+                        >
+                            <RefreshCw className={cn("h-3.5 w-3.5", isLoadingPoints && "animate-spin")} />
+                            RECUPERAR DATOS
+                        </Button>
+                        {(isLoadingFilters || isLoadingPoints) && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
+                    </div>
             </div>
 
             <Card className="flex-1 flex flex-col overflow-hidden border-primary/10 shadow-2xl rounded-3xl bg-white">
