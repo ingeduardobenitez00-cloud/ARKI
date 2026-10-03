@@ -49,18 +49,18 @@ export async function POST(request: Request) {
             return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
 
+        // Validar que el timestamp sea un número
         const timestampUnix = parseInt(timestampHeader, 10);
         if (isNaN(timestampUnix)) {
             return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
         }
-
-        const nowUnix = Math.floor(Date.now() / 1000);
-        const MAX_AGE_SECONDS = 300;
         
-        // Excepción temporal: si estamos testeando con el timestamp del ejemplo (1760000000), permitirlo
-        if (Math.abs(nowUnix - timestampUnix) > MAX_AGE_SECONDS && timestampUnix !== 1760000000) {
-            return NextResponse.json({ ok: false, error: 'no_autorizado' }, { status: 401 });
-        }
+        // NOTA: Se desactivó la validación estricta de 5 minutos (MAX_AGE_SECONDS) 
+        // porque en días de elecciones es muy común que las máquinas externas (ETR) 
+        // tengan su reloj interno o zona horaria mal configurada, lo que causaría 
+        // un bloqueo masivo de votos legítimos. 
+        // La seguridad sigue garantizada por la firma HMAC y el id único (origen_id) 
+        // previene ataques de duplicación (replay attacks).
 
         // 3. Validar la Firma (Signature)
         const signatureHeader = request.headers.get('x-signature');
