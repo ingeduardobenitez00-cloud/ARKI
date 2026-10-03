@@ -379,44 +379,50 @@ export default function ImprimirListadoDirigentePage() {
                 <p className="text-sm font-bold text-muted-foreground">Este dirigente no tiene votos registrados aún.</p>
               </div>
             ) : (
-              <div className="bg-slate-50/50">
-                {Object.entries(groupedVotos).map(([local, localVotos]) => (
-                    <div key={local} className="mb-6 border-b border-slate-200 last:border-0 pb-6 last:pb-0">
-                        <div className="bg-slate-100/80 px-6 py-3 border-y border-slate-200 flex items-center justify-between sticky top-0 z-10">
-                            <h3 className="text-xs font-black uppercase text-slate-800 flex items-center gap-2">
-                                <MapPin className="h-4 w-4 text-red-500" />
-                                {local}
-                            </h3>
-                            <Badge variant="outline" className="bg-white text-[10px] font-black">
-                                {localVotos.length} ELECTORES
-                            </Badge>
-                        </div>
-                        <div className="px-6 pt-4 overflow-x-auto">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow className="text-[10px] font-black uppercase bg-transparent hover:bg-transparent">
-                                        <TableHead className="w-[80px]">SECC</TableHead>
-                                        <TableHead className="w-[120px]">Mesa/Orden</TableHead>
-                                        <TableHead className="w-[100px]">Cédula</TableHead>
-                                        <TableHead>Nombre y Apellido</TableHead>
-                                        <TableHead className="w-[120px]">Teléfono</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {localVotos.map(v => (
-                                        <TableRow key={v.id} className="text-xs hover:bg-white">
-                                            <TableCell className="font-bold">{v.CODIGO_SEC || v.SECCIONAL}</TableCell>
-                                            <TableCell className="font-bold text-primary">M: {v.MESA} / O: {v.ORDEN}</TableCell>
-                                            <TableCell className="font-mono">{v.CEDULA}</TableCell>
-                                            <TableCell className="font-black uppercase">{v.NOMBRE} {v.APELLIDO}</TableCell>
-                                            <TableCell className="font-bold text-muted-foreground">{v.TELEFONO_MIGRADO || v.TELEFONO}</TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </div>
-                ))}
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-primary/10">
+                <Accordion type="multiple" className="w-full space-y-3" defaultValue={Object.keys(groupedVotos).length === 1 ? [Object.keys(groupedVotos)[0]] : []}>
+                  {Object.entries(groupedVotos).map(([local, localVotos]) => (
+                      <AccordionItem key={local} value={local} className="border-2 border-primary/20 rounded-xl px-4 bg-muted/10 overflow-hidden shadow-sm">
+                          <AccordionTrigger className="hover:no-underline py-4">
+                              <div className="flex items-center justify-between w-full pr-4">
+                                  <h3 className="text-sm font-black uppercase text-slate-800 flex items-center gap-2">
+                                      <MapPin className="h-4 w-4 text-red-500" />
+                                      {local}
+                                  </h3>
+                                  <Badge variant="default" className="text-xs font-black px-3 py-1 bg-primary text-white shadow-sm">
+                                      {localVotos.length} ELECTORES
+                                  </Badge>
+                              </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-2 pb-4">
+                              <div className="overflow-x-auto bg-white rounded-xl border border-slate-200 shadow-inner">
+                                  <Table>
+                                      <TableHeader>
+                                          <TableRow className="text-[10px] font-black uppercase bg-muted/30">
+                                              <TableHead className="w-[80px]">SECC</TableHead>
+                                              <TableHead className="w-[120px]">Mesa/Orden</TableHead>
+                                              <TableHead className="w-[100px]">Cédula</TableHead>
+                                              <TableHead>Nombre y Apellido</TableHead>
+                                              <TableHead className="w-[120px]">Teléfono</TableHead>
+                                          </TableRow>
+                                      </TableHeader>
+                                      <TableBody>
+                                          {localVotos.map(v => (
+                                              <TableRow key={v.id} className="text-xs hover:bg-muted/10 transition-colors">
+                                                  <TableCell className="font-bold">{v.CODIGO_SEC || v.SECCIONAL}</TableCell>
+                                                  <TableCell className="font-bold text-primary">M: {v.MESA} / O: {v.ORDEN}</TableCell>
+                                                  <TableCell className="font-mono">{v.CEDULA}</TableCell>
+                                                  <TableCell className="font-black uppercase">{v.NOMBRE} {v.APELLIDO}</TableCell>
+                                                  <TableCell className="font-bold text-muted-foreground">{v.TELEFONO_MIGRADO || v.TELEFONO}</TableCell>
+                                              </TableRow>
+                                          ))}
+                                      </TableBody>
+                                  </Table>
+                              </div>
+                          </AccordionContent>
+                      </AccordionItem>
+                  ))}
+                </Accordion>
               </div>
             )}
           </CardContent>

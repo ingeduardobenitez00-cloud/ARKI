@@ -26,6 +26,11 @@ service cloud.firestore {
       allow write: if true; // Para guardar la nueva inscripción
     }
 
+    // 4. TRANSMISIONES DEBUG
+    match /transmisiones_recibidas/{docId} {
+      allow read, write: if true;
+    }
+
     // 4. MAPA TÉCNICO POLÍTICO
     match /seccionales_data/{id} {
       allow read: if request.auth != null;

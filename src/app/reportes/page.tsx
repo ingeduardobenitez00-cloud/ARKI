@@ -87,7 +87,6 @@ export default function ReportesPage() {
     }
 
     // Coordinadores, Presidentes, Admins o PC Central descargan de manera fluida y sin límites.
-    // Se remueve la llamada a 'limit' por completo, lo que permite traer 20,000 o más registros sin restricciones del servidor de Firebase.
     return query(
       collection(db, collectionName),
       orderBy('APELLIDO', 'asc')
@@ -457,7 +456,7 @@ export default function ReportesPage() {
                 row.CEDULA || '',
                 `${row.NOMBRE} ${row.APELLIDO}`,
                 row.TELEFONO || '',
-                `${row.LOCAL || ''}\nM: ${row.MESA || ''} / O: ${row.ORDEN || ''}`,
+                `${row.DESC_LOCAL || row.LOCAL || ''}\nM: ${row.MESA || ''} / O: ${row.ORDEN || ''}`,
                 row.estado_votacion === 'Ya Votó' ? 'SI' : 'NO'
             ];
             tableRows.push(rowData);
@@ -514,7 +513,7 @@ export default function ReportesPage() {
                             <TableCell className="text-center font-mono text-[10px]">{p.TELEFONO || '-'}</TableCell>
                             <TableCell className="text-center">{(p.seccional_jurisdiccion || p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.seccional_jurisdiccion || p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
                             <TableCell className="text-[10px] uppercase">
-                                <div>{p.LOCAL}</div>
+                                <div>{p.DESC_LOCAL || p.LOCAL}</div>
                                 <div className="text-primary font-bold">M: {p.MESA} / O: {p.ORDEN}</div>
                             </TableCell>
                             <TableCell className="text-center">

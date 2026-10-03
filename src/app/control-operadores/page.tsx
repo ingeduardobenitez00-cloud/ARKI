@@ -77,6 +77,7 @@ export default function RendimientoOperadoresPage() {
 
     const sumUsersVotos = useMemo(() => users.reduce((acc, user) => acc + (user.votosCargados || 0), 0), [users]);
     const [isAutoSyncing, setIsAutoSyncing] = useState(false);
+    const [hasAttemptedSync, setHasAttemptedSync] = useState(false);
 
     useEffect(() => {
         if (!currentUser || (currentUser.role !== 'Admin' && currentUser.role !== 'Super-Admin')) return;
@@ -84,11 +85,11 @@ export default function RendimientoOperadoresPage() {
         const currentTotal = viewMode === 'internas' ? totalVotosInternas : totalVotosGlobal;
         // Si hay una discrepancia mayor a 50 votos entre el total real y la suma de perfiles,
         // forzamos una sincronización automática silenciosa para arreglar el TOP histórico.
-        if (currentTotal > 0 && sumUsersVotos > 0 && (Math.abs(currentTotal - sumUsersVotos) > 50) && !isAutoSyncing) {
+        if (currentTotal > 0 && sumUsersVotos > 0 && (Math.abs(currentTotal - sumUsersVotos) > 50) && !isAutoSyncing && !hasAttemptedSync) {
             const doAutoSync = async () => {
                 setIsAutoSyncing(true);
+                setHasAttemptedSync(true);
                 try {
-                    toast({ title: 'Sincronizando Histórico...', description: 'Estamos actualizando el TOP de operadores automáticamente.' });
                     
                     const collectionName = viewMode === 'internas' ? 'votos_confirmados_internas' : VOTOS_COLLECTION;
                     const capturesSnap = await getDocs(collection(db, collectionName));
@@ -122,7 +123,6 @@ export default function RendimientoOperadoresPage() {
                     if (count > 0) {
                         await batch.commit();
                     }
-                    toast({ title: '¡Sincronización Completada!', description: 'El panel histórico ahora está 100% al día.' });
                 } catch(err) {
                     console.error("Error en auto-sync:", err);
                 } finally {

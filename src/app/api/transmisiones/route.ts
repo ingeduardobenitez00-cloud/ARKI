@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import * as crypto from 'crypto';
 import { z } from 'zod';
-import { collection, doc, getDoc, setDoc, getDocs, query, where, writeBatch } from 'firebase/firestore';
-import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { firebaseConfig } from '@/firebase/config';
+import { initializeApp, getApps } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
+
+// Initialize Firebase Admin
+try {
+    if (!getApps().length) {
+        initializeApp({
+            projectId: 'arki-23779628-5035d'
+        });
+    }
+} catch (error) {
+    console.error('Firebase admin initialization error', error);
+}
 
 // Esquema de validación estricto según los requerimientos
 const transmisionSchema = z.object({
@@ -88,22 +97,15 @@ export async function POST(request: Request) {
 
         const data = validationResult.data;
 
-        // Inicializar Firebase (server-safe)
-        let firebaseApp;
-        if (!getApps().length) {
-            firebaseApp = initializeApp(firebaseConfig);
-        } else {
-            firebaseApp = getApp();
-        }
-        const db = getFirestore(firebaseApp);
+        const db = getFirestore();
 
-        // 5. Guardar en Firestore con Client SDK
+        // 5. Guardar en Firestore con Admin SDK
         try {
-            const docRef = doc(db, 'transmisiones_recibidas', data.origen_id.toString());
+            const docRef = db.collection('transmisiones_recibidas').doc(data.origen_id.toString());
             
             // Check if document already exists to return duplicado = true
-            const docSnap = await getDoc(docRef);
-            if (docSnap.exists()) {
+            const docSnap = await docRef.get();
+            if (docSnap.exists) {
                 return NextResponse.json({ ok: true, duplicado: true }, { status: 200 });
             }
 
@@ -112,7 +114,7 @@ export async function POST(request: Request) {
                 recibido_en: new Date().toISOString()
             };
 
-            await setDoc(docRef, docData);
+            await docRef.set(docData);
 
             // ==============================================================
             // ACTUALIZAR EL ESTADO DEL ELECTOR EN EL REPORTE
@@ -123,7 +125,7 @@ export async function POST(request: Request) {
                     const locStr = String(data.local);
                     
                     const localNamesToSearch: any[] = [locNum, locStr];
-                    const localesQuery = await getDocs(query(collection(db, 'locales_votacion'), where('codigo_local', '==', locStr)));
+                    const localesQuery = await db.collection('locales_votacion').where('codigo_local', '==', locStr).get();
                     
                     localesQuery.forEach(d => {
                         const lData = d.data();
@@ -146,12 +148,11 @@ export async function POST(request: Request) {
                         for (const mes of [mesaNum, mesaStr]) {
                             for (const ord of [ordNum, ordStr]) {
                                 queries.push(
-                                    getDocs(query(
-                                        collection(db, 'votos_confirmados'),
-                                        where('LOCAL', '==', loc),
-                                        where('MESA', '==', mes),
-                                        where('ORDEN', '==', ord)
-                                    ))
+                                    db.collection('votos_confirmados')
+                                        .where('LOCAL', '==', loc)
+                                        .where('MESA', '==', mes)
+                                        .where('ORDEN', '==', ord)
+                                        .get()
                                 );
                             }
                         }
@@ -162,20 +163,18 @@ export async function POST(request: Request) {
                         for (const mes of [mesaNum, mesaStr]) {
                             for (const ord of [ordNum, ordStr]) {
                                 queries.push(
-                                    getDocs(query(
-                                        collection(db, 'votos_confirmados'),
-                                        where('SECCIONAL', '==', sec),
-                                        where('MESA', '==', mes),
-                                        where('ORDEN', '==', ord)
-                                    ))
+                                    db.collection('votos_confirmados')
+                                        .where('SECCIONAL', '==', sec)
+                                        .where('MESA', '==', mes)
+                                        .where('ORDEN', '==', ord)
+                                        .get()
                                 );
                                 queries.push(
-                                    getDocs(query(
-                                        collection(db, 'votos_confirmados'),
-                                        where('CODIGO_SEC', '==', sec),
-                                        where('MESA', '==', mes),
-                                        where('ORDEN', '==', ord)
-                                    ))
+                                    db.collection('votos_confirmados')
+                                        .where('CODIGO_SEC', '==', sec)
+                                        .where('MESA', '==', mes)
+                                        .where('ORDEN', '==', ord)
+                                        .get()
                                 );
                             }
                         }
@@ -194,7 +193,7 @@ export async function POST(request: Request) {
                     });
 
                     if (matchedDocs.length > 0) {
-                        const batch = writeBatch(db);
+                        const batch = db.batch();
                         matchedDocs.forEach((votoDoc) => {
                             batch.update(votoDoc.ref, {
                                 estado_votacion: 'Ya Votó',

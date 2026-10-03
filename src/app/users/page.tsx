@@ -888,7 +888,7 @@ export default function UsersPage() {
   const fetchUsersAndSeccionales = useCallback(async () => {
     setIsLoading(true);
     try {
-        const usersQuery = query(collection(db, USERS_COLLECTION_NAME), limit(150));
+        const usersQuery = query(collection(db, USERS_COLLECTION_NAME));
         const usersSnap = await getDocs(usersQuery);
         setUsers(usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User)));
         const seccSnap = await getDocs(collection(db, 'seccionales'));
