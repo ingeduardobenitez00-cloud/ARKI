@@ -1,11 +1,14 @@
 import { NextResponse } from 'next/server';
-import { collection, getDocs, query, where, writeBatch, doc } from 'firebase/firestore';
-import { db } from '@/firebase/config';
+import * as admin from 'firebase-admin';
 
 export async function GET() {
     try {
+        if (!admin.apps.length) {
+            admin.initializeApp();
+        }
+        const db = admin.firestore();
         console.log('Obteniendo transmisiones para reprocesar...');
-        const transmisionesSnap = await getDocs(query(collection(db, 'transmisiones_recibidas'), where('estado', '==', 'v')));
+        const transmisionesSnap = await db.collection('transmisiones_recibidas').where('estado', '==', 'v').get();
         
         console.log(`Se encontraron ${transmisionesSnap.size} transmisiones.`);
         
@@ -26,12 +29,11 @@ export async function GET() {
                 for (const mes of [mesaNum, mesaStr]) {
                     for (const ord of [ordNum, ordStr]) {
                         queries.push(
-                            getDocs(query(
-                                collection(db, 'votos_confirmados'),
-                                where('LOCAL', '==', loc),
-                                where('MESA', '==', mes),
-                                where('ORDEN', '==', ord)
-                            ))
+                            db.collection('votos_confirmados')
+                              .where('LOCAL', '==', loc)
+                              .where('MESA', '==', mes)
+                              .where('ORDEN', '==', ord)
+                              .get()
                         );
                     }
                 }
@@ -50,7 +52,7 @@ export async function GET() {
             });
 
             if (matchedDocs.length > 0) {
-                const batch = writeBatch(db);
+                const batch = db.batch();
                 let needsUpdate = false;
                 
                 matchedDocs.forEach((votoDoc) => {

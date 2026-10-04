@@ -1,18 +1,10 @@
 import { NextResponse } from 'next/server';
-import * as crypto from 'crypto';
+import crypto from 'crypto';
 import { z } from 'zod';
-import { initializeApp, getApps } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
+import * as admin from 'firebase-admin';
 
-// Initialize Firebase Admin
-try {
-    if (!getApps().length) {
-        initializeApp({
-            projectId: 'arki-23779628-5035d'
-        });
-    }
-} catch (error) {
-    console.error('Firebase admin initialization error', error);
+if (!admin.apps.length) {
+    admin.initializeApp();
 }
 
 // Esquema de validación estricto según los requerimientos
@@ -34,7 +26,7 @@ export async function POST(request: Request) {
         const token = process.env.TRANSMISIONES_TOKEN;
         if (!token) {
             console.error('TRANSMISIONES_TOKEN no está configurado en el entorno.');
-            return NextResponse.json({ ok: false, error: 'no_guardado' }, { status: 500 });
+            return NextResponse.json({ ok: false, error: 'no_guardado_token', details: 'Token de entorno no configurado' }, { status: 500 });
         }
 
         // 1. Validar el encabezado Authorization
@@ -96,8 +88,13 @@ export async function POST(request: Request) {
         }
 
         const data = validationResult.data;
-
-        const db = getFirestore();
+        let db;
+        try {
+            db = admin.firestore();
+        } catch (initErr: any) {
+            console.error('Firebase admin init error:', initErr);
+            return NextResponse.json({ ok: false, error: 'no_guardado_general', details: 'Firebase init falló: ' + (initErr.message || String(initErr)) }, { status: 500 });
+        }
 
         // 5. Guardar en Firestore con Admin SDK
         try {
@@ -212,11 +209,11 @@ export async function POST(request: Request) {
 
         } catch (dbError: any) {
             console.error('Error guardando en Firestore:', dbError);
-            return NextResponse.json({ ok: false, error: 'no_guardado' }, { status: 500 });
+            return NextResponse.json({ ok: false, error: 'no_guardado_db', details: dbError.message }, { status: 500 });
         }
 
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error inesperado en el webhook de transmisiones:', error);
-        return NextResponse.json({ ok: false, error: 'no_guardado' }, { status: 500 });
+        return NextResponse.json({ ok: false, error: 'no_guardado_general', details: error.message }, { status: 500 });
     }
 }

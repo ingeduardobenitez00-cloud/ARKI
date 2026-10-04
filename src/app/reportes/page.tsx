@@ -582,18 +582,6 @@ export default function ReportesPage() {
                     )}
                 </div>
                 <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-                    {isAdmin && viewMode === 'generales' && (
-                        <Button 
-                            variant="secondary" 
-                            size="sm" 
-                            onClick={handleSyncETR} 
-                            disabled={isSyncing || isLoading}
-                            className="h-8 gap-2 text-[10px] font-black uppercase bg-green-50 text-green-700 hover:bg-green-100 border border-green-200"
-                        >
-                            {isSyncing ? <Loader2 className="h-3 w-3 animate-spin" /> : <DatabaseZap className="h-3 w-3" />}
-                            Sincronizar ETR
-                        </Button>
-                    )}
                     <Button 
                         variant="outline" 
                         size="sm" 
