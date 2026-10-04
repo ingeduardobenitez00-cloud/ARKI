@@ -3,9 +3,6 @@ import crypto from 'crypto';
 import { z } from 'zod';
 import * as admin from 'firebase-admin';
 
-if (!admin.apps.length) {
-    admin.initializeApp();
-}
 
 // Esquema de validación estricto según los requerimientos
 const transmisionSchema = z.object({
@@ -23,6 +20,10 @@ const transmisionSchema = z.object({
 
 export async function POST(request: Request) {
     try {
+        if (!admin.apps.length) {
+            admin.initializeApp({ projectId: 'arki-23779628-5035d' });
+        }
+
         const token = process.env.TRANSMISIONES_TOKEN;
         if (!token) {
             console.error('TRANSMISIONES_TOKEN no está configurado en el entorno.');

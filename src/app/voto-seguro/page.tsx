@@ -719,77 +719,116 @@ export default function VotoSeguroPage() {
 
   const renderTable = (items: VotoSeguroData[]) => {
     const hasAnyMigrated = items.some(p => String(p.TELEFONO_MIGRADO || '').trim().length >= 6);
+    const hasAnyPuntero = items.some(p => (p as any).PUNTEROS || (p as any).PUNTERO);
+
+    const renderRows = (rowItems: VotoSeguroData[]) => (
+        <Table>
+            <TableHeader>
+                <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
+                    <TableHead className="w-[100px] text-center">Cédula</TableHead>
+                    <TableHead>Elector</TableHead>
+                    <TableHead className="text-center">SECC</TableHead>
+                    <TableHead>Local / Mesa</TableHead>
+                    <TableHead>Registrado (Usuario)</TableHead>
+                    {hasAnyMigrated && <TableHead>WhatsApp Migrado</TableHead>}
+                    <TableHead className="text-right">Acción</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {rowItems.map((p) => (
+                    <TableRow key={p.id} className="hover:bg-muted/20">
+                        <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
+                        <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
+                        <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
+                        <TableCell className="text-[10px] uppercase">
+                            <div>{p.DESC_LOCAL || p.LOCAL}</div>
+                            <div className="text-primary font-bold">M: {p.MESA || '-'} / O: {p.ORDEN || '-'}</div>
+                        </TableCell>
+                        <TableCell>
+                            {p.TELEFONO ? (
+                                <div className="text-[11px] font-black text-green-700 flex items-center gap-1.5 bg-green-50/40 border border-green-100/50 rounded-xl px-2.5 py-1.5 w-max">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
+                                    {p.TELEFONO}
+                                </div>
+                            ) : (
+                                <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Registro</div>
+                            )}
+                        </TableCell>
+                        {hasAnyMigrated && (
+                            <TableCell>
+                                {p.TELEFONO_MIGRADO ? (
+                                    <div className="text-[11px] font-black text-blue-700 flex items-center gap-1.5 bg-blue-50/40 border border-blue-100/50 rounded-xl px-2.5 py-1.5 w-max">
+                                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
+                                        {p.TELEFONO_MIGRADO}
+                                    </div>
+                                ) : (
+                                    <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Migrar</div>
+                                )}
+                            </TableCell>
+                        )}
+                        <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-1">
+                                <CredentialDownloadButton voto={p} />
+                                {isAdmin && viewMode !== 'internas' && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50" 
+                                        onClick={() => { setVotoToMove(p); setIsMoveDialogOpen(true); }}
+                                    >
+                                        <ArrowRightLeft className="h-4 w-4" />
+                                    </Button>
+                                )}
+                                {viewMode !== 'internas' && (
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        </TableCell>
+                    </TableRow>
+                ))}
+            </TableBody>
+        </Table>
+    );
+
+    if (hasAnyPuntero) {
+        const grouped = items.reduce((acc, curr) => {
+            const pName = String((curr as any).PUNTEROS || (curr as any).PUNTERO || 'SIN PUNTERO ASIGNADO').trim();
+            if (!acc[pName]) acc[pName] = [];
+            acc[pName].push(curr);
+            return acc;
+        }, {} as Record<string, VotoSeguroData[]>);
+
+        return (
+            <div className="w-full space-y-4">
+                <Accordion type="multiple" className="w-full space-y-3">
+                    {Object.entries(grouped).map(([punteroName, punteroItems], idx) => (
+                        <AccordionItem value={`puntero-${idx}`} key={idx} className="border bg-white shadow-sm rounded-xl overflow-hidden">
+                            <AccordionTrigger className="px-6 py-4 hover:bg-slate-50/50 transition-colors">
+                                <div className="flex items-center gap-4 text-left">
+                                    <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                                        <UserIcon className="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 className="font-black text-sm uppercase tracking-tight text-slate-800">{punteroName}</h3>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{punteroItems.length} Electores asignados</p>
+                                    </div>
+                                </div>
+                            </AccordionTrigger>
+                            <AccordionContent className="p-0 border-t bg-slate-50/30 overflow-x-auto">
+                                {renderRows(punteroItems)}
+                            </AccordionContent>
+                        </AccordionItem>
+                    ))}
+                </Accordion>
+            </div>
+        );
+    }
 
     return (
-      <div className="overflow-x-auto">
-          <Table>
-              <TableHeader>
-                  <TableRow className="bg-muted/50 text-[10px] font-black uppercase">
-                      <TableHead className="w-[100px] text-center">Cédula</TableHead>
-                      <TableHead>Elector</TableHead>
-                      <TableHead className="text-center">SECC</TableHead>
-                      <TableHead>Local / Mesa</TableHead>
-                      <TableHead>Registrado (Usuario)</TableHead>
-                      {hasAnyMigrated && <TableHead>WhatsApp Migrado</TableHead>}
-                      <TableHead className="text-right">Acción</TableHead>
-                  </TableRow>
-              </TableHeader>
-              <TableBody>
-                  {items.map((p) => (
-                      <TableRow key={p.id} className="hover:bg-muted/20">
-                          <TableCell className="font-mono text-[10px] text-center">{p.CEDULA}</TableCell>
-                          <TableCell className="font-black text-[11px] uppercase">{p.NOMBRE} {p.APELLIDO}</TableCell>
-                          <TableCell className="text-center">{(p.SECCIONAL || p.CODIGO_SEC) ? <Badge variant="outline" className="text-[9px] font-black border-primary/10">SECC {p.SECCIONAL || p.CODIGO_SEC}</Badge> : <span className="text-[9px] text-muted-foreground italic font-black">---</span>}</TableCell>
-                          <TableCell className="text-[10px] uppercase">
-                              <div>{p.DESC_LOCAL || p.LOCAL}</div>
-                              <div className="text-primary font-bold">M: {p.MESA || '-'} / O: {p.ORDEN || '-'}</div>
-                          </TableCell>
-                          <TableCell>
-                              {p.TELEFONO ? (
-                                  <div className="text-[11px] font-black text-green-700 flex items-center gap-1.5 bg-green-50/40 border border-green-100/50 rounded-xl px-2.5 py-1.5 w-max">
-                                      <span className="w-1.5 h-1.5 rounded-full bg-green-500 shrink-0" />
-                                      {p.TELEFONO}
-                                  </div>
-                              ) : (
-                                  <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Registro</div>
-                              )}
-                          </TableCell>
-                          {hasAnyMigrated && (
-                              <TableCell>
-                                  {p.TELEFONO_MIGRADO ? (
-                                      <div className="text-[11px] font-black text-blue-700 flex items-center gap-1.5 bg-blue-50/40 border border-blue-100/50 rounded-xl px-2.5 py-1.5 w-max">
-                                          <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                                          {p.TELEFONO_MIGRADO}
-                                      </div>
-                                  ) : (
-                                      <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider italic">Sin Migrar</div>
-                                  )}
-                              </TableCell>
-                          )}
-                          <TableCell className="text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                  <CredentialDownloadButton voto={p} />
-                                  {isAdmin && viewMode !== 'internas' && (
-                                      <Button 
-                                          variant="ghost" 
-                                          size="sm" 
-                                          className="h-8 w-8 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50" 
-                                          onClick={() => { setVotoToMove(p); setIsMoveDialogOpen(true); }}
-                                      >
-                                          <ArrowRightLeft className="h-4 w-4" />
-                                      </Button>
-                                  )}
-                                  {viewMode !== 'internas' && (
-                                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-500 hover:bg-red-50" onClick={() => { if(canDelete){ setVotoToDelete(p); setIsAlertOpen(true); } else toast({title: "Función Bloqueada", description: "Solicita a la apoderación del equipo o al departamento de informática la habilitación de esta función.", variant: "destructive"}); }} disabled={!canDelete}>
-                                          <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                  )}
-                              </div>
-                          </TableCell>
-                      </TableRow>
-                  ))}
-              </TableBody>
-          </Table>
+      <div className="overflow-x-auto bg-white rounded-xl shadow-sm border">
+          {renderRows(items)}
       </div>
     );
   };

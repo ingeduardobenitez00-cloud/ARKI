@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server';
 import * as admin from 'firebase-admin';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
     try {
         if (!admin.apps.length) {
-            admin.initializeApp();
+            admin.initializeApp({ projectId: 'arki-23779628-5035d' });
         }
         const db = admin.firestore();
         console.log('Obteniendo transmisiones para reprocesar...');
